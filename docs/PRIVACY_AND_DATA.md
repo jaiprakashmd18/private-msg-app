@@ -1,0 +1,49 @@
+# Privacy, data handling and deletion
+
+The in-app privacy notice lives at `/privacy` (`src/app/privacy/page.tsx`). This document is the operator's reference.
+
+## Data stored
+
+| Data | Where | Who can read it in the app |
+| --- | --- | --- |
+| Phone number, display name, bio, last seen | `profiles`, `authorized_phone_numbers`, `auth.users` | Active members (directory); admin |
+| Messages (text, timestamps, edit/delete markers) | `messages` | Members of that conversation only; admin **only if** the audited policy is on |
+| Files | Storage bucket `attachments` + `attachments` table | Members of that conversation only |
+| Delivery/read watermarks | `conversation_members` | Members of that conversation |
+| Security events (masked phone numbers, actor ids, admin actions) | `audit_logs` | Admin |
+| Rate-limit counters (HMAC hashes, no raw numbers/IPs) | `private.rate_limits` | Nobody via API; purged after 1 day |
+
+Not stored by the app: OTP codes (handled by Supabase Auth/SMS provider), message content in logs, IP addresses (only hashed in rate-limit keys). Supabase and Vercel keep their own operational logs (including IPs) per their policies.
+
+## Administrator access policy
+
+- **Default: administrators cannot read message content** through the app. They see counts, members and timestamps.
+- An administrator can enable *Admin → Privacy & retention → Allow administrators to read messages*. When on:
+  - every member sees a banner in each conversation and in Settings;
+  - content is only available through an RPC that writes an `admin.messages_viewed` audit entry per view;
+  - the change itself is audited (`admin.settings_updated` with before/after values).
+- Anyone with owner access to the Supabase project (dashboard/SQL) can technically read all data. Limit who has that access and enable 2FA on the Supabase and Vercel accounts.
+
+## Retention
+
+- Messages: kept until deleted, unless *Delete messages older than N days* is set; then a daily job (and *Run retention now*) hard-deletes older messages and their files.
+- Audit log: 365 days by default (30–3650 configurable).
+- Orphaned uploads (files never attached, or whose message was deleted): removed after 24 hours by the same job.
+
+## Data-deletion procedure
+
+**A member deleting a message:** message menu → *Delete for everyone*. The text is erased immediately and its files are removed; a "This message was deleted" placeholder remains.
+
+**Deleting a member's account and data (right to erasure)** — performed by the administrator:
+1. Verify the request comes from the number's owner (e.g. ask them to message you from the app).
+2. *Admin → Members & access* → find the number → **Delete account** → confirm. This, atomically and audited:
+   - signs them out everywhere;
+   - permanently deletes every message they sent and every file they uploaded;
+   - deletes their profile, memberships and their Supabase Auth user (sign-in record).
+3. If they should never sign in again, also click **Remove** (allowlist entry).
+4. Conversations they took part in remain for the other member, showing the deleted user's messages as gone and their name as "Deleted user".
+5. Note in your records: data persists in **backups** until those expire (Pro: 7 days; your own dumps: until you delete them). Delete or rotate manual dumps accordingly.
+
+**Deleting a whole conversation:** *Admin → Conversations → Delete* removes all its messages and files for both members.
+
+**Deleting everything (shutting the service down):** delete the Supabase project (Project Settings → General → Delete project) and the Vercel project, and destroy any dumps.

@@ -1,0 +1,640 @@
+/**
+ * Database security test-suite. Every test talks to PostgreSQL exactly the way
+ * the Supabase Data API does (role `authenticated` + JWT claims), so these
+ * tests exercise the real RLS policies, grants and RPCs from the migrations.
+ *
+ * Run with: npm run test:db
+ */
+import { randomUUID } from "node:crypto";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  asOwner,
+  asUser,
+  createUser,
+  directConversation,
+  freshPhone,
+  pool,
+  send,
+  setSettings,
+} from "./helpers";
+
+afterAll(async () => {
+  await pool.end();
+});
+
+beforeAll(async () => {
+  await setSettings({
+    admin_can_read_messages: false,
+    attachments_enabled: true,
+    edit_window_minutes: 15,
+    message_retention_days: null,
+  });
+});
+
+describe("allowlist enforcement at sign-up", () => {
+  it("rejects creation of an auth user whose number is not approved", async () => {
+    const phone = freshPhone();
+    await expect(
+      asOwner("insert into auth.users (id, phone) values ($1, $2)", [randomUUID(), phone.slice(1)]),
+    ).rejects.toThrow(/not authorized/i);
+  });
+
+  it("rejects users without a phone number (e.g. email or anonymous sign-up)", async () => {
+    await expect(
+      asOwner("insert into auth.users (id, email) values ($1, 'x@example.com')", [randomUUID()]),
+    ).rejects.toThrow(/Only phone sign-up/i);
+  });
+
+  it("rejects a disabled number", async () => {
+    const phone = freshPhone();
+    await asOwner(
+      "insert into public.authorized_phone_numbers (phone_e164, status) values ($1, 'disabled')",
+      [phone],
+    );
+    await expect(
+      asOwner("insert into auth.users (id, phone) values ($1, $2)", [randomUUID(), phone.slice(1)]),
+    ).rejects.toThrow(/not authorized/i);
+  });
+
+  it("auth hook rejects unapproved numbers and accepts approved ones", async () => {
+    const denied = await asOwner<{ r: { error?: { http_code: number } } }>(
+      "select public.before_user_created_hook($1::jsonb) as r",
+      [JSON.stringify({ user: { phone: freshPhone().slice(1) } })],
+    );
+    expect(denied[0].r.error?.http_code).toBe(403);
+
+    const phone = freshPhone();
+    await asOwner("insert into public.authorized_phone_numbers (phone_e164) values ($1)", [phone]);
+    const allowed = await asOwner<{ r: object }>(
+      "select public.before_user_created_hook($1::jsonb) as r",
+      [JSON.stringify({ user: { phone: phone.slice(1) } })],
+    );
+    expect(allowed[0].r).toEqual({});
+  });
+
+  it("creates a linked profile for an approved number", async () => {
+    const u = await createUser({ label: "Tester" });
+    const [access] = await asUser<{ is_active: boolean; role: string; display_name: string }>(
+      u.id,
+      "select * from public.my_access()",
+    );
+    expect(access.is_active).toBe(true);
+    expect(access.role).toBe("member");
+    expect(access.display_name).toBe("Tester");
+  });
+
+  it("does not let a user change the phone number on their account", async () => {
+    const u = await createUser();
+    await expect(
+      asOwner("update auth.users set phone = $2 where id = $1", [u.id, freshPhone().slice(1)]),
+    ).rejects.toThrow(/not permitted/i);
+  });
+});
+
+describe("privilege escalation", () => {
+  it("members cannot read or modify the allowlist", async () => {
+    const u = await createUser();
+    expect(await asUser(u.id, "select * from public.authorized_phone_numbers")).toHaveLength(0);
+    await expect(
+      asUser(u.id, "insert into public.authorized_phone_numbers (phone_e164) values ($1)", [freshPhone()]),
+    ).rejects.toThrow(/permission denied/i);
+    await expect(
+      asUser(u.id, "update public.authorized_phone_numbers set role = 'admin' where id = $1", [u.entryId]),
+    ).rejects.toThrow(/permission denied/i);
+  });
+
+  it("members cannot grant themselves admin through their profile or an RPC", async () => {
+    const u = await createUser();
+    // Only display_name/bio are updatable; re-linking to another entry is denied.
+    await expect(
+      asUser(u.id, "update public.profiles set authorized_phone_id = null where id = $1", [u.id]),
+    ).rejects.toThrow(/permission denied/i);
+    await expect(asUser(u.id, "select public.admin_add_number($1)", [freshPhone()])).rejects.toThrow(
+      /Administrator privileges required/i,
+    );
+    await expect(asUser(u.id, "select public.admin_stats()")).rejects.toThrow(
+      /Administrator privileges required/i,
+    );
+  });
+
+  it("members can update only their own display name and bio", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    await asUser(a.id, "update public.profiles set display_name = 'Me' where id = $1", [a.id]);
+    await asUser(a.id, "update public.profiles set display_name = 'Hacked' where id = $1", [b.id]);
+    const rows = await asOwner<{ id: string; display_name: string }>(
+      "select id, display_name from public.profiles where id = any($1)",
+      [[a.id, b.id]],
+    );
+    expect(rows.find((r) => r.id === a.id)?.display_name).toBe("Me");
+    expect(rows.find((r) => r.id === b.id)?.display_name).not.toBe("Hacked");
+  });
+
+  it("server-only functions are not callable by signed-in users", async () => {
+    const u = await createUser();
+    await expect(
+      asUser(u.id, "select public.server_phone_is_authorized($1)", [u.phone]),
+    ).rejects.toThrow(/permission denied/i);
+    await expect(
+      asUser(u.id, "select public.server_consume_rate_limit('k', 60, 5)"),
+    ).rejects.toThrow(/permission denied/i);
+    await expect(asUser(u.id, "select public.server_run_retention_purge()")).rejects.toThrow(
+      /permission denied/i,
+    );
+  });
+
+  it("the anon role can read nothing", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    await send(a.id, conv, "secret");
+    for (const table of ["profiles", "messages", "conversations", "authorized_phone_numbers", "audit_logs"]) {
+      await expect(asUser(null, `select * from public.${table}`, [], "anon")).rejects.toThrow(
+        /permission denied/i,
+      );
+    }
+    await expect(asUser(null, "select * from public.list_conversations()", [], "anon")).rejects.toThrow(
+      /permission denied/i,
+    );
+  });
+});
+
+describe("conversation and message isolation", () => {
+  it("outsiders cannot read another pair's messages", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const c = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    await send(a.id, conv, "hello b");
+
+    expect(await asUser(b.id, "select * from public.messages where conversation_id = $1", [conv])).toHaveLength(1);
+    expect(await asUser(c.id, "select * from public.messages where conversation_id = $1", [conv])).toHaveLength(0);
+    expect(await asUser(c.id, "select * from public.conversations where id = $1", [conv])).toHaveLength(0);
+    expect(
+      await asUser(c.id, "select * from public.conversation_members where conversation_id = $1", [conv]),
+    ).toHaveLength(0);
+    expect(await asUser(c.id, "select * from public.search_messages('hello')")).toHaveLength(0);
+  });
+
+  it("outsiders cannot send to a conversation they are not in", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const c = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    await expect(send(c.id, conv, "intrusion")).rejects.toThrow(/not a member/i);
+  });
+
+  it("users cannot add themselves to a conversation or insert messages directly", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const c = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    await expect(
+      asUser(c.id, "insert into public.conversation_members (conversation_id, user_id) values ($1, $2)", [
+        conv,
+        c.id,
+      ]),
+    ).rejects.toThrow(/permission denied/i);
+    await expect(
+      asUser(
+        c.id,
+        "insert into public.messages (conversation_id, sender_id, client_id, body) values ($1, $2, $3, 'x')",
+        [conv, c.id, randomUUID()],
+      ),
+    ).rejects.toThrow(/permission denied/i);
+    await expect(
+      asUser(a.id, "update public.messages set body = 'forged' where conversation_id = $1", [conv]),
+    ).rejects.toThrow(/permission denied/i);
+  });
+
+  it("cannot start a conversation with a disabled user", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    await asOwner("update public.authorized_phone_numbers set status = 'disabled' where id = $1", [b.entryId]);
+    await expect(directConversation(a.id, b.id)).rejects.toThrow(/does not have access/i);
+  });
+
+  it("creates exactly one conversation per pair", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const first = await directConversation(a.id, b.id);
+    const second = await directConversation(b.id, a.id);
+    expect(second).toBe(first);
+  });
+});
+
+describe("messages", () => {
+  it("deduplicates retried sends with the same client_id", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    const clientId = randomUUID();
+    const m1 = await send(a.id, conv, "once", clientId);
+    const m2 = await send(a.id, conv, "once", clientId);
+    expect(m2.id).toBe(m1.id);
+    const rows = await asOwner("select 1 from public.messages where conversation_id = $1", [conv]);
+    expect(rows).toHaveLength(1);
+  });
+
+  it("validates message input", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    await expect(send(a.id, conv, "   \n ")).rejects.toThrow(/empty/i);
+    await expect(send(a.id, conv, "x".repeat(4001))).rejects.toThrow(/too long/i);
+    const ok = await send(a.id, conv, "  line 1\nline 2  ");
+    expect(ok.body).toBe("line 1\nline 2");
+  });
+
+  it("rate-limits message floods", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    for (let i = 0; i < 15; i += 1) await send(a.id, conv, `m${i}`);
+    await expect(send(a.id, conv, "one too many")).rejects.toThrow(/too quickly/i);
+  });
+
+  it("only the sender can edit, and only within the edit window", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    const m = await send(a.id, conv, "original");
+    await expect(asUser(b.id, "select public.edit_message($1, 'hijack')", [m.id])).rejects.toThrow(
+      /not found/i,
+    );
+    const [edited] = await asUser<{ body: string; edited_at: string }>(
+      a.id,
+      "select * from public.edit_message($1, 'fixed')",
+      [m.id],
+    );
+    expect(edited.body).toBe("fixed");
+    expect(edited.edited_at).not.toBeNull();
+
+    await asOwner("update public.messages set created_at = now() - interval '1 hour' where id = $1", [m.id]);
+    await expect(asUser(a.id, "select public.edit_message($1, 'late')", [m.id])).rejects.toThrow(
+      /no longer be edited/i,
+    );
+  });
+
+  it("only the sender can delete; deletion wipes the body for everyone", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    const m = await send(a.id, conv, "regret");
+    await expect(asUser(b.id, "select public.delete_message($1)", [m.id])).rejects.toThrow(/not found/i);
+    await asUser(a.id, "select public.delete_message($1)", [m.id]);
+    const [row] = await asUser<{ body: string; deleted_at: string | null }>(
+      b.id,
+      "select body, deleted_at from public.messages where id = $1",
+      [m.id],
+    );
+    expect(row.body).toBe("");
+    expect(row.deleted_at).not.toBeNull();
+  });
+
+  it("tracks unread counts and read receipts", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    await send(a.id, conv, "one");
+    await send(a.id, conv, "two");
+
+    const [beforeRead] = await asUser<{ unread_count: number; last_message_body: string }>(
+      b.id,
+      "select * from public.list_conversations() where id = $1",
+      [conv],
+    );
+    expect(beforeRead.unread_count).toBe(2);
+    expect(beforeRead.last_message_body).toBe("two");
+
+    await asUser(b.id, "select public.mark_conversation_read($1)", [conv]);
+    const [afterRead] = await asUser<{ unread_count: number }>(
+      b.id,
+      "select * from public.list_conversations() where id = $1",
+      [conv],
+    );
+    expect(afterRead.unread_count).toBe(0);
+
+    const [senderView] = await asUser<{ other_last_read_at: string | null }>(
+      a.id,
+      "select * from public.list_conversations() where id = $1",
+      [conv],
+    );
+    expect(senderView.other_last_read_at).not.toBeNull();
+  });
+
+  it("a quick reply right after sending is still marked read", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    await send(a.id, conv, "ping"); // sets a's own read watermark
+    await send(b.id, conv, "pong"); // immediate reply
+    await asUser(a.id, "select public.mark_conversation_read($1)", [conv]);
+    const [row] = await asUser<{ unread_count: number }>(
+      a.id,
+      "select * from public.list_conversations() where id = $1",
+      [conv],
+    );
+    expect(row.unread_count).toBe(0);
+  });
+
+  it("history persists across sign-out / new sessions", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    await send(a.id, conv, "keep me");
+    await asOwner("delete from auth.sessions where user_id = $1", [b.id]); // sign out everywhere
+    await asOwner("insert into auth.sessions (id, user_id) values (gen_random_uuid(), $1)", [b.id]); // sign in again
+    const rows = await asUser<{ body: string }>(
+      b.id,
+      "select body from public.messages where conversation_id = $1",
+      [conv],
+    );
+    expect(rows.map((r) => r.body)).toEqual(["keep me"]);
+  });
+
+  it("search only covers the caller's conversations", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const c = await createUser();
+    const ab = await directConversation(a.id, b.id);
+    const ac = await directConversation(a.id, c.id);
+    await send(a.id, ab, "pineapple pizza plan");
+    await send(a.id, ac, "pineapple smoothie");
+    const forB = await asUser<{ conversation_id: string }>(b.id, "select * from public.search_messages('pinea')");
+    expect(forB.map((r) => r.conversation_id)).toEqual([ab]);
+    const forA = await asUser(a.id, "select * from public.search_messages('pineapple')");
+    expect(forA).toHaveLength(2);
+  });
+});
+
+describe("revocation", () => {
+  it("disabling a number cuts off an existing session immediately and ends sessions", async () => {
+    const admin = await createUser({ role: "admin" });
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    await send(a.id, conv, "before revoke");
+
+    await asUser(admin.id, "select public.admin_set_number_status($1, 'disabled')", [b.entryId]);
+
+    // Same JWT as before — RLS re-checks the allowlist on every query.
+    expect(await asUser(b.id, "select * from public.messages where conversation_id = $1", [conv])).toHaveLength(0);
+    expect(await asUser(b.id, "select * from public.profiles")).toHaveLength(1); // own row only
+    await expect(send(b.id, conv, "still here?")).rejects.toThrow(/revoked/i);
+    await expect(asUser(b.id, "select * from public.list_conversations()")).rejects.toThrow(/revoked/i);
+    const sessions = await asOwner("select 1 from auth.sessions where user_id = $1", [b.id]);
+    expect(sessions).toHaveLength(0);
+    const [access] = await asUser<{ is_active: boolean }>(b.id, "select * from public.my_access()");
+    expect(access.is_active).toBe(false);
+
+    // A cannot keep sending to a revoked participant.
+    await expect(send(a.id, conv, "hello?")).rejects.toThrow(/no longer has access/i);
+
+    // Re-enabling restores access to the full history.
+    await asUser(admin.id, "select public.admin_set_number_status($1, 'active')", [b.entryId]);
+    expect(await asUser(b.id, "select * from public.messages where conversation_id = $1", [conv])).toHaveLength(1);
+  });
+
+  it("removing a number revokes access; re-adding re-links the account", async () => {
+    const admin = await createUser({ role: "admin" });
+    const b = await createUser();
+    await asUser(admin.id, "select public.admin_remove_number($1)", [b.entryId]);
+    const [access] = await asUser<{ is_active: boolean }>(b.id, "select * from public.my_access()");
+    expect(access.is_active).toBe(false);
+
+    await asUser(admin.id, "select public.admin_add_number($1, 'back')", [b.phone]);
+    const [again] = await asUser<{ is_active: boolean }>(b.id, "select * from public.my_access()");
+    expect(again.is_active).toBe(true);
+  });
+});
+
+describe("admin operations", () => {
+  it("admins can add numbers; duplicates and bad formats are rejected; actions are audited", async () => {
+    const admin = await createUser({ role: "admin" });
+    const phone = freshPhone();
+    const [row] = await asUser<{ role: string; status: string }>(
+      admin.id,
+      "select * from public.admin_add_number($1, 'New person')",
+      [phone],
+    );
+    expect(row.role).toBe("member");
+    expect(row.status).toBe("active");
+    await expect(asUser(admin.id, "select public.admin_add_number($1)", [phone])).rejects.toThrow(
+      /already on the allowlist/i,
+    );
+    await expect(asUser(admin.id, "select public.admin_add_number('0123')")).rejects.toThrow(
+      /international format/i,
+    );
+    const logs = await asUser<{ action: string }>(
+      admin.id,
+      "select action from public.audit_logs where actor_id = $1",
+      [admin.id],
+    );
+    expect(logs.map((l) => l.action)).toContain("admin.number_added");
+  });
+
+  it("admins cannot change administrator entries from the dashboard", async () => {
+    const admin = await createUser({ role: "admin" });
+    const other = await createUser({ role: "admin" });
+    await expect(
+      asUser(admin.id, "select public.admin_set_number_status($1, 'disabled')", [other.entryId]),
+    ).rejects.toThrow(/database owner/i);
+    await expect(asUser(admin.id, "select public.admin_remove_number($1)", [admin.entryId])).rejects.toThrow(
+      /database owner/i,
+    );
+  });
+
+  it("a disabled admin loses admin rights", async () => {
+    const admin = await createUser({ role: "admin" });
+    await asOwner("update public.authorized_phone_numbers set status = 'disabled' where id = $1", [admin.entryId]);
+    await expect(asUser(admin.id, "select public.admin_stats()")).rejects.toThrow(/revoked/i);
+  });
+
+  it("audit logs cannot be written or altered directly, even by admins", async () => {
+    const admin = await createUser({ role: "admin" });
+    await expect(
+      asUser(admin.id, "insert into public.audit_logs (action) values ('fake')"),
+    ).rejects.toThrow(/permission denied/i);
+    await expect(asUser(admin.id, "delete from public.audit_logs")).rejects.toThrow(/permission denied/i);
+    await expect(asUser(admin.id, "update public.audit_logs set action = 'x'")).rejects.toThrow(
+      /permission denied/i,
+    );
+    const member = await createUser();
+    expect(await asUser(member.id, "select * from public.audit_logs")).toHaveLength(0);
+  });
+
+  it("admins cannot read message content unless the policy is enabled, and reads are audited", async () => {
+    const admin = await createUser({ role: "admin" });
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    await send(a.id, conv, "private words");
+
+    // Not via RLS…
+    expect(await asUser(admin.id, "select * from public.messages where conversation_id = $1", [conv])).toHaveLength(0);
+    // …and not via the RPC while the policy is off.
+    await expect(
+      asUser(admin.id, "select * from public.admin_read_conversation_messages($1)", [conv]),
+    ).rejects.toThrow(/disabled by policy/i);
+
+    await setSettings({ admin_can_read_messages: true });
+    try {
+      const rows = await asUser<{ body: string }>(
+        admin.id,
+        "select * from public.admin_read_conversation_messages($1)",
+        [conv],
+      );
+      expect(rows.map((r) => r.body)).toEqual(["private words"]);
+      const logs = await asOwner(
+        "select 1 from public.audit_logs where actor_id = $1 and action = 'admin.messages_viewed' and target_id = $2",
+        [admin.id, conv],
+      );
+      expect(logs).toHaveLength(1);
+    } finally {
+      await setSettings({ admin_can_read_messages: false });
+    }
+  });
+
+  it("stats and conversation listing expose metadata only", async () => {
+    const admin = await createUser({ role: "admin" });
+    const [stats] = await asUser<{ s: Record<string, number> }>(admin.id, "select public.admin_stats() as s");
+    expect(stats.s.numbers_total).toBeGreaterThan(0);
+    const convs = await asUser<Record<string, unknown>>(admin.id, "select * from public.admin_list_conversations()");
+    for (const c of convs) expect(Object.keys(c)).not.toContain("body");
+  });
+
+  it("retention purge deletes only messages older than the configured period", async () => {
+    const admin = await createUser({ role: "admin" });
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    const old = await send(a.id, conv, "old");
+    await send(a.id, conv, "new");
+    await asOwner("update public.messages set created_at = now() - interval '40 days' where id = $1", [old.id]);
+
+    // No retention configured: nothing is purged.
+    await asUser(admin.id, "select public.admin_run_retention_purge()");
+    expect(await asOwner("select 1 from public.messages where conversation_id = $1", [conv])).toHaveLength(2);
+
+    await setSettings({ message_retention_days: 30 });
+    try {
+      await asUser(admin.id, "select public.admin_run_retention_purge()");
+      const left = await asOwner<{ body: string }>(
+        "select body from public.messages where conversation_id = $1",
+        [conv],
+      );
+      expect(left.map((r) => r.body)).toEqual(["new"]);
+    } finally {
+      await setSettings({ message_retention_days: null });
+    }
+  });
+
+  it("user deletion removes the user's messages and is blocked for admins/self", async () => {
+    const admin = await createUser({ role: "admin" });
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    await send(b.id, conv, "from b");
+    await send(a.id, conv, "from a");
+    await asUser(admin.id, "select * from public.admin_prepare_user_deletion($1)", [b.id]);
+    const left = await asOwner<{ body: string }>("select body from public.messages where conversation_id = $1", [conv]);
+    expect(left.map((r) => r.body)).toEqual(["from a"]);
+    await expect(
+      asUser(admin.id, "select * from public.admin_prepare_user_deletion($1)", [admin.id]),
+    ).rejects.toThrow(/own account/i);
+  });
+});
+
+describe("attachments", () => {
+  async function upload(userId: string, path: string, size = 1234, mimetype = "image/png") {
+    await asUser(
+      userId,
+      "insert into storage.objects (bucket_id, name, owner_id, metadata) values ('attachments', $1, $2, $3)",
+      [path, userId, JSON.stringify({ size, mimetype })],
+    );
+  }
+
+  it("members can upload only into their own folder of their own conversations", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const c = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    await upload(a.id, `${conv}/${a.id}/${randomUUID()}-ok.png`);
+    await expect(upload(a.id, `${conv}/${b.id}/${randomUUID()}-spoof.png`)).rejects.toThrow(
+      /row-level security/i,
+    );
+    await expect(upload(c.id, `${conv}/${c.id}/${randomUUID()}-intrude.png`)).rejects.toThrow(
+      /row-level security/i,
+    );
+  });
+
+  it("attached files are readable by members only", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const c = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    const path = `${conv}/${a.id}/${randomUUID()}-photo.png`;
+    await upload(a.id, path);
+
+    // Before it is attached, only the uploader can see it.
+    expect(await asUser(b.id, "select 1 from storage.objects where name = $1", [path])).toHaveLength(0);
+
+    await asUser(a.id, "select public.send_message($1, $2, '', $3::jsonb)", [
+      conv,
+      randomUUID(),
+      JSON.stringify([{ path, name: "photo.png" }]),
+    ]);
+    expect(await asUser(b.id, "select 1 from storage.objects where name = $1", [path])).toHaveLength(1);
+    expect(await asUser(c.id, "select 1 from storage.objects where name = $1", [path])).toHaveLength(0);
+    const [att] = await asUser<{ size_bytes: string; mime_type: string }>(
+      b.id,
+      "select size_bytes, mime_type from public.attachments where storage_path = $1",
+      [path],
+    );
+    expect(Number(att.size_bytes)).toBe(1234);
+    expect(att.mime_type).toBe("image/png");
+  });
+
+  it("cannot attach someone else's upload or an oversized file", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    const bPath = `${conv}/${b.id}/${randomUUID()}-b.png`;
+    await upload(b.id, bPath);
+    await expect(
+      asUser(a.id, "select public.send_message($1, $2, '', $3::jsonb)", [
+        conv,
+        randomUUID(),
+        JSON.stringify([{ path: bPath, name: "b.png" }]),
+      ]),
+    ).rejects.toThrow(/Invalid attachment path/i);
+
+    const big = `${conv}/${a.id}/${randomUUID()}-big.bin`;
+    await asOwner(
+      "insert into storage.objects (bucket_id, name, owner_id, metadata) values ('attachments', $1, $2, $3)",
+      [big, a.id, JSON.stringify({ size: 20 * 1024 * 1024, mimetype: "application/zip" })],
+    );
+    await expect(
+      asUser(a.id, "select public.send_message($1, $2, '', $3::jsonb)", [
+        conv,
+        randomUUID(),
+        JSON.stringify([{ path: big, name: "big.bin" }]),
+      ]),
+    ).rejects.toThrow(/10 MB/i);
+  });
+
+  it("uploads are blocked when the administrator disables attachments", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    await setSettings({ attachments_enabled: false });
+    try {
+      await expect(upload(a.id, `${conv}/${a.id}/${randomUUID()}-x.png`)).rejects.toThrow(
+        /row-level security/i,
+      );
+    } finally {
+      await setSettings({ attachments_enabled: true });
+    }
+  });
+});
