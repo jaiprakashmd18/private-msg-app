@@ -1,189 +1,69 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { otpRequestSchema } from "@/lib/validation";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
-type Step = "phone" | "code";
+const ERRORS: Record<string, string> = {
+  not_authorized:
+    "This Google account isn't approved to use this app. Ask the administrator to add your email address.",
+  no_access: "Access for this Google account is currently disabled. Contact the administrator.",
+  failed: "Sign-in didn't complete. Please try again.",
+};
 
-interface ApiResult {
-  ok: boolean;
-  message?: string;
-  redirectTo?: string;
-  error?: { message: string; code: string };
+function GoogleIcon() {
+  return (
+    <svg viewBox="0 0 48 48" aria-hidden className="size-5">
+      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.4-.4-3.5z" />
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
+    </svg>
+  );
 }
 
-async function post(url: string, body: unknown): Promise<ApiResult> {
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    return (await res.json()) as ApiResult;
-  } catch {
-    return { ok: false, error: { message: "Network error — check your connection.", code: "network" } };
-  }
-}
-
-const RESEND_SECONDS = 60;
-
-export function LoginForm() {
-  const [step, setStep] = useState<Step>("phone");
-  const [phoneInput, setPhoneInput] = useState("");
-  const [phone, setPhone] = useState("");
-  const [code, setCode] = useState("");
+export function LoginForm({ errorKey }: { errorKey?: string }) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [cooldown, setCooldown] = useState(0);
-  const codeRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(errorKey ? (ERRORS[errorKey] ?? ERRORS.failed!) : null);
 
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [cooldown]);
-
-  useEffect(() => {
-    if (step === "code") codeRef.current?.focus();
-  }, [step]);
-
-  async function requestCode(target: string) {
+  async function signIn() {
     setBusy(true);
     setError(null);
-    const result = await post("/api/auth/otp", { phone: target });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error?.message ?? "Could not send a code.");
-      return false;
-    }
-    setNotice(result.message ?? null);
-    setCooldown(RESEND_SECONDS);
-    return true;
-  }
-
-  async function onSubmitPhone(e: React.FormEvent) {
-    e.preventDefault();
-    const parsed = otpRequestSchema.safeParse({ phone: phoneInput });
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid phone number");
-      return;
-    }
-    if (await requestCode(parsed.data.phone)) {
-      setPhone(parsed.data.phone);
-      setCode("");
-      setStep("code");
-    }
-  }
-
-  async function onSubmitCode(e: React.FormEvent) {
-    e.preventDefault();
-    if (!/^\d{6}$/.test(code)) {
-      setError("Enter the 6-digit code.");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    const result = await post("/api/auth/verify", { phone, token: code });
-    if (!result.ok) {
+    const { error: oauthError } = await getSupabaseBrowserClient().auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: "select_account" },
+      },
+    });
+    // On success the browser is already on its way to Google.
+    if (oauthError) {
       setBusy(false);
-      setError(result.error?.message ?? "Verification failed.");
-      setCode("");
-      codeRef.current?.focus();
-      return;
+      setError(ERRORS.failed!);
     }
-    // Full navigation so the new session cookies are used everywhere.
-    window.location.assign(result.redirectTo ?? "/chat");
   }
 
   return (
-    <div className="rounded-2xl border bg-card/80 p-6 shadow-xl backdrop-blur">
-      {step === "phone" ? (
-        <form onSubmit={onSubmitPhone} noValidate className="grid gap-4">
-          <div className="grid gap-2">
-            <Label htmlFor="phone">Phone number</Label>
-            <Input
-              id="phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="+1 415 555 0123"
-              value={phoneInput}
-              onChange={(e) => setPhoneInput(e.target.value)}
-              aria-invalid={Boolean(error)}
-              aria-describedby="phone-help phone-error"
-              required
-              autoFocus
-            />
-            <p id="phone-help" className="text-xs text-muted-foreground">
-              Include your country code. We&apos;ll text you a one-time code.
-            </p>
-          </div>
-          {error && (
-            <p id="phone-error" role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
-          <Button type="submit" size="lg" disabled={busy || !phoneInput.trim()}>
-            {busy ? <Spinner label="Sending code" /> : "Send code"}
-          </Button>
-        </form>
+    <div className="grid gap-4 rounded-2xl border bg-card/80 p-6 shadow-xl backdrop-blur">
+      <Button
+        size="lg"
+        variant="outline"
+        className="h-12 bg-background/60 text-base"
+        onClick={() => void signIn()}
+        disabled={busy}
+      >
+        {busy ? <Spinner label="Redirecting to Google" /> : <GoogleIcon />}
+        Continue with Google
+      </Button>
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
       ) : (
-        <form onSubmit={onSubmitCode} noValidate className="grid gap-4">
-          <button
-            type="button"
-            onClick={() => {
-              setStep("phone");
-              setError(null);
-            }}
-            className="-ml-1 inline-flex w-fit items-center gap-1 rounded-md px-1 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" aria-hidden /> Change number
-          </button>
-          <div className="grid gap-2">
-            <Label htmlFor="code">Verification code</Label>
-            <Input
-              ref={codeRef}
-              id="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="\d{6}"
-              maxLength={6}
-              placeholder="••••••"
-              className="text-center font-mono text-2xl tracking-[0.5em]"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              aria-invalid={Boolean(error)}
-              aria-describedby="code-help code-error"
-              required
-            />
-            <p id="code-help" className="text-xs text-muted-foreground" aria-live="polite">
-              {notice ?? "Enter the code we sent."} Sent to <span className="font-medium text-foreground">{phone}</span>.
-              If nothing arrives, check the number or ask the administrator to approve it.
-            </p>
-          </div>
-          {error && (
-            <p id="code-error" role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
-          <Button type="submit" size="lg" disabled={busy || code.length !== 6}>
-            {busy ? <Spinner label="Verifying" /> : "Verify and continue"}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={busy || cooldown > 0}
-            onClick={() => void requestCode(phone)}
-          >
-            {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
-          </Button>
-        </form>
+        <p className="text-center text-xs text-muted-foreground">
+          Only Google accounts approved by the administrator can sign in.
+        </p>
       )}
     </div>
   );

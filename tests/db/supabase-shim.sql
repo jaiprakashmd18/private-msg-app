@@ -21,6 +21,10 @@ create table if not exists auth.users (
   phone text unique,
   email text,
   phone_confirmed_at timestamptz,
+  email_confirmed_at timestamptz,
+  raw_app_meta_data jsonb,
+  raw_user_meta_data jsonb,
+  is_anonymous boolean not null default false,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

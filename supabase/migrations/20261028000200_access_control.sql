@@ -2,14 +2,15 @@
 -- 0200 — Access control: allowlist enforcement at sign-up, access helper
 -- functions, table privileges and Row Level Security.
 --
--- Defence in depth for "only approved numbers":
+-- Sign-in is "Sign in with Google" only. Defence in depth for "only approved
+-- Google accounts":
 --   1. public.before_user_created_hook  — Supabase Auth hook. Rejects sign-up
---      of unapproved numbers before any user row exists or SMS is sent.
+--      of non-Google or unapproved accounts before any user row exists.
 --   2. private.enforce_allowlist_on_signup — BEFORE INSERT trigger on
 --      auth.users. Same check inside the insert transaction, so even if the
---      hook is not configured, no account can exist for an unapproved number.
+--      hook is not configured, no account can exist for an unapproved email.
 --   3. RLS on every table calls private.is_active_user(), which re-checks the
---      allowlist on EVERY query. Disabling or removing a number therefore cuts
+--      allowlist on EVERY query. Disabling or removing an email therefore cuts
 --      off existing sessions immediately, regardless of JWT lifetime.
 -- =============================================================================
 
@@ -17,31 +18,38 @@
 -- Helpers
 -- -----------------------------------------------------------------------------
 
--- Supabase Auth stores phone numbers as digits without '+'. Normalize to E.164.
-create or replace function private.normalize_phone(p_phone text)
+create or replace function private.normalize_email(p_email text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select nullif(lower(btrim(coalesce(p_email, ''))), '');
+$$;
+
+-- Masked email for audit logs: first 2 characters of the name + domain.
+create or replace function private.mask_email(p_email text)
 returns text
 language sql
 immutable
 set search_path = ''
 as $$
   select case
-    when p_phone is null or regexp_replace(p_phone, '[^0-9]', '', 'g') = '' then null
-    else '+' || regexp_replace(p_phone, '[^0-9]', '', 'g')
+    when p_email is null then null
+    when position('@' in p_email) = 0 then '***'
+    else left(split_part(p_email, '@', 1), 2) || '***@' || split_part(p_email, '@', 2)
   end;
 $$;
 
--- Masked phone for audit logs: keeps country prefix hint and last 2 digits.
-create or replace function private.mask_phone(p_phone text)
-returns text
+-- Only Google accounts may sign up. Email/password, magic link, phone and
+-- anonymous sign-ups are refused even if someone enables them by mistake.
+create or replace function private.is_allowed_provider(p_provider text, p_is_anonymous boolean)
+returns boolean
 language sql
 immutable
 set search_path = ''
 as $$
-  select case
-    when p_phone is null then null
-    when char_length(p_phone) <= 5 then '***'
-    else left(p_phone, 3) || repeat('*', char_length(p_phone) - 5) || right(p_phone, 2)
-  end;
+  select coalesce(p_provider, 'google') = 'google' and not coalesce(p_is_anonymous, false);
 $$;
 
 create or replace function private.try_uuid(p_text text)
@@ -86,7 +94,7 @@ as $$
   select exists (
     select 1
     from public.profiles p
-    join public.authorized_phone_numbers a on a.id = p.authorized_phone_id
+    join public.authorized_emails a on a.id = p.authorized_email_id
     where p.id = (select auth.uid())
       and a.status = 'active'
   );
@@ -102,7 +110,7 @@ as $$
   select exists (
     select 1
     from public.profiles p
-    join public.authorized_phone_numbers a on a.id = p.authorized_phone_id
+    join public.authorized_emails a on a.id = p.authorized_email_id
     where p.id = (select auth.uid())
       and a.status = 'active'
       and a.role = 'admin'
@@ -182,22 +190,25 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_phone text := private.normalize_phone(event -> 'user' ->> 'phone');
+  v_email    text := private.normalize_email(event -> 'user' ->> 'email');
+  v_provider text := event -> 'user' -> 'app_metadata' ->> 'provider';
 begin
-  if v_phone is not null and exists (
-    select 1 from public.authorized_phone_numbers
-    where phone_e164 = v_phone and status = 'active'
-  ) then
+  if v_email is not null
+     and private.is_allowed_provider(v_provider, (event -> 'user' ->> 'is_anonymous')::boolean)
+     and exists (
+       select 1 from public.authorized_emails
+       where email = v_email and status = 'active'
+     ) then
     return '{}'::jsonb;
   end if;
 
-  perform private.write_audit(null, 'auth.signup_rejected', 'phone', null,
-    jsonb_build_object('phone', private.mask_phone(v_phone), 'source', 'hook'));
+  perform private.write_audit(null, 'auth.signup_rejected', 'email', null,
+    jsonb_build_object('email', private.mask_email(v_email), 'provider', v_provider, 'source', 'hook'));
 
   return jsonb_build_object(
     'error', jsonb_build_object(
       'http_code', 403,
-      'message', 'This phone number is not authorized to use this app.'
+      'message', 'This Google account is not authorized to use this app.'
     )
   );
 end;
@@ -222,20 +233,21 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_phone text := private.normalize_phone(new.phone);
+  v_email text := private.normalize_email(new.email);
 begin
-  if v_phone is null then
-    raise exception 'Only phone sign-up is permitted' using errcode = '42501';
+  if v_email is null
+     or not private.is_allowed_provider(new.raw_app_meta_data ->> 'provider', new.is_anonymous) then
+    raise exception 'Only Google sign-in is permitted' using errcode = '42501';
   end if;
 
   -- FOR SHARE blocks a concurrent disable/remove of this entry until the
   -- sign-up transaction commits, so approval cannot be raced.
-  perform 1 from public.authorized_phone_numbers
-    where phone_e164 = v_phone and status = 'active'
+  perform 1 from public.authorized_emails
+    where email = v_email and status = 'active'
     for share;
 
   if not found then
-    raise exception 'Phone number is not authorized' using errcode = '42501';
+    raise exception 'This Google account is not authorized' using errcode = '42501';
   end if;
 
   return new;
@@ -249,32 +261,41 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_phone text := private.normalize_phone(new.phone);
-  v_entry public.authorized_phone_numbers;
+  v_email text := private.normalize_email(new.email);
+  v_entry public.authorized_emails;
+  v_name  text;
 begin
-  select * into v_entry from public.authorized_phone_numbers where phone_e164 = v_phone;
+  select * into v_entry from public.authorized_emails where email = v_email;
 
-  insert into public.profiles (id, phone_e164, authorized_phone_id, display_name)
-  values (new.id, v_phone, v_entry.id, coalesce(v_entry.label, ''));
+  -- Prefer the admin's label, then the name from the Google profile.
+  v_name := left(coalesce(
+    nullif(btrim(v_entry.label), ''),
+    nullif(btrim(new.raw_user_meta_data ->> 'full_name'), ''),
+    nullif(btrim(new.raw_user_meta_data ->> 'name'), ''),
+    ''
+  ), 60);
+
+  insert into public.profiles (id, email, authorized_email_id, display_name)
+  values (new.id, v_email, v_entry.id, v_name);
 
   perform private.write_audit(new.id, 'auth.account_created', 'user', new.id::text,
-    jsonb_build_object('phone', private.mask_phone(v_phone)));
+    jsonb_build_object('email', private.mask_email(v_email)));
   return new;
 end;
 $$;
 
--- Users may not change the phone number on their account: the number IS the
+-- Users may not change the email on their account: the Google address IS the
 -- identity that the administrator approved.
-create or replace function private.prevent_phone_change()
+create or replace function private.prevent_email_change()
 returns trigger
 language plpgsql
 security definer
 set search_path = ''
 as $$
 begin
-  if old.phone is not null and old.phone <> ''
-     and new.phone is distinct from old.phone then
-    raise exception 'Changing the phone number of an account is not permitted' using errcode = '42501';
+  if old.email is not null and old.email <> ''
+     and private.normalize_email(new.email) is distinct from private.normalize_email(old.email) then
+    raise exception 'Changing the email of an account is not permitted' using errcode = '42501';
   end if;
   return new;
 end;
@@ -288,11 +309,11 @@ create trigger create_profile_for_new_user
   after insert on auth.users
   for each row execute function private.create_profile_for_new_user();
 
-create trigger prevent_phone_change
-  before update of phone on auth.users
-  for each row execute function private.prevent_phone_change();
+create trigger prevent_email_change
+  before update of email on auth.users
+  for each row execute function private.prevent_email_change();
 
--- Re-adding a previously removed number re-links the existing account.
+-- Re-adding a previously removed email re-links the existing account.
 create or replace function private.link_profile_to_allowlist()
 returns trigger
 language plpgsql
@@ -301,15 +322,15 @@ set search_path = ''
 as $$
 begin
   update public.profiles
-    set authorized_phone_id = new.id
-    where phone_e164 = new.phone_e164
-      and authorized_phone_id is null;
+    set authorized_email_id = new.id
+    where email = new.email
+      and authorized_email_id is null;
   return new;
 end;
 $$;
 
 create trigger link_profile_to_allowlist
-  after insert on public.authorized_phone_numbers
+  after insert on public.authorized_emails
   for each row execute function private.link_profile_to_allowlist();
 
 -- Ends every session (and refresh token) for a user. Access tokens already
@@ -332,7 +353,7 @@ $$;
 -- Writes that need business rules go through SECURITY DEFINER RPCs (0300/0400).
 -- -----------------------------------------------------------------------------
 revoke all on table
-  public.authorized_phone_numbers,
+  public.authorized_emails,
   public.profiles,
   public.conversations,
   public.conversation_members,
@@ -342,10 +363,9 @@ revoke all on table
   public.audit_logs
 from anon, authenticated;
 
-revoke all on table private.rate_limits from public, anon, authenticated;
 
 grant select on table
-  public.authorized_phone_numbers,
+  public.authorized_emails,
   public.profiles,
   public.conversations,
   public.conversation_members,
@@ -356,14 +376,14 @@ grant select on table
 to authenticated;
 
 -- The only direct write an ordinary user can make: their own profile text.
--- Column-level grant — `id`, `phone_e164`, `authorized_phone_id` are not
+-- Column-level grant — `id`, `email`, `authorized_email_id` are not
 -- updatable, so a user cannot attach themselves to another allowlist entry.
 grant update (display_name, bio) on table public.profiles to authenticated;
 
 -- -----------------------------------------------------------------------------
 -- Row Level Security — enabled (and forced) on every exposed table.
 -- -----------------------------------------------------------------------------
-alter table public.authorized_phone_numbers enable row level security;
+alter table public.authorized_emails enable row level security;
 alter table public.profiles                 enable row level security;
 alter table public.conversations            enable row level security;
 alter table public.conversation_members     enable row level security;
@@ -371,11 +391,10 @@ alter table public.messages                 enable row level security;
 alter table public.attachments              enable row level security;
 alter table public.app_settings             enable row level security;
 alter table public.audit_logs               enable row level security;
-alter table private.rate_limits             enable row level security;
 
 -- Allowlist: administrators only (read). Writes only via admin RPCs.
 create policy "admins read allowlist"
-  on public.authorized_phone_numbers for select to authenticated
+  on public.authorized_emails for select to authenticated
   using ((select private.is_admin()));
 
 -- Profiles: active users can see profiles (names/numbers of the private group);
@@ -416,6 +435,3 @@ create policy "active users read settings"
 create policy "admins read audit logs"
   on public.audit_logs for select to authenticated
   using ((select private.is_admin()));
-
--- private.rate_limits has RLS enabled and no policies: only service_role
--- (which bypasses RLS) and SECURITY DEFINER functions can touch it.

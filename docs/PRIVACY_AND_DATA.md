@@ -6,14 +6,13 @@ The in-app privacy notice lives at `/privacy` (`src/app/privacy/page.tsx`). This
 
 | Data | Where | Who can read it in the app |
 | --- | --- | --- |
-| Phone number, display name, bio, last seen | `profiles`, `authorized_phone_numbers`, `auth.users` | Active members (directory); admin |
+| Google account email, display name (initially the Google name), bio, last seen | `profiles`, `authorized_emails`, `auth.users` | Active members (directory); admin |
 | Messages (text, timestamps, edit/delete markers) | `messages` | Members of that conversation only; admin **only if** the audited policy is on |
 | Files | Storage bucket `attachments` + `attachments` table | Members of that conversation only |
 | Delivery/read watermarks | `conversation_members` | Members of that conversation |
-| Security events (masked phone numbers, actor ids, admin actions) | `audit_logs` | Admin |
-| Rate-limit counters (HMAC hashes, no raw numbers/IPs) | `private.rate_limits` | Nobody via API; purged after 1 day |
+| Security events (masked email addresses, actor ids, admin actions) | `audit_logs` | Admin |
 
-Not stored by the app: OTP codes (handled by Supabase Auth/SMS provider), message content in logs, IP addresses (only hashed in rate-limit keys). Supabase and Vercel keep their own operational logs (including IPs) per their policies.
+Not stored by the app: Google passwords (sign-in happens on Google's own page), message content in logs, IP addresses. Supabase and Vercel keep their own operational logs (including IPs) per their policies.
 
 ## Administrator access policy
 
@@ -35,8 +34,8 @@ Not stored by the app: OTP codes (handled by Supabase Auth/SMS provider), messag
 **A member deleting a message:** message menu → *Delete for everyone*. The text is erased immediately and its files are removed; a "This message was deleted" placeholder remains.
 
 **Deleting a member's account and data (right to erasure)** — performed by the administrator:
-1. Verify the request comes from the number's owner (e.g. ask them to message you from the app).
-2. *Admin → Members & access* → find the number → **Delete account** → confirm. This, atomically and audited:
+1. Verify the request comes from the account's owner (e.g. ask them to message you from the app).
+2. *Admin → Members & access* → find the email → **Delete account** → confirm. This, atomically and audited:
    - signs them out everywhere;
    - permanently deletes every message they sent and every file they uploaded;
    - deletes their profile, memberships and their Supabase Auth user (sign-in record).

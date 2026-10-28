@@ -14,12 +14,23 @@ export const pool = new pg.Pool({ connectionString: url, max: 4 });
  */
 export type Rows<T> = [T, ...T[]];
 
-let phoneCounter = Math.floor(Math.random() * 1_000_000);
+let counter = Math.floor(Math.random() * 1_000_000);
 
-/** A fresh, unique E.164 number in the reserved +1555 range. */
-export function freshPhone(): string {
-  phoneCounter += 1;
-  return `+1555${String(phoneCounter).padStart(7, "0")}`;
+/** A fresh, unique email address (reserved example.com domain). */
+export function freshEmail(): string {
+  counter += 1;
+  return `user${counter}@example.com`;
+}
+
+export const GOOGLE_APP_METADATA = JSON.stringify({ provider: "google", providers: ["google"] });
+
+/** Inserts an auth user the way Supabase Auth does after a Google sign-in. */
+export function insertAuthUser(id: string, email: string, provider = "google", fullName = "Test User") {
+  return asOwner(
+    `insert into auth.users (id, email, email_confirmed_at, raw_app_meta_data, raw_user_meta_data)
+     values ($1, $2, now(), $3, $4)`,
+    [id, email, JSON.stringify({ provider, providers: [provider] }), JSON.stringify({ full_name: fullName })],
+  );
 }
 
 /** Runs SQL as the database owner (bypasses RLS) — test setup only. */
@@ -57,23 +68,19 @@ export async function asUser<T = Record<string, unknown>>(
 
 /** Adds a number to the allowlist and creates the auth user, as Supabase Auth would. */
 export async function createUser(opts: { role?: "member" | "admin"; label?: string } = {}) {
-  const phone = freshPhone();
+  const email = freshEmail();
   await asOwner(
-    "insert into public.authorized_phone_numbers (phone_e164, label, role) values ($1, $2, $3)",
-    [phone, opts.label ?? null, opts.role ?? "member"],
+    "insert into public.authorized_emails (email, label, role) values ($1, $2, $3)",
+    [email, opts.label ?? null, opts.role ?? "member"],
   );
   const id = randomUUID();
-  // Supabase Auth stores phone numbers without the leading '+'.
-  await asOwner("insert into auth.users (id, phone, phone_confirmed_at) values ($1, $2, now())", [
-    id,
-    phone.slice(1),
-  ]);
+  await insertAuthUser(id, email);
   await asOwner("insert into auth.sessions (id, user_id) values (gen_random_uuid(), $1)", [id]);
   const [entry] = await asOwner<{ id: string }>(
-    "select id from public.authorized_phone_numbers where phone_e164 = $1",
-    [phone],
+    "select id from public.authorized_emails where email = $1",
+    [email],
   );
-  return { id, phone, entryId: entry.id };
+  return { id, email, entryId: entry.id };
 }
 
 export async function directConversation(a: string, b: string): Promise<string> {

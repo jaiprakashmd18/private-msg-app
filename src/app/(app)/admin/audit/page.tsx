@@ -12,7 +12,7 @@ const PAGE = 50;
 const FILTERS = [
   { value: "", label: "All" },
   { value: "admin.", label: "Admin actions" },
-  { value: "auth.", label: "Sign-in & OTP" },
+  { value: "auth.", label: "Sign-in" },
   { value: "system.", label: "System" },
 ];
 
@@ -29,8 +29,8 @@ export default async function AuditPage({ searchParams }: PageProps<"/admin/audi
   if (error) return <p className="text-sm text-destructive">Could not load the audit log.</p>;
   const logs = (data ?? []) as AuditLog[];
 
-  const { data: profiles } = await supabase.from("profiles").select("id, display_name, phone_e164");
-  const who = new Map((profiles ?? []).map((p) => [p.id as string, (p.display_name as string) || (p.phone_e164 as string)]));
+  const { data: profiles } = await supabase.from("profiles").select("id, display_name, email");
+  const who = new Map((profiles ?? []).map((p) => [p.id as string, (p.display_name as string) || (p.email as string)]));
   const last = logs[logs.length - 1];
 
   return (
@@ -38,7 +38,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/admin/audi
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Audit log</h1>
         <p className="text-sm text-muted-foreground">
-          Append-only record of security events. Phone numbers are masked; message content is never logged.
+          Append-only record of security events. Email addresses are masked; message content is never logged.
         </p>
       </div>
       <nav aria-label="Filter audit log" className="flex flex-wrap gap-2">

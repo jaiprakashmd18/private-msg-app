@@ -85,9 +85,9 @@ export function SettingsView() {
           <CardContent>
             <form onSubmit={save} className="grid gap-4" noValidate>
               <div className="grid gap-2">
-                <Label htmlFor="phone">Phone number</Label>
-                <Input id="phone" value={access.phone_e164} disabled readOnly />
-                <p className="text-xs text-muted-foreground">Your number is your identity and can&apos;t be changed.</p>
+                <Label htmlFor="email">Google account</Label>
+                <Input id="email" value={access.email} disabled readOnly />
+                <p className="text-xs text-muted-foreground">Your Google account is your identity and can&apos;t be changed here.</p>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="display_name">Display name</Label>

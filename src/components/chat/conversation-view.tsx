@@ -60,7 +60,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
     return () => clearInterval(t);
   }, []);
 
-  const name = displayNameOf(summary?.other_display_name, summary?.other_phone_e164);
+  const name = displayNameOf(summary?.other_display_name, summary?.other_email);
   const editWindowMs = (settings?.edit_window_minutes ?? 15) * 60_000;
 
   // Keep scroll anchored: stick to bottom for new messages, preserve position
@@ -136,7 +136,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
             <div className="min-w-0 flex-1">
               <h2 className="truncate font-semibold">{name}</h2>
               <p className="truncate text-xs text-muted-foreground">
-                {otherInactive ? "No longer has access" : summary.other_phone_e164}
+                {otherInactive ? "No longer has access" : summary.other_email}
               </p>
             </div>
           </>

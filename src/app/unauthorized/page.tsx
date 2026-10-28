@@ -19,7 +19,7 @@ export default async function UnauthorizedPage() {
         </div>
         <h1 className="text-xl font-semibold">Access not available</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          The number <span className="font-medium text-foreground">{access.phone_e164}</span> is not currently
+          The Google account <span className="font-medium text-foreground">{access.email}</span> is not currently
           approved to use this app. If you think this is a mistake, contact the administrator.
         </p>
         <SignOutButton variant="outline" className="mt-6 w-full" />

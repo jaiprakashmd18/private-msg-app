@@ -26,8 +26,8 @@ export function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>
-          <span className="block font-medium text-foreground">{displayNameOf(access.display_name, access.phone_e164)}</span>
-          <span className="block">{access.phone_e164}</span>
+          <span className="block font-medium text-foreground">{displayNameOf(access.display_name, access.email)}</span>
+          <span className="block">{access.email}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>

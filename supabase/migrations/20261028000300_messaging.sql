@@ -20,7 +20,7 @@ alter default privileges in schema private revoke execute on functions from publ
 create or replace function public.my_access()
 returns table (
   user_id       uuid,
-  phone_e164    text,
+  email    text,
   display_name  text,
   bio           text,
   is_active     boolean,
@@ -33,19 +33,19 @@ set search_path = ''
 as $$
   select
     p.id,
-    p.phone_e164,
+    p.email,
     p.display_name,
     p.bio,
     coalesce(a.status = 'active', false),
     case when a.status = 'active' then a.role end
   from public.profiles p
-  left join public.authorized_phone_numbers a on a.id = p.authorized_phone_id
+  left join public.authorized_emails a on a.id = p.authorized_email_id
   where p.id = (select auth.uid());
 $$;
 
 -- Active users the caller can start a conversation with.
 create or replace function public.list_directory()
-returns table (id uuid, display_name text, phone_e164 text)
+returns table (id uuid, display_name text, email text)
 language plpgsql
 stable
 security definer
@@ -55,11 +55,11 @@ declare
   v_uid uuid := private.require_active_user();
 begin
   return query
-    select p.id, p.display_name, p.phone_e164
+    select p.id, p.display_name, p.email
     from public.profiles p
-    join public.authorized_phone_numbers a on a.id = p.authorized_phone_id
+    join public.authorized_emails a on a.id = p.authorized_email_id
     where a.status = 'active' and p.id <> v_uid
-    order by lower(nullif(p.display_name, '')) nulls last, p.phone_e164;
+    order by lower(nullif(p.display_name, '')) nulls last, p.email;
 end;
 $$;
 
@@ -83,7 +83,7 @@ begin
 
   if not exists (
     select 1 from public.profiles p
-    join public.authorized_phone_numbers a on a.id = p.authorized_phone_id
+    join public.authorized_emails a on a.id = p.authorized_email_id
     where p.id = p_other_user_id and a.status = 'active'
   ) then
     raise exception 'That person does not have access to this app' using errcode = '42501';
@@ -116,7 +116,7 @@ returns table (
   created_at                    timestamptz,
   other_user_id                 uuid,
   other_display_name            text,
-  other_phone_e164              text,
+  other_email              text,
   other_is_active               boolean,
   other_last_read_at            timestamptz,
   other_last_delivered_at       timestamptz,
@@ -143,7 +143,7 @@ begin
       c.created_at,
       o.user_id,
       op.display_name,
-      op.phone_e164,
+      op.email,
       coalesce(oa.status = 'active', false),
       o.last_read_at,
       o.last_delivered_at,
@@ -166,7 +166,7 @@ begin
     left join public.conversation_members o
       on o.conversation_id = c.id and o.user_id <> v_uid
     left join public.profiles op on op.id = o.user_id
-    left join public.authorized_phone_numbers oa on oa.id = op.authorized_phone_id
+    left join public.authorized_emails oa on oa.id = op.authorized_email_id
     left join lateral (
       select m.* from public.messages m
       where m.conversation_id = c.id
@@ -229,7 +229,7 @@ begin
   if exists (
     select 1 from public.conversation_members m
     left join public.profiles p on p.id = m.user_id
-    left join public.authorized_phone_numbers a on a.id = p.authorized_phone_id
+    left join public.authorized_emails a on a.id = p.authorized_email_id
     where m.conversation_id = p_conversation_id
       and m.user_id <> v_uid
       and a.status is distinct from 'active'

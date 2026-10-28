@@ -8,18 +8,18 @@
    │  HTTPS: Supabase REST/RPC + Storage (user JWT, RLS applies)
    ▼
  Vercel (Next.js 16 server)                         Supabase
-   • proxy.ts – refreshes session cookie, ──────►   • Auth (phone OTP via Twilio etc.)
+   • proxy.ts – refreshes session cookie, ──────►   • Auth (Sign in with Google)
      redirects signed-out users                        – before-user-created hook  ─┐
    • server layouts – check access in DB              – custom access token hook  ─┤ allowlist
-   • /api/auth/* – OTP request/verify with             • Postgres                    │
-     rate limits + allowlist pre-check                 – RLS on every table  ◄──────┘
+   • /auth/callback – finishes Google sign-in,         • Postgres                    │
+     routes by access                 – RLS on every table  ◄──────┘
    • /api/admin/* – the few service-role ops           – SECURITY DEFINER RPCs (all writes)
    • /api/cron/retention – daily purge                 – audit_logs (append-only)
                                                        • Realtime (postgres_changes, RLS-filtered)
                                                        • Storage bucket `attachments` (private, RLS)
 ```
 
-**Key principle:** the browser talks to Supabase directly with the user's own JWT, and *the database decides* what that user may do. The Next.js server never acts as a privileged proxy for chat data. The service-role key is used server-side only for: the OTP allowlist pre-check and rate limiting, deleting auth users, deleting storage files, and the scheduled retention job.
+**Key principle:** the browser talks to Supabase directly with the user's own JWT, and *the database decides* what that user may do. The Next.js server never acts as a privileged proxy for chat data. The service-role key is used server-side only for deleting auth users, deleting storage files, and the scheduled retention job.
 
 ## 2. File tree
 
@@ -31,7 +31,7 @@
 ├── vercel.json                      # daily retention cron
 ├── scripts/test-db.sh               # runs the DB security suite (throwaway Postgres or given DB)
 ├── supabase/
-│   ├── config.toml                  # local stack config: phone auth, test OTPs, auth hooks
+│   ├── config.toml                  # local stack config: Google provider, auth hooks
 │   ├── migrations/
 │   │   ├── …0100_schema.sql             # tables, indexes, constraints
 │   │   ├── …0200_access_control.sql     # allowlist enforcement, helpers, grants, RLS
@@ -39,13 +39,13 @@
 │   │   ├── …0400_admin.sql              # admin RPCs, retention, server-only functions
 │   │   ├── …0500_storage_realtime.sql   # attachments bucket + policies, realtime publication
 │   │   └── …0600_access_token_hook.sql  # refuse tokens for non-active users
-│   ├── seed.sql                     # LOCAL ONLY test numbers
+│   ├── seed.sql                     # LOCAL ONLY example allowlist
 │   └── snippets/create_first_admin.sql
 ├── src/
 │   ├── proxy.ts                     # Next.js 16 "proxy" (formerly middleware)
 │   ├── app/
 │   │   ├── layout.tsx, globals.css, page.tsx, error.tsx, not-found.tsx, icon.svg
-│   │   ├── login/                   # phone → OTP screens
+│   │   ├── login/                   # "Continue with Google" + error messages
 │   │   ├── unauthorized/            # shown to signed-in users without access
 │   │   ├── privacy/                 # public privacy notice
 │   │   ├── (app)/layout.tsx         # requires an ACTIVE user (DB check)
@@ -53,7 +53,7 @@
 │   │   ├── (app)/settings/          # profile, theme, privacy info, sessions
 │   │   ├── (app)/admin/             # overview, users, conversations, audit, settings
 │   │   └── api/
-│   │       ├── auth/{otp,verify,signout}/route.ts
+│   │       ├── auth/signout/route.ts
 │   │       ├── admin/{users/[id],conversations/[id],retention}/route.ts
 │   │       └── cron/retention/route.ts
 │   ├── components/
@@ -65,7 +65,7 @@
 │   │   ├── supabase/{client,server,admin,proxy}.ts
 │   │   ├── data/chat.ts             # all chat data access (RPC/REST/Storage)
 │   │   ├── env.ts, env.server.ts    # zod-validated environment
-│   │   ├── validation.ts, phone.ts  # zod schemas, E.164 normalization
+│   │   ├── validation.ts            # zod schemas
 │   │   ├── errors.ts                # centralized error mapping
 │   │   ├── access.ts, admin-route.ts, http.ts, rate-limit.ts, storage.server.ts
 │   │   └── format.ts, constants.ts, utils.ts
@@ -80,15 +80,14 @@
 
 | Table | Purpose | Notable constraints |
 | --- | --- | --- |
-| `authorized_phone_numbers` | **The allowlist.** E.164 number, label, `role` (`member`/`admin`), `status` (`active`/`disabled`). | `phone_e164` unique + format check. `role` is never writable through the API. |
-| `profiles` | One per auth user: phone, display name, bio, last seen. `authorized_phone_id` → allowlist. | PK = `auth.users.id` (cascade). Link set NULL when the number is removed. Only `display_name`, `bio` are user-updatable (column grants). |
+| `authorized_emails` | **The allowlist.** Lower-cased Google account email, label, `role` (`member`/`admin`), `status` (`active`/`disabled`). | `email` unique + format check. `role` is never writable through the API. |
+| `profiles` | One per auth user: email, display name (from the label or Google profile), bio, last seen. `authorized_email_id` → allowlist. | PK = `auth.users.id` (cascade). Link set NULL when the email is removed. Only `display_name`, `bio` are user-updatable (column grants). |
 | `conversations` | `kind = 'direct'`; `direct_key` = sorted member ids → one conversation per pair. | `direct_key` unique. |
 | `conversation_members` | Membership + `last_delivered_at` / `last_read_at` watermarks. | PK (conversation, user). No client INSERT/UPDATE/DELETE. |
 | `messages` | Body ≤ 4000 chars, `client_id` for idempotency, `edited_at`, `deleted_at` (soft delete), generated `search_vector`. | `unique (sender_id, client_id)`; index `(conversation_id, created_at desc, id desc)` for paging; GIN on `search_vector`. |
 | `attachments` | Metadata for files in the `attachments` bucket. | Size ≤ 10 MB, `storage_path` unique, cascades with message. |
 | `app_settings` | Single row: retention, audit retention, admin message access, attachments, edit window. | Bounded checks on every value. |
-| `audit_logs` | Append-only security log (masked phones, no message content). | No client write grants at all. |
-| `private.rate_limits` | Fixed-window counters for OTP endpoints (HMAC'd keys). | In the non-exposed `private` schema. |
+| `audit_logs` | Append-only security log (masked emails, no message content). | No client write grants at all. |
 
 **Why receipts are watermarks, not a `message_receipts` table:** in 1:1 chats, "delivered/read up to time T" per member is equivalent to per-message receipts, needs one row per member instead of one per message, makes unread counts a single indexed range count, and generates one realtime event per read instead of one per message.
 
@@ -98,13 +97,14 @@
 
 ### Sign-up and sign-in (allowlist)
 
-1. User enters a number → `POST /api/auth/otp`:
-   same-origin check → zod/E.164 validation → rate limits (per IP 20/h, per number 5/h and 1/min, in Postgres) → `server_phone_is_authorized()` → only then `signInWithOtp`. The response is **identical** for approved and unapproved numbers (no allowlist enumeration).
-2. Even if someone calls the Supabase Auth API directly with the public key:
-   - **`before_user_created_hook`** rejects unapproved numbers before an account exists or an SMS is sent;
-   - **`enforce_allowlist_on_signup` trigger** on `auth.users` performs the same check inside the insert transaction (with `FOR SHARE` on the allowlist row, so approval can't be raced) — this holds even if the hook isn't configured;
-   - **`custom_access_token_hook`** refuses to issue or refresh any token for a user whose number is not active.
-3. `POST /api/auth/verify` verifies the code server-side with its own brute-force limits. The session is stored in `SameSite=Lax` cookies managed by `@supabase/ssr`. They are intentionally readable by JavaScript (the browser Supabase client needs the access token for REST and Realtime), so XSS prevention — React escaping, no HTML rendering of messages, CSP — matters.
+1. The login page calls `supabase.auth.signInWithOAuth({ provider: "google" })` (PKCE). The user picks a Google account; Google returns them to Supabase Auth, which redirects to `/auth/callback?code=…`.
+2. Before Supabase Auth creates an account for a first-time user:
+   - **`before_user_created_hook`** refuses anything that isn't a Google sign-in for an **active** allowlisted email;
+   - **`enforce_allowlist_on_signup` trigger** on `auth.users` performs the same check inside the insert transaction (with `FOR SHARE` on the allowlist row, so approval can't be raced). This holds even if the hook isn't configured, and it also blocks email/password, magic-link, phone and anonymous users even when an admin enables those methods by mistake (or uses the service-role admin API);
+   - **`custom_access_token_hook`** refuses to issue or refresh any token for a user whose email is not active.
+3. `/auth/callback` exchanges the code for a session on the server, logs `auth.sign_in`, and redirects to `/chat` or `/unauthorized`. Refusals come back as `/login?error=not_authorized|no_access|failed` with a friendly message.
+4. The session is stored in `SameSite=Lax` cookies managed by `@supabase/ssr`. They are intentionally readable by JavaScript (the browser Supabase client needs the access token for REST and Realtime), so XSS prevention (React escaping, no HTML rendering of messages, CSP) matters.
+5. Users cannot change the email on their account (trigger), because the approved address *is* the identity.
 
 ### Every request
 
@@ -117,7 +117,7 @@
 
 ### Administrators
 
-- Admin rights live in `authorized_phone_numbers.role`, which no API path can write. The first admin is created with SQL in the dashboard (`supabase/snippets/create_first_admin.sql`). Admin entries can't be disabled/removed from the dashboard either (prevents lock-out and admin-vs-admin abuse).
+- Admin rights live in `authorized_emails.role`, which no API path can write. The first admin is created with SQL in the dashboard (`supabase/snippets/create_first_admin.sql`). Admin entries can't be disabled/removed from the dashboard either (prevents lock-out and admin-vs-admin abuse).
 - Admins see metadata by default. Reading message content requires `app_settings.admin_can_read_messages = true`, works only through `admin_read_conversation_messages()`, writes an audit entry per view, and displays a notice to every member while enabled.
 
 ## 5. Messaging flow

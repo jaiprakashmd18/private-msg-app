@@ -1,48 +1,47 @@
 /**
- * End-to-end tests against a running Supabase stack (Auth + REST + Realtime +
- * Storage), using the same supabase-js client the app uses.
+ * End-to-end tests against a running LOCAL Supabase stack (Auth + REST +
+ * Realtime + Storage), using the same supabase-js client the app uses.
  *
- * Requirements (local):
- *   supabase start                 # applies migrations + supabase/seed.sql
- *   export SUPABASE_URL=http://127.0.0.1:54321
- *   export SUPABASE_ANON_KEY=...   # `supabase status -o env` → ANON_KEY
- *   export SUPABASE_SERVICE_ROLE_KEY=...  # → SERVICE_ROLE_KEY
- *   npm run test:integration
+ * Google sign-in can't be automated, so users are created the way Supabase
+ * Auth creates them after a Google login (auth.users row with provider
+ * "google"), and their access tokens are signed with the local JWT secret —
+ * exactly what Auth would issue. Everything after sign-in is the real stack.
  *
- * Uses the test numbers from supabase/config.toml ([auth.sms.test_otp]) and
- * supabase/seed.sql, so no SMS is sent. NEVER point this at production.
+ *   supabase start
+ *   eval "$(npx supabase status -o env)"   # ANON_KEY, SERVICE_ROLE_KEY, JWT_SECRET, API_URL, DB_URL
+ *   SUPABASE_URL=$API_URL SUPABASE_ANON_KEY=$ANON_KEY SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY \
+ *   SUPABASE_JWT_SECRET=$JWT_SECRET DATABASE_URL=$DB_URL npm run test:integration
+ *
+ * NEVER point this at production.
  */
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const url = process.env.SUPABASE_URL;
 const anonKey = process.env.SUPABASE_ANON_KEY;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const enabled = Boolean(url && anonKey && serviceKey);
+const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+const dbUrl = process.env.DATABASE_URL;
+const enabled = Boolean(url && anonKey && serviceKey && jwtSecret && dbUrl);
 
-const ADMIN = "+15550000001";
-const ALICE = "+15550000002";
-const BOB = "+15550000003";
-const TEST_CODE = "123456";
+const b64url = (v: string | Buffer) => Buffer.from(v).toString("base64url");
 
-function client(): SupabaseClient {
-  return createClient(url!, anonKey!, { auth: { persistSession: false, autoRefreshToken: false } });
+function mintToken(userId: string, email: string): string {
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const payload = b64url(
+    JSON.stringify({ sub: userId, email, role: "authenticated", aud: "authenticated", iat: now, exp: now + 3600 }),
+  );
+  const sig = createHmac("sha256", jwtSecret!).update(`${header}.${payload}`).digest("base64url");
+  return `${header}.${payload}.${sig}`;
 }
 
-async function signIn(phone: string): Promise<{ sb: SupabaseClient; userId: string }> {
-  const sb = client();
-  let { error: otpError } = await sb.auth.signInWithOtp({ phone });
-  if (otpError?.status === 429) {
-    // Supabase enforces a minimum interval between codes for the same number
-    // (auth.sms.max_frequency); wait it out once when tests run back-to-back.
-    await new Promise((r) => setTimeout(r, 6000));
-    ({ error: otpError } = await sb.auth.signInWithOtp({ phone }));
-  }
-  if (otpError) throw otpError;
-  const { data, error } = await sb.auth.verifyOtp({ phone, token: TEST_CODE, type: "sms" });
-  if (error) throw error;
-  return { sb, userId: data.user!.id };
+interface TestUser {
+  sb: SupabaseClient;
+  userId: string;
+  email: string;
 }
 
 function waitFor<T>(fn: () => T | undefined, timeoutMs = 8000): Promise<T> {
@@ -59,53 +58,80 @@ function waitFor<T>(fn: () => T | undefined, timeoutMs = 8000): Promise<T> {
 }
 
 describe.skipIf(!enabled)("Supabase end-to-end", () => {
+  let db: pg.Pool;
   let service: SupabaseClient;
-  let admin: { sb: SupabaseClient; userId: string };
-  let alice: { sb: SupabaseClient; userId: string };
-  let bob: { sb: SupabaseClient; userId: string };
+  let admin: TestUser;
+  let alice: TestUser;
+  let bob: TestUser;
   let conversationId: string;
 
+  /** Approves an email and creates the user as a Google sign-in would. */
+  async function googleUser(role: "admin" | "member"): Promise<TestUser> {
+    const email = `it-${randomUUID().slice(0, 8)}@example.com`;
+    await db.query("insert into public.authorized_emails (email, role) values ($1, $2)", [email, role]);
+    const userId = randomUUID();
+    await db.query(
+      `insert into auth.users (instance_id, id, aud, role, email, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+       values ('00000000-0000-0000-0000-000000000000', $1, 'authenticated', 'authenticated', $2, now(),
+               '{"provider":"google","providers":["google"]}', '{"full_name":"Integration User"}', now(), now())`,
+      [userId, email],
+    );
+    const token = mintToken(userId, email);
+    const sb = createClient(url!, anonKey!, { accessToken: async () => token });
+    return { sb, userId, email };
+  }
+
   beforeAll(async () => {
+    db = new pg.Pool({ connectionString: dbUrl });
     service = createClient(url!, serviceKey!, { auth: { persistSession: false } });
-    // Make sure the seeded numbers are active (a previous run may have failed mid-way).
-    await service.from("authorized_phone_numbers").update({ status: "active", disabled_at: null }).in("phone_e164", [ADMIN, ALICE, BOB]);
-    admin = await signIn(ADMIN);
-    alice = await signIn(ALICE);
-    bob = await signIn(BOB);
-  }, 60_000);
+    admin = await googleUser("admin");
+    alice = await googleUser("member");
+    bob = await googleUser("member");
+  });
 
   afterAll(async () => {
-    await service?.from("authorized_phone_numbers").update({ status: "active", disabled_at: null }).eq("phone_e164", BOB);
     for (const c of [admin?.sb, alice?.sb, bob?.sb]) await c?.removeAllChannels();
+    await db?.end();
   });
 
-  it("rejects OTP sign-up for a number that is not on the allowlist (direct Auth API call)", async () => {
-    const outsider = `+1555${String(Math.floor(Math.random() * 9_000_000) + 1_000_000)}`;
-    const { error } = await client().auth.signInWithOtp({ phone: outsider });
+  it("refuses email/password sign-up, even for an approved email", async () => {
+    const email = `it-${randomUUID().slice(0, 8)}@example.com`;
+    await db.query("insert into public.authorized_emails (email) values ($1)", [email]);
+    const anon = createClient(url!, anonKey!, { auth: { persistSession: false } });
+    const { error } = await anon.auth.signUp({ email, password: "Sup3r-secret-pass!" });
     expect(error).not.toBeNull();
-    // No auth user was created.
-    const { data } = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    expect(data.users.some((u) => u.phone === outsider.slice(1))).toBe(false);
+    const { rows } = await db.query("select 1 from auth.users where email = $1", [email]);
+    expect(rows).toHaveLength(0);
   });
 
-  it("rejects password sign-up as an allowlist bypass", async () => {
-    const { error } = await client().auth.signUp({ phone: "+15559999999", password: "Sup3r-secret-pass" });
+  it("refuses non-Google accounts even when created with the service-role admin API", async () => {
+    const email = `it-${randomUUID().slice(0, 8)}@example.com`;
+    await db.query("insert into public.authorized_emails (email) values ($1)", [email]);
+    const { error } = await service.auth.admin.createUser({ email, email_confirm: true });
     expect(error).not.toBeNull();
+    // The hook received the provider from Supabase Auth and logged the refusal.
+    const { rows } = await db.query(
+      "select metadata from public.audit_logs where action = 'auth.signup_rejected' order by id desc limit 1",
+    );
+    expect(rows[0]?.metadata.provider).toBe("email");
   });
 
-  it("signs in an approved number and reports active access", async () => {
-    const { data, error } = await alice.sb.rpc("my_access").single<{ is_active: boolean; role: string }>();
+  it("gives an approved Google account active access", async () => {
+    const { data, error } = await alice.sb
+      .rpc("my_access")
+      .single<{ is_active: boolean; role: string; display_name: string }>();
     expect(error).toBeNull();
     expect(data?.is_active).toBe(true);
     expect(data?.role).toBe("member");
+    expect(data?.display_name).toBe("Integration User");
   });
 
   it("prevents self-promotion to admin and admin RPCs for members", async () => {
-    const upd = await alice.sb.from("authorized_phone_numbers").update({ role: "admin" }).eq("phone_e164", ALICE).select();
+    const upd = await alice.sb.from("authorized_emails").update({ role: "admin" }).eq("email", alice.email).select();
     expect(upd.error ?? upd.data?.length === 0).toBeTruthy();
     const stats = await alice.sb.rpc("admin_stats");
     expect(stats.error?.message).toMatch(/Administrator privileges required/);
-    const prof = await alice.sb.from("profiles").update({ authorized_phone_id: null }).eq("id", alice.userId);
+    const prof = await alice.sb.from("profiles").update({ authorized_email_id: null }).eq("id", alice.userId);
     expect(prof.error).not.toBeNull();
   });
 
@@ -132,11 +158,7 @@ describe.skipIf(!enabled)("Supabase end-to-end", () => {
     // stream is attached. Send warm-up messages until one arrives.
     const deadline = Date.now() + 20_000;
     while (received.length === 0 && Date.now() < deadline) {
-      await alice.sb.rpc("send_message", {
-        p_conversation_id: conversationId,
-        p_client_id: randomUUID(),
-        p_body: "warm-up",
-      });
+      await alice.sb.rpc("send_message", { p_conversation_id: conversationId, p_client_id: randomUUID(), p_body: "warm-up" });
       await new Promise((r) => setTimeout(r, 2000));
     }
 
@@ -147,7 +169,6 @@ describe.skipIf(!enabled)("Supabase end-to-end", () => {
       p_body: body,
     });
     expect(sent.error).toBeNull();
-
     const got = await waitFor(() => received.find((m) => m.body === body));
     expect(got.id).toBe((sent.data as { id: string }).id);
   });
@@ -164,7 +185,6 @@ describe.skipIf(!enabled)("Supabase end-to-end", () => {
     await alice.sb.rpc("send_message", { p_conversation_id: conversationId, p_client_id: randomUUID(), p_body: "not for admin" });
     await new Promise((r) => setTimeout(r, 2500));
     expect(leaked).toHaveLength(0);
-
     const { data } = await admin.sb.from("messages").select("id").eq("conversation_id", conversationId);
     expect(data).toEqual([]);
   });
@@ -174,15 +194,6 @@ describe.skipIf(!enabled)("Supabase end-to-end", () => {
     const a = await alice.sb.rpc("send_message", { p_conversation_id: conversationId, p_client_id: clientId, p_body: "retry me" });
     const b = await alice.sb.rpc("send_message", { p_conversation_id: conversationId, p_client_id: clientId, p_body: "retry me" });
     expect((a.data as { id: string }).id).toBe((b.data as { id: string }).id);
-  });
-
-  it("keeps history across sign-out and a new sign-in", async () => {
-    const before = await bob.sb.from("messages").select("id").eq("conversation_id", conversationId);
-    await bob.sb.auth.signOut();
-    bob = await signIn(BOB);
-    const after = await bob.sb.from("messages").select("id").eq("conversation_id", conversationId);
-    expect(after.data?.length).toBe(before.data?.length);
-    expect(after.data!.length).toBeGreaterThan(0);
   });
 
   it("enforces attachment storage policies", async () => {
@@ -218,20 +229,19 @@ describe.skipIf(!enabled)("Supabase end-to-end", () => {
 
     const forBob = await bob.sb.storage.from("attachments").createSignedUrl(ownPath, 60);
     expect(forBob.error).toBeNull();
-    const download = await fetch(forBob.data!.signedUrl);
-    expect(download.status).toBe(200);
+    expect((await fetch(forBob.data!.signedUrl)).status).toBe(200);
 
     const forAdmin = await admin.sb.storage.from("attachments").createSignedUrl(ownPath, 60);
     expect(forAdmin.error).not.toBeNull();
   });
 
   it("revoking access cuts off an existing session immediately", async () => {
-    const { data: entries } = await admin.sb.rpc("admin_list_numbers");
-    const bobEntry = (entries as { id: string; phone_e164: string }[]).find((e) => e.phone_e164 === BOB)!;
-    const disabled = await admin.sb.rpc("admin_set_number_status", { p_id: bobEntry.id, p_status: "disabled" });
+    const { data: entries } = await admin.sb.rpc("admin_list_allowlist");
+    const bobEntry = (entries as { id: string; email: string }[]).find((e) => e.email === bob.email)!;
+    const disabled = await admin.sb.rpc("admin_set_access_status", { p_id: bobEntry.id, p_status: "disabled" });
     expect(disabled.error).toBeNull();
 
-    // Bob still holds a cryptographically valid access token…
+    // Bob still holds a cryptographically valid access token, but:
     const reads = await bob.sb.from("messages").select("id").eq("conversation_id", conversationId);
     expect(reads.data).toEqual([]);
     const send = await bob.sb.rpc("send_message", { p_conversation_id: conversationId, p_client_id: randomUUID(), p_body: "x" });
@@ -239,16 +249,8 @@ describe.skipIf(!enabled)("Supabase end-to-end", () => {
     const access = await bob.sb.rpc("my_access").single<{ is_active: boolean }>();
     expect(access.data?.is_active).toBe(false);
 
-    // …but his refresh token no longer works.
-    const refreshed = await bob.sb.auth.refreshSession();
-    expect(refreshed.error).not.toBeNull();
-
-    // Signing in again is refused: the access-token hook issues no token.
-    await client().auth.signInWithOtp({ phone: BOB });
-    const relogin = await client().auth.verifyOtp({ phone: BOB, token: TEST_CODE, type: "sms" });
-    expect(relogin.error).not.toBeNull();
-    expect(relogin.data.session).toBeNull();
-
-    await admin.sb.rpc("admin_set_number_status", { p_id: bobEntry.id, p_status: "active" });
+    await admin.sb.rpc("admin_set_access_status", { p_id: bobEntry.id, p_status: "active" });
+    const restored = await bob.sb.from("messages").select("id").eq("conversation_id", conversationId);
+    expect(restored.data!.length).toBeGreaterThan(0);
   });
 });

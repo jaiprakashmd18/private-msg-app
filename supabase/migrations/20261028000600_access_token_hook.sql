@@ -19,13 +19,13 @@ begin
   if v_user_id is null or not exists (
     select 1
     from public.profiles p
-    join public.authorized_phone_numbers a on a.id = p.authorized_phone_id
+    join public.authorized_emails a on a.id = p.authorized_email_id
     where p.id = v_user_id and a.status = 'active'
   ) then
     return jsonb_build_object(
       'error', jsonb_build_object(
         'http_code', 403,
-        'message', 'This phone number does not currently have access to this app.'
+        'message', 'This Google account does not currently have access to this app.'
       )
     );
   end if;

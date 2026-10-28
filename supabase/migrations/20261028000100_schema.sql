@@ -30,15 +30,18 @@ end;
 $$;
 
 -- -----------------------------------------------------------------------------
--- authorized_phone_numbers — the allowlist. The single source of truth for
--- whether a phone number may use the app and with which role.
+-- authorized_emails — the allowlist. The single source of truth for
+-- whether a Google account (by email address) may use the app and with which
+-- role. Emails are stored lower-cased.
 -- Roles can only be changed with SQL by the database owner (see
 -- supabase/snippets/create_first_admin.sql); no API path changes `role`.
 -- -----------------------------------------------------------------------------
-create table public.authorized_phone_numbers (
+create table public.authorized_emails (
   id           uuid primary key default gen_random_uuid(),
-  phone_e164   text not null unique
-                 check (phone_e164 ~ '^\+[1-9][0-9]{6,14}$'),
+  email        text not null unique
+                 check (char_length(email) <= 254
+                        and email = lower(email)
+                        and email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
   label        text check (label is null or char_length(label) <= 80),
   role         public.app_role not null default 'member',
   status       public.access_status not null default 'active',
@@ -48,19 +51,19 @@ create table public.authorized_phone_numbers (
   updated_at   timestamptz not null default now()
 );
 
-create trigger authorized_phone_numbers_updated_at
-  before update on public.authorized_phone_numbers
+create trigger authorized_emails_updated_at
+  before update on public.authorized_emails
   for each row execute function private.set_updated_at();
 
 -- -----------------------------------------------------------------------------
 -- profiles — one per auth user. Created automatically by the auth trigger in
--- 0200. `authorized_phone_id` links to the allowlist entry; when the entry is
+-- 0200. `authorized_email_id` links to the allowlist entry; when the entry is
 -- removed the link becomes NULL and the user loses access everywhere.
 -- -----------------------------------------------------------------------------
 create table public.profiles (
   id                   uuid primary key references auth.users (id) on delete cascade,
-  authorized_phone_id  uuid unique references public.authorized_phone_numbers (id) on delete set null,
-  phone_e164           text not null unique,
+  authorized_email_id  uuid unique references public.authorized_emails (id) on delete set null,
+  email                text not null unique,
   display_name         text not null default ''
                          check (char_length(display_name) <= 60),
   bio                  text not null default ''
@@ -193,7 +196,7 @@ create trigger app_settings_updated_at
 
 -- -----------------------------------------------------------------------------
 -- audit_logs — append-only. Written exclusively by SECURITY DEFINER functions.
--- Phone numbers are stored masked; message content is never written here.
+-- Email addresses are stored masked; message content is never written here.
 -- -----------------------------------------------------------------------------
 create table public.audit_logs (
   id           bigint generated always as identity primary key,
@@ -207,16 +210,3 @@ create table public.audit_logs (
 
 create index audit_logs_created_idx on public.audit_logs (created_at desc);
 create index audit_logs_action_idx on public.audit_logs (action, created_at desc);
-
--- -----------------------------------------------------------------------------
--- private.rate_limits — fixed-window counters used by the OTP endpoints.
--- Keys are hashed by the application, never raw phone numbers or IPs.
--- -----------------------------------------------------------------------------
-create table private.rate_limits (
-  key           text not null,
-  window_start  timestamptz not null,
-  hits          integer not null default 0,
-  primary key (key, window_start)
-);
-
-create index rate_limits_window_idx on private.rate_limits (window_start);

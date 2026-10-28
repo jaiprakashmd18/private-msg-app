@@ -71,14 +71,14 @@ function PeoplePicker({ onDone }: { onDone: () => void }) {
 
   const needle = filter.trim().toLowerCase();
   const visible = (people ?? []).filter(
-    (p) => !needle || `${p.display_name} ${p.phone_e164}`.toLowerCase().includes(needle),
+    (p) => !needle || `${p.display_name} ${p.email}`.toLowerCase().includes(needle),
   );
 
   return (
     <>
       <Input
         aria-label="Filter members"
-        placeholder="Search by name or number"
+        placeholder="Search by name or email"
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         autoFocus
@@ -97,7 +97,7 @@ function PeoplePicker({ onDone }: { onDone: () => void }) {
         ) : (
           <ul className="space-y-0.5">
             {visible.map((p) => {
-              const name = displayNameOf(p.display_name, p.phone_e164);
+              const name = displayNameOf(p.display_name, p.email);
               return (
                 <li key={p.id}>
                   <button
@@ -109,7 +109,7 @@ function PeoplePicker({ onDone }: { onDone: () => void }) {
                     <Avatar name={name} seed={p.id} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium">{name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">{p.phone_e164}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{p.email}</span>
                     </span>
                     {pending === p.id && <Spinner />}
                   </button>

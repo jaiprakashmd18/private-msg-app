@@ -12,7 +12,8 @@ import {
   asUser,
   createUser,
   directConversation,
-  freshPhone,
+  freshEmail,
+  insertAuthUser,
   pool,
   send,
   setSettings,
@@ -32,47 +33,69 @@ beforeAll(async () => {
 });
 
 describe("allowlist enforcement at sign-up", () => {
-  it("rejects creation of an auth user whose number is not approved", async () => {
-    const phone = freshPhone();
-    await expect(
-      asOwner("insert into auth.users (id, phone) values ($1, $2)", [randomUUID(), phone.slice(1)]),
-    ).rejects.toThrow(/not authorized/i);
-  });
-
-  it("rejects users without a phone number (e.g. email or anonymous sign-up)", async () => {
-    await expect(
-      asOwner("insert into auth.users (id, email) values ($1, 'x@example.com')", [randomUUID()]),
-    ).rejects.toThrow(/Only phone sign-up/i);
-  });
-
-  it("rejects a disabled number", async () => {
-    const phone = freshPhone();
-    await asOwner(
-      "insert into public.authorized_phone_numbers (phone_e164, status) values ($1, 'disabled')",
-      [phone],
-    );
-    await expect(
-      asOwner("insert into auth.users (id, phone) values ($1, $2)", [randomUUID(), phone.slice(1)]),
-    ).rejects.toThrow(/not authorized/i);
-  });
-
-  it("auth hook rejects unapproved numbers and accepts approved ones", async () => {
-    const denied = await asOwner<{ r: { error?: { http_code: number } } }>(
+  const hook = (user: object) =>
+    asOwner<{ r: { error?: { http_code: number; message: string } } }>(
       "select public.before_user_created_hook($1::jsonb) as r",
-      [JSON.stringify({ user: { phone: freshPhone().slice(1) } })],
+      [JSON.stringify({ user })],
     );
-    expect(denied[0].r.error?.http_code).toBe(403);
 
-    const phone = freshPhone();
-    await asOwner("insert into public.authorized_phone_numbers (phone_e164) values ($1)", [phone]);
-    const allowed = await asOwner<{ r: object }>(
-      "select public.before_user_created_hook($1::jsonb) as r",
-      [JSON.stringify({ user: { phone: phone.slice(1) } })],
-    );
-    expect(allowed[0].r).toEqual({});
+  it("rejects a Google account whose email is not approved", async () => {
+    await expect(insertAuthUser(randomUUID(), freshEmail())).rejects.toThrow(/not authorized/i);
   });
 
-  it("creates a linked profile for an approved number", async () => {
+  it("rejects non-Google sign-ups (email/password, magic link, anonymous) even for approved emails", async () => {
+    const email = freshEmail();
+    await asOwner("insert into public.authorized_emails (email) values ($1)", [email]);
+    await expect(insertAuthUser(randomUUID(), email, "email")).rejects.toThrow(/Only Google sign-in/i);
+    await expect(insertAuthUser(randomUUID(), email, "phone")).rejects.toThrow(/Only Google sign-in/i);
+    await expect(
+      asOwner("insert into auth.users (id, is_anonymous) values ($1, true)", [randomUUID()]),
+    ).rejects.toThrow(/Only Google sign-in/i);
+  });
+
+  it("rejects a disabled email", async () => {
+    const email = freshEmail();
+    await asOwner("insert into public.authorized_emails (email, status) values ($1, 'disabled')", [email]);
+    await expect(insertAuthUser(randomUUID(), email)).rejects.toThrow(/not authorized/i);
+  });
+
+  it("matches emails case-insensitively", async () => {
+    const email = freshEmail();
+    await asOwner("insert into public.authorized_emails (email) values ($1)", [email]);
+    const id = randomUUID();
+    await insertAuthUser(id, email.toUpperCase());
+    const [p] = await asOwner<{ email: string }>("select email from public.profiles where id = $1", [id]);
+    expect(p.email).toBe(email);
+  });
+
+  it("auth hook rejects unapproved or non-Google accounts and accepts approved Google accounts", async () => {
+    const google = { provider: "google", providers: ["google"] };
+    const [denied] = await hook({ email: freshEmail(), app_metadata: google });
+    expect(denied.r.error?.http_code).toBe(403);
+
+    const email = freshEmail();
+    await asOwner("insert into public.authorized_emails (email) values ($1)", [email]);
+    const [allowed] = await hook({ email, app_metadata: google });
+    expect(allowed.r).toEqual({});
+
+    const [wrongProvider] = await hook({ email, app_metadata: { provider: "email", providers: ["email"] } });
+    expect(wrongProvider.r.error?.http_code).toBe(403);
+  });
+
+  it("access-token hook refuses tokens for disabled or unknown users", async () => {
+    const u = await createUser();
+    const token = (userId: string) =>
+      asOwner<{ r: { error?: unknown; claims?: unknown } }>(
+        "select public.custom_access_token_hook($1::jsonb) as r",
+        [JSON.stringify({ user_id: userId, claims: { sub: userId, role: "authenticated" } })],
+      );
+    expect((await token(u.id))[0].r.claims).toBeDefined();
+    await asOwner("update public.authorized_emails set status = 'disabled' where id = $1", [u.entryId]);
+    expect((await token(u.id))[0].r.error).toBeDefined();
+    expect((await token(randomUUID()))[0].r.error).toBeDefined();
+  });
+
+  it("creates a linked profile named from the admin label or the Google profile", async () => {
     const u = await createUser({ label: "Tester" });
     const [access] = await asUser<{ is_active: boolean; role: string; display_name: string }>(
       u.id,
@@ -81,12 +104,16 @@ describe("allowlist enforcement at sign-up", () => {
     expect(access.is_active).toBe(true);
     expect(access.role).toBe("member");
     expect(access.display_name).toBe("Tester");
+
+    const v = await createUser();
+    const [noLabel] = await asUser<{ display_name: string }>(v.id, "select * from public.my_access()");
+    expect(noLabel.display_name).toBe("Test User");
   });
 
-  it("does not let a user change the phone number on their account", async () => {
+  it("does not let a user change the email on their account", async () => {
     const u = await createUser();
     await expect(
-      asOwner("update auth.users set phone = $2 where id = $1", [u.id, freshPhone().slice(1)]),
+      asOwner("update auth.users set email = $2 where id = $1", [u.id, freshEmail()]),
     ).rejects.toThrow(/not permitted/i);
   });
 });
@@ -94,12 +121,12 @@ describe("allowlist enforcement at sign-up", () => {
 describe("privilege escalation", () => {
   it("members cannot read or modify the allowlist", async () => {
     const u = await createUser();
-    expect(await asUser(u.id, "select * from public.authorized_phone_numbers")).toHaveLength(0);
+    expect(await asUser(u.id, "select * from public.authorized_emails")).toHaveLength(0);
     await expect(
-      asUser(u.id, "insert into public.authorized_phone_numbers (phone_e164) values ($1)", [freshPhone()]),
+      asUser(u.id, "insert into public.authorized_emails (email) values ($1)", [freshEmail()]),
     ).rejects.toThrow(/permission denied/i);
     await expect(
-      asUser(u.id, "update public.authorized_phone_numbers set role = 'admin' where id = $1", [u.entryId]),
+      asUser(u.id, "update public.authorized_emails set role = 'admin' where id = $1", [u.entryId]),
     ).rejects.toThrow(/permission denied/i);
   });
 
@@ -107,9 +134,9 @@ describe("privilege escalation", () => {
     const u = await createUser();
     // Only display_name/bio are updatable; re-linking to another entry is denied.
     await expect(
-      asUser(u.id, "update public.profiles set authorized_phone_id = null where id = $1", [u.id]),
+      asUser(u.id, "update public.profiles set authorized_email_id = null where id = $1", [u.id]),
     ).rejects.toThrow(/permission denied/i);
-    await expect(asUser(u.id, "select public.admin_add_number($1)", [freshPhone()])).rejects.toThrow(
+    await expect(asUser(u.id, "select public.admin_add_email($1)", [freshEmail()])).rejects.toThrow(
       /Administrator privileges required/i,
     );
     await expect(asUser(u.id, "select public.admin_stats()")).rejects.toThrow(
@@ -132,12 +159,6 @@ describe("privilege escalation", () => {
 
   it("server-only functions are not callable by signed-in users", async () => {
     const u = await createUser();
-    await expect(
-      asUser(u.id, "select public.server_phone_is_authorized($1)", [u.phone]),
-    ).rejects.toThrow(/permission denied/i);
-    await expect(
-      asUser(u.id, "select public.server_consume_rate_limit('k', 60, 5)"),
-    ).rejects.toThrow(/permission denied/i);
     await expect(asUser(u.id, "select public.server_run_retention_purge()")).rejects.toThrow(
       /permission denied/i,
     );
@@ -148,7 +169,7 @@ describe("privilege escalation", () => {
     const b = await createUser();
     const conv = await directConversation(a.id, b.id);
     await send(a.id, conv, "secret");
-    for (const table of ["profiles", "messages", "conversations", "authorized_phone_numbers", "audit_logs"]) {
+    for (const table of ["profiles", "messages", "conversations", "authorized_emails", "audit_logs"]) {
       await expect(asUser(null, `select * from public.${table}`, [], "anon")).rejects.toThrow(
         /permission denied/i,
       );
@@ -210,7 +231,7 @@ describe("conversation and message isolation", () => {
   it("cannot start a conversation with a disabled user", async () => {
     const a = await createUser();
     const b = await createUser();
-    await asOwner("update public.authorized_phone_numbers set status = 'disabled' where id = $1", [b.entryId]);
+    await asOwner("update public.authorized_emails set status = 'disabled' where id = $1", [b.entryId]);
     await expect(directConversation(a.id, b.id)).rejects.toThrow(/does not have access/i);
   });
 
@@ -369,14 +390,14 @@ describe("messages", () => {
 });
 
 describe("revocation", () => {
-  it("disabling a number cuts off an existing session immediately and ends sessions", async () => {
+  it("disabling an email cuts off an existing session immediately and ends sessions", async () => {
     const admin = await createUser({ role: "admin" });
     const a = await createUser();
     const b = await createUser();
     const conv = await directConversation(a.id, b.id);
     await send(a.id, conv, "before revoke");
 
-    await asUser(admin.id, "select public.admin_set_number_status($1, 'disabled')", [b.entryId]);
+    await asUser(admin.id, "select public.admin_set_access_status($1, 'disabled')", [b.entryId]);
 
     // Same JWT as before — RLS re-checks the allowlist on every query.
     expect(await asUser(b.id, "select * from public.messages where conversation_id = $1", [conv])).toHaveLength(0);
@@ -392,62 +413,63 @@ describe("revocation", () => {
     await expect(send(a.id, conv, "hello?")).rejects.toThrow(/no longer has access/i);
 
     // Re-enabling restores access to the full history.
-    await asUser(admin.id, "select public.admin_set_number_status($1, 'active')", [b.entryId]);
+    await asUser(admin.id, "select public.admin_set_access_status($1, 'active')", [b.entryId]);
     expect(await asUser(b.id, "select * from public.messages where conversation_id = $1", [conv])).toHaveLength(1);
   });
 
-  it("removing a number revokes access; re-adding re-links the account", async () => {
+  it("removing an email revokes access; re-adding re-links the account", async () => {
     const admin = await createUser({ role: "admin" });
     const b = await createUser();
-    await asUser(admin.id, "select public.admin_remove_number($1)", [b.entryId]);
+    await asUser(admin.id, "select public.admin_remove_email($1)", [b.entryId]);
     const [access] = await asUser<{ is_active: boolean }>(b.id, "select * from public.my_access()");
     expect(access.is_active).toBe(false);
 
-    await asUser(admin.id, "select public.admin_add_number($1, 'back')", [b.phone]);
+    await asUser(admin.id, "select public.admin_add_email($1, 'back')", [b.email]);
     const [again] = await asUser<{ is_active: boolean }>(b.id, "select * from public.my_access()");
     expect(again.is_active).toBe(true);
   });
 });
 
 describe("admin operations", () => {
-  it("admins can add numbers; duplicates and bad formats are rejected; actions are audited", async () => {
+  it("admins can add emails (normalized); duplicates and bad formats are rejected; actions are audited", async () => {
     const admin = await createUser({ role: "admin" });
-    const phone = freshPhone();
-    const [row] = await asUser<{ role: string; status: string }>(
+    const email = freshEmail();
+    const [row] = await asUser<{ role: string; status: string; email: string }>(
       admin.id,
-      "select * from public.admin_add_number($1, 'New person')",
-      [phone],
+      "select * from public.admin_add_email($1, 'New person')",
+      [`  ${email.toUpperCase()} `],
     );
+    expect(row.email).toBe(email);
     expect(row.role).toBe("member");
     expect(row.status).toBe("active");
-    await expect(asUser(admin.id, "select public.admin_add_number($1)", [phone])).rejects.toThrow(
+    await expect(asUser(admin.id, "select public.admin_add_email($1)", [email])).rejects.toThrow(
       /already on the allowlist/i,
     );
-    await expect(asUser(admin.id, "select public.admin_add_number('0123')")).rejects.toThrow(
-      /international format/i,
+    await expect(asUser(admin.id, "select public.admin_add_email('not-an-email')")).rejects.toThrow(
+      /valid email/i,
     );
     const logs = await asUser<{ action: string }>(
       admin.id,
       "select action from public.audit_logs where actor_id = $1",
       [admin.id],
     );
-    expect(logs.map((l) => l.action)).toContain("admin.number_added");
+    expect(logs.map((l) => l.action)).toContain("admin.email_added");
   });
 
   it("admins cannot change administrator entries from the dashboard", async () => {
     const admin = await createUser({ role: "admin" });
     const other = await createUser({ role: "admin" });
     await expect(
-      asUser(admin.id, "select public.admin_set_number_status($1, 'disabled')", [other.entryId]),
+      asUser(admin.id, "select public.admin_set_access_status($1, 'disabled')", [other.entryId]),
     ).rejects.toThrow(/database owner/i);
-    await expect(asUser(admin.id, "select public.admin_remove_number($1)", [admin.entryId])).rejects.toThrow(
+    await expect(asUser(admin.id, "select public.admin_remove_email($1)", [admin.entryId])).rejects.toThrow(
       /database owner/i,
     );
   });
 
   it("a disabled admin loses admin rights", async () => {
     const admin = await createUser({ role: "admin" });
-    await asOwner("update public.authorized_phone_numbers set status = 'disabled' where id = $1", [admin.entryId]);
+    await asOwner("update public.authorized_emails set status = 'disabled' where id = $1", [admin.entryId]);
     await expect(asUser(admin.id, "select public.admin_stats()")).rejects.toThrow(/revoked/i);
   });
 
@@ -499,7 +521,7 @@ describe("admin operations", () => {
   it("stats and conversation listing expose metadata only", async () => {
     const admin = await createUser({ role: "admin" });
     const [stats] = await asUser<{ s: Record<string, number> }>(admin.id, "select public.admin_stats() as s");
-    expect(stats.s.numbers_total).toBeGreaterThan(0);
+    expect(stats.s.allowlist_total).toBeGreaterThan(0);
     const convs = await asUser<Record<string, unknown>>(admin.id, "select * from public.admin_list_conversations()");
     for (const c of convs) expect(Object.keys(c)).not.toContain("body");
   });

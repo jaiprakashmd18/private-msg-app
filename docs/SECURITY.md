@@ -8,15 +8,15 @@ Automated test files: `tests/db/security.test.ts` (database, 39 tests), `tests/i
 
 | # | Requirement | Mechanism | Automated test |
 | --- | --- | --- | --- |
-| 1 | Only approved numbers can create an account | Auth hook `before_user_created_hook` + `BEFORE INSERT` trigger on `auth.users` (`enforce_allowlist_on_signup`) | db: *rejects creation of an auth user whose number is not approved*, *auth hook rejects…*; integration: *rejects OTP sign-up … (direct Auth API call)* |
-| 2 | No bypass via email / anonymous / password sign-up | Trigger rejects any user without an approved phone; email sign-up disabled in config | db: *rejects users without a phone number*; integration: *rejects password sign-up* |
-| 3 | No SMS to unapproved numbers; no allowlist enumeration | `/api/auth/otp` checks the allowlist before calling Auth and returns the same response either way | api: *gives an unapproved number the generic response and creates no account* |
+| 1 | Only approved Google accounts can create an account | Auth hook `before_user_created_hook` + `BEFORE INSERT` trigger on `auth.users` (`enforce_allowlist_on_signup`), emails compared lower-cased | db: *rejects a Google account whose email is not approved*, *auth hook rejects…*, *matches emails case-insensitively* |
+| 2 | No bypass via email/password, magic link, phone or anonymous sign-up, even for an approved email | Trigger and hook accept only `provider = google`; email/phone providers disabled in config; also blocks the service-role admin API | db: *rejects non-Google sign-ups…*; integration: *refuses email/password sign-up…*, *refuses non-Google accounts even when created with the service-role admin API* |
+| 3 | Sign-in refusals are clear but leak nothing | `/auth/callback` maps Auth refusals to `/login?error=not_authorized\|no_access\|failed` | api: *sends refused Google sign-ins back to the login page with a reason* |
 | 4 | Approval can't be raced | Allowlist row locked `FOR SHARE` inside the sign-up transaction | (by construction; covered by #1 tests) |
-| 5 | Revocation is immediate, including existing sessions | RLS calls `private.is_active_user()` on every query; `admin_set_number_status` deletes `auth.sessions` (refresh tokens); `custom_access_token_hook` refuses new/refreshed tokens | db: *disabling a number cuts off an existing session immediately…*; integration: *revoking access cuts off an existing session immediately* (same JWT, refresh fails, re-login refused) |
+| 5 | Revocation is immediate, including existing sessions | RLS calls `private.is_active_user()` on every query; `admin_set_access_status` deletes `auth.sessions` (refresh tokens); `custom_access_token_hook` refuses new/refreshed tokens | db: *disabling an email cuts off an existing session immediately…*, *access-token hook refuses tokens for disabled or unknown users*; integration: *revoking access cuts off an existing session immediately* (same JWT) |
 | 6 | Users read only their own conversations/messages | RLS: active user AND `is_conversation_member()` | db: *outsiders cannot read another pair's messages*; integration: *does not deliver realtime events or REST reads to outsiders* |
 | 7 | Users send only to their own conversations | `send_message` checks membership + other party still active | db: *outsiders cannot send…*, *A cannot keep sending to a revoked participant* |
 | 8 | Users can't add themselves to conversations or write tables directly | No INSERT/UPDATE/DELETE grants on chat tables; writes only via RPCs | db: *users cannot add themselves to a conversation or insert messages directly* |
-| 9 | Users can't make themselves admin or approve their own number | No write grants on `authorized_phone_numbers`; `profiles` only `display_name`, `bio` updatable (column grants); admin RPCs check `private.is_admin()` | db: *members cannot read or modify the allowlist*, *…grant themselves admin…*; integration: *prevents self-promotion…* |
+| 9 | Users can't make themselves admin or approve their own email | No write grants on `authorized_emails`; `profiles` only `display_name`, `bio` updatable (column grants); users can't change their account email (trigger); admin RPCs check `private.is_admin()` | db: *members cannot read or modify the allowlist*, *…grant themselves admin…*, *does not let a user change the email on their account*; integration: *prevents self-promotion…* |
 | 10 | Admin rights come only from the DB owner | `role` changed only via SQL; admin entries immutable from dashboard | db: *admins cannot change administrator entries from the dashboard*, *a disabled admin loses admin rights* |
 | 11 | Audit logs are tamper-resistant | No client write grants; only SECURITY DEFINER functions insert | db: *audit logs cannot be written or altered directly, even by admins* |
 | 12 | Admin access to message content is explicit and audited | RPC only works when the policy is on; writes `admin.messages_viewed`; members see a banner | db: *admins cannot read message content unless the policy is enabled, and reads are audited* |
@@ -24,11 +24,11 @@ Automated test files: `tests/db/security.test.ts` (database, 39 tests), `tests/i
 | 14 | Realtime obeys access policy | Postgres Changes applies SELECT RLS per subscriber | integration: *delivers messages in real time…*, *does not deliver realtime events… to outsiders* |
 | 15 | Input validation and size limits | zod on the client/server + DB `CHECK`s + RPC validation (4000 chars, 5 files, 10 MB) | db: *validates message input*; unit: `validation.test.ts` |
 | 16 | Duplicate-safe retries | `unique (sender_id, client_id)` + idempotent `send_message` | db + integration: *deduplicates retried sends* |
-| 17 | Abuse limits | OTP: per-IP and per-number limits (Postgres-backed, fail closed); verify: per-number/IP brute-force limits; messages: 15 per 10 s per sender; Supabase Auth's own limits | db: *rate-limits message floods*; unit: *fails closed…*; manual: checklist |
+| 17 | Abuse limits | Sign-in throttling and bot protection are handled by Google and Supabase Auth's built-in rate limits; messages: 15 per 10 s per sender | db: *rate-limits message floods* |
 | 18 | CSRF on cookie-authenticated routes | `assertSameOrigin` on all POST/DELETE route handlers; cookies `SameSite=Lax` | unit: *same-origin (CSRF) check*; api: *rejects … cross-site requests* |
 | 19 | Secrets never reach the browser | Service key only in `env.server.ts` (`server-only` import guard), never `NEXT_PUBLIC_` | build fails if imported client-side |
 | 20 | Security headers | CSP (`frame-ancestors 'none'`, connect only to self + Supabase), HSTS, nosniff, no-referrer | api: *sends security headers* |
-| 21 | No sensitive logging | OTPs/tokens never logged; audit stores masked phones; server error logs truncate messages and omit bodies | code review (`lib/errors.ts`) |
+| 21 | No sensitive logging | Tokens never logged; audit stores masked emails; server error logs truncate messages and omit bodies | code review (`lib/errors.ts`) |
 
 ### How the RLS tests work
 
@@ -56,10 +56,9 @@ Do not advertise the app as end-to-end encrypted until that is implemented and r
 
 ## 3. Known limitations and residual risks
 
-- **SMS OTP is only as strong as the phone number.** SIM-swap or SS7 attacks can intercept codes. Members should set a carrier account PIN. (Supabase MFA could be added as a second factor.)
+- **Security depends on each member's Google account.** Anyone who controls an approved Google account can sign in as that member. Members should turn on 2-Step Verification in their Google account.
 - **Existing access tokens stay cryptographically valid until expiry** (default 1 hour) after revocation. They are useless — RLS denies every read/write and Realtime stops delivering — but tune *Auth → JWT expiry* lower if you want them to expire sooner.
-- **Disabled-but-existing users can still request an SMS by calling the Auth API directly** (the sign-up hook only covers *new* users). They cannot get a token. Cost exposure is bounded by Supabase's SMS rate limits; enabling CAPTCHA (Auth → Attack Protection) or a *Send SMS* hook removes it.
-- **Member directory:** active members can see each other's names and phone numbers (needed to start conversations).
+- **Member directory:** active members can see each other's names and email addresses (needed to start conversations).
 - **Infrastructure owners** (whoever controls the Supabase project) can read all data regardless of the in-app admin policy.
 - **Backups** retain deleted messages until the backup expires.
 - **CSP** allows inline scripts because Next.js injects inline bootstrap scripts; switch to nonce-based CSP if you need stricter XSS hardening. All message content is rendered as text (React escapes it); there is no HTML/Markdown rendering.
@@ -68,5 +67,5 @@ Do not advertise the app as end-to-end encrypted until that is implemented and r
 ## 4. Secrets handling
 
 - `.env.example` holds placeholders only; `.env*` files are git-ignored.
-- `SUPABASE_SERVICE_ROLE_KEY`, `APP_SECRET`, `CRON_SECRET` are server-only (Vercel environment variables, never `NEXT_PUBLIC_`).
+- `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET` are server-only (Vercel environment variables, never `NEXT_PUBLIC_`).
 - If a secret leaks: rotate it in Supabase (Project Settings → API Keys) / regenerate, update Vercel env vars, redeploy.

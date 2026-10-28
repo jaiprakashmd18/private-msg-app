@@ -56,7 +56,7 @@ export function ConversationsManager({
   }
 
   const names = (c: AdminConversation) =>
-    c.members.map((m) => displayNameOf(m.display_name, m.phone_e164)).join(" ↔ ") || "Deleted users";
+    c.members.map((m) => displayNameOf(m.display_name, m.email)).join(" ↔ ") || "Deleted users";
 
   return (
     <div className="grid gap-6">
@@ -138,7 +138,7 @@ export function ConversationsManager({
                   return (
                     <li key={m.id} className="rounded-lg bg-muted p-2.5">
                       <p className="text-xs text-muted-foreground">
-                        {displayNameOf(sender?.display_name, sender?.phone_e164)} · {formatDateTime(m.created_at)}
+                        {displayNameOf(sender?.display_name, sender?.email)} · {formatDateTime(m.created_at)}
                       </p>
                       <p className="whitespace-pre-wrap break-words">
                         {m.deleted_at ? <em className="text-muted-foreground">Deleted</em> : m.body || <em>Attachment</em>}

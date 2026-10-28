@@ -14,13 +14,13 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { adminRequest } from "@/lib/admin-client";
 import { formatDateTime } from "@/lib/format";
-import { addNumberSchema } from "@/lib/validation";
-import type { AdminNumber } from "@/types/app";
+import { addEmailSchema } from "@/lib/validation";
+import type { AllowlistEntry } from "@/types/app";
 
-export function NumbersManager({ numbers }: { numbers: AdminNumber[] }) {
+export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
   const { supabase, access, reportError } = useApp();
   const router = useRouter();
-  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [label, setLabel] = useState("");
   const [adding, setAdding] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -29,24 +29,24 @@ export function NumbersManager({ numbers }: { numbers: AdminNumber[] }) {
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = addNumberSchema.safeParse({ phone, label: label || undefined });
+    const parsed = addEmailSchema.safeParse({ email, label: label || undefined });
     if (!parsed.success) {
       setFormError(parsed.error.issues[0]?.message ?? "Invalid input");
       return;
     }
     setFormError(null);
     setAdding(true);
-    const { error } = await supabase.rpc("admin_add_number", {
-      p_phone: parsed.data.phone,
+    const { error } = await supabase.rpc("admin_add_email", {
+      p_email: parsed.data.email,
       p_label: parsed.data.label ?? null,
     });
     setAdding(false);
     if (error) {
-      reportError(error, "Could not add the number.");
+      reportError(error, "Could not add the email.");
       return;
     }
-    toast.success(`${parsed.data.phone} can now sign in`);
-    setPhone("");
+    toast.success(`${parsed.data.email} can now sign in with Google`);
+    setEmail("");
     setLabel("");
     router.refresh();
   }
@@ -66,8 +66,8 @@ export function NumbersManager({ numbers }: { numbers: AdminNumber[] }) {
   }
 
   const needle = filter.trim().toLowerCase();
-  const visible = numbers.filter(
-    (n) => !needle || `${n.phone_e164} ${n.label ?? ""} ${n.display_name ?? ""}`.toLowerCase().includes(needle),
+  const visible = entries.filter(
+    (n) => !needle || `${n.email} ${n.label ?? ""} ${n.display_name ?? ""}`.toLowerCase().includes(needle),
   );
 
   return (
@@ -75,26 +75,27 @@ export function NumbersManager({ numbers }: { numbers: AdminNumber[] }) {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Members &amp; access</h1>
         <p className="text-sm text-muted-foreground">
-          Only numbers on this list can sign in. Disabling or removing a number signs the person out everywhere and
+          Only Google accounts on this list can sign in. Disabling or removing an email signs the person out everywhere and
           blocks access immediately.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Approve a phone number</CardTitle>
-          <CardDescription>The person can sign in with an SMS code right away.</CardDescription>
+          <CardTitle>Approve a Google account</CardTitle>
+          <CardDescription>They can click “Continue with Google” and sign in right away.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={add} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end" noValidate>
             <div className="grid gap-2">
-              <Label htmlFor="new-phone">Phone number</Label>
+              <Label htmlFor="new-email">Gmail / Google account email</Label>
               <Input
-                id="new-phone"
-                type="tel"
-                placeholder="+14155550123"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                id="new-email"
+                type="email"
+                autoComplete="off"
+                placeholder="name@gmail.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 aria-invalid={Boolean(formError)}
                 required
               />
@@ -109,7 +110,7 @@ export function NumbersManager({ numbers }: { numbers: AdminNumber[] }) {
                 onChange={(e) => setLabel(e.target.value)}
               />
             </div>
-            <Button type="submit" disabled={adding || !phone.trim()}>
+            <Button type="submit" disabled={adding || !email.trim()}>
               {adding ? <Spinner /> : <Plus />} Approve
             </Button>
           </form>
@@ -125,10 +126,10 @@ export function NumbersManager({ numbers }: { numbers: AdminNumber[] }) {
         <CardHeader className="flex-row items-center justify-between gap-4">
           <div>
             <CardTitle>Allowlist</CardTitle>
-            <CardDescription>{numbers.length} numbers</CardDescription>
+            <CardDescription>{entries.length} accounts</CardDescription>
           </div>
           <Input
-            aria-label="Filter numbers"
+            aria-label="Filter accounts"
             placeholder="Filter"
             className="max-w-48"
             value={filter}
@@ -137,7 +138,7 @@ export function NumbersManager({ numbers }: { numbers: AdminNumber[] }) {
         </CardHeader>
         <CardContent className="p-0">
           {visible.length === 0 ? (
-            <p className="px-5 pb-5 text-sm text-muted-foreground">No numbers found.</p>
+            <p className="px-5 pb-5 text-sm text-muted-foreground">No accounts found.</p>
           ) : (
             <ul className="divide-y">
               {visible.map((n) => {
@@ -148,7 +149,7 @@ export function NumbersManager({ numbers }: { numbers: AdminNumber[] }) {
                   <li key={n.id} className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium tabular-nums">{n.phone_e164}</span>
+                        <span className="font-medium tabular-nums">{n.email}</span>
                         {n.status === "active" ? (
                           <Badge variant="success">Active</Badge>
                         ) : (
@@ -180,13 +181,13 @@ export function NumbersManager({ numbers }: { numbers: AdminNumber[] }) {
                             size="sm"
                             variant="outline"
                             disabled={busy}
-                            title={`Disable ${n.phone_e164}?`}
+                            title={`Disable ${n.email}?`}
                             description="They will be signed out on all devices and lose access to all conversations immediately. Their messages are kept and access can be restored later."
                             confirmLabel="Disable access"
                             onConfirm={() =>
                               run(
                                 n.id,
-                                async () => await supabase.rpc("admin_set_number_status", { p_id: n.id, p_status: "disabled" }),
+                                async () => await supabase.rpc("admin_set_access_status", { p_id: n.id, p_status: "disabled" }),
                                 "Access disabled",
                               )
                             }
@@ -201,7 +202,7 @@ export function NumbersManager({ numbers }: { numbers: AdminNumber[] }) {
                             onClick={() =>
                               run(
                                 n.id,
-                                async () => await supabase.rpc("admin_set_number_status", { p_id: n.id, p_status: "active" }),
+                                async () => await supabase.rpc("admin_set_access_status", { p_id: n.id, p_status: "active" }),
                                 "Access restored",
                               )
                             }
@@ -216,7 +217,7 @@ export function NumbersManager({ numbers }: { numbers: AdminNumber[] }) {
                             disabled={busy}
                             destructive={false}
                             title="Sign out all sessions?"
-                            description="Ends every active session for this person. They can sign in again with a new code while their number is approved."
+                            description="Ends every active session for this person. They can sign in again with Google while their email is approved."
                             confirmLabel="Sign out everywhere"
                             onConfirm={() =>
                               run(
@@ -233,11 +234,11 @@ export function NumbersManager({ numbers }: { numbers: AdminNumber[] }) {
                           size="sm"
                           variant="outline"
                           disabled={busy}
-                          title={`Remove ${n.phone_e164} from the allowlist?`}
-                          description="They lose access immediately and cannot sign in. Their account and messages are kept; adding the number again restores access."
+                          title={`Remove ${n.email} from the allowlist?`}
+                          description="They lose access immediately and cannot sign in. Their account and messages are kept; adding the email again restores access."
                           confirmLabel="Remove"
                           onConfirm={() =>
-                            run(n.id, async () => await supabase.rpc("admin_remove_number", { p_id: n.id }), "Number removed")
+                            run(n.id, async () => await supabase.rpc("admin_remove_email", { p_id: n.id }), "Email removed")
                           }
                         >
                           <Trash2 /> Remove
@@ -251,7 +252,7 @@ export function NumbersManager({ numbers }: { numbers: AdminNumber[] }) {
                             description={
                               <>
                                 This deletes the account, every message and file this person sent, and their sign-in
-                                record. <strong>This cannot be undone.</strong> The number stays on the allowlist unless
+                                record. <strong>This cannot be undone.</strong> The email stays on the allowlist unless
                                 you remove it too.
                               </>
                             }

@@ -2,7 +2,7 @@
   "name": "private-msg-app",
   "version": "1.0.0",
   "private": true,
-  "description": "Invitation-only private messaging app (Next.js + Supabase) with phone OTP and an admin-managed allowlist.",
+  "description": "Invitation-only private messaging app (Next.js + Supabase) with Google sign-in and an admin-managed allowlist.",
   "engines": {
     "node": ">=20.9.0"
   },
@@ -28,7 +28,6 @@
     "@supabase/supabase-js": "2.118.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
-    "libphonenumber-js": "1.13.15",
     "lucide-react": "1.63.0",
     "next": "16.4.3",
     "react": "19.3.1",

@@ -2,15 +2,12 @@
  * HTTP-level tests for the Next.js route handlers. Requires the app running
  * against a LOCAL Supabase stack:
  *   npm run build && npm start        (with .env.local pointing at `supabase start`)
- *   APP_URL=http://localhost:3000 SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run test:integration
+ *   APP_URL=http://localhost:3000 npm run test:integration
  */
-import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 
 const appUrl = process.env.APP_URL;
-const supabaseUrl = process.env.SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const enabled = Boolean(appUrl && supabaseUrl && serviceKey);
+const enabled = Boolean(appUrl);
 
 function post(path: string, body: unknown, origin = appUrl!) {
   return fetch(`${appUrl}${path}`, {
@@ -21,25 +18,25 @@ function post(path: string, body: unknown, origin = appUrl!) {
 }
 
 describe.skipIf(!enabled)("Next.js API routes", () => {
-  it("gives an unapproved number the generic response and creates no account", async () => {
-    const phone = `+1555${String(Math.floor(Math.random() * 9_000_000) + 1_000_000)}`;
-    const res = await post("/api/auth/otp", { phone });
-    expect(res.status).toBe(200);
-    expect((await res.json()).message).toMatch(/If this number is approved/);
-    const service = createClient(supabaseUrl!, serviceKey!, { auth: { persistSession: false } });
-    const { data } = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    expect(data.users.some((u) => u.phone === phone.slice(1))).toBe(false);
+  it("sends refused Google sign-ins back to the login page with a reason", async () => {
+    const cases: [string, string][] = [
+      ["error=access_denied&error_description=This+Google+account+is+not+authorized+to+use+this+app.", "not_authorized"],
+      ["error=server_error&error_description=This+Google+account+does+not+currently+have+access", "no_access"],
+      ["", "failed"],
+      ["code=not-a-real-code", "failed"],
+    ];
+    for (const [query, reason] of cases) {
+      const res = await fetch(`${appUrl}/auth/callback?${query}`, { redirect: "manual" });
+      expect(res.status).toBe(307);
+      expect(res.headers.get("location")).toMatch(new RegExp(`/login\\?error=${reason}$`));
+    }
+    const page = await (await fetch(`${appUrl}/login?error=not_authorized`)).text();
+    expect(page).toContain("isn&#x27;t approved");
   });
 
-  it("rejects malformed numbers and cross-site requests", async () => {
-    expect((await post("/api/auth/otp", { phone: "12345" })).status).toBe(400);
-    expect((await post("/api/auth/otp", { phone: "+14155550123" }, "https://evil.example")).status).toBe(403);
-    expect((await post("/api/auth/verify", { phone: "+14155550123", token: "abc" })).status).toBe(400);
-  });
-
-  it("refuses verification with a wrong code", async () => {
-    const res = await post("/api/auth/verify", { phone: "+15550000002", token: "000000" });
-    expect([401, 429]).toContain(res.status);
+  it("rejects cross-site sign-out requests", async () => {
+    const res = await post("/api/auth/signout", {}, "https://evil.example");
+    expect([401, 403]).toContain(res.status); // 401 when signed out, 403 (origin check) when signed in
   });
 
   it("protects admin and cron endpoints", async () => {

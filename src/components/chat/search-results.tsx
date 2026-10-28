@@ -56,7 +56,7 @@ export function SearchResults({ query, onNavigate }: { query: string; onNavigate
 
   const needle = query.toLowerCase();
   const people = conversations.filter((c) =>
-    `${c.other_display_name ?? ""} ${c.other_phone_e164 ?? ""}`.toLowerCase().includes(needle),
+    `${c.other_display_name ?? ""} ${c.other_email ?? ""}`.toLowerCase().includes(needle),
   );
 
   return (
@@ -72,7 +72,7 @@ export function SearchResults({ query, onNavigate }: { query: string; onNavigate
                   onClick={onNavigate}
                   className="block rounded-xl px-2 py-2 hover:bg-accent/60"
                 >
-                  {displayNameOf(c.other_display_name, c.other_phone_e164)}
+                  {displayNameOf(c.other_display_name, c.other_email)}
                 </Link>
               </li>
             ))}
@@ -91,7 +91,7 @@ export function SearchResults({ query, onNavigate }: { query: string; onNavigate
           <ul>
             {results.map((r) => {
               const conv = conversations.find((c) => c.id === r.conversation_id);
-              const who = r.sender_id === access.user_id ? "You" : displayNameOf(conv?.other_display_name, conv?.other_phone_e164);
+              const who = r.sender_id === access.user_id ? "You" : displayNameOf(conv?.other_display_name, conv?.other_email);
               return (
                 <li key={r.message_id}>
                   <Link
@@ -101,7 +101,7 @@ export function SearchResults({ query, onNavigate }: { query: string; onNavigate
                   >
                     <span className="flex items-baseline gap-2">
                       <span className="flex-1 truncate text-sm font-medium">
-                        {displayNameOf(conv?.other_display_name, conv?.other_phone_e164)}
+                        {displayNameOf(conv?.other_display_name, conv?.other_email)}
                       </span>
                       <time dateTime={r.created_at} className="text-xs text-muted-foreground">
                         {formatListTime(r.created_at)}

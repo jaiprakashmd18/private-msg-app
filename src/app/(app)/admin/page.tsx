@@ -36,9 +36,9 @@ export default async function AdminOverviewPage() {
         <p className="text-sm text-muted-foreground">Usage and access at a glance. No message content is shown here.</p>
       </div>
       <section aria-label="Access" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Approved numbers" value={stats.numbers_total} />
-        <Stat label="Active" value={stats.numbers_active} />
-        <Stat label="Disabled" value={stats.numbers_disabled} />
+        <Stat label="Approved accounts" value={stats.allowlist_total} />
+        <Stat label="Active" value={stats.allowlist_active} />
+        <Stat label="Disabled" value={stats.allowlist_disabled} />
         <Stat label="Registered accounts" value={stats.users_registered} hint={`${stats.users_without_access} without access`} />
       </section>
       <section aria-label="Usage" className="grid grid-cols-2 gap-3 lg:grid-cols-4">

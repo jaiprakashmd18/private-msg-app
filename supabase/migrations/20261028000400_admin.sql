@@ -13,10 +13,10 @@
 -- -----------------------------------------------------------------------------
 -- Allowlist management
 -- -----------------------------------------------------------------------------
-create or replace function public.admin_list_numbers()
+create or replace function public.admin_list_allowlist()
 returns table (
   id             uuid,
-  phone_e164     text,
+  email     text,
   label          text,
   role           public.app_role,
   status         public.access_status,
@@ -35,60 +35,60 @@ as $$
 begin
   perform private.require_admin();
   return query
-    select a.id, a.phone_e164, a.label, a.role, a.status, a.created_at, a.disabled_at,
+    select a.id, a.email, a.label, a.role, a.status, a.created_at, a.disabled_at,
            p.id, p.display_name, p.created_at, p.last_seen_at
-    from public.authorized_phone_numbers a
-    left join public.profiles p on p.authorized_phone_id = a.id
+    from public.authorized_emails a
+    left join public.profiles p on p.authorized_email_id = a.id
     order by a.created_at desc;
 end;
 $$;
 
-create or replace function public.admin_add_number(p_phone text, p_label text default null)
-returns public.authorized_phone_numbers
+create or replace function public.admin_add_email(p_email text, p_label text default null)
+returns public.authorized_emails
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
   v_uid   uuid := private.require_admin();
-  v_phone text := btrim(coalesce(p_phone, ''));
+  v_email text := private.normalize_email(p_email);
   v_label text := nullif(btrim(coalesce(p_label, '')), '');
-  v_row   public.authorized_phone_numbers;
+  v_row   public.authorized_emails;
 begin
-  if v_phone !~ '^\+[1-9][0-9]{6,14}$' then
-    raise exception 'Phone number must be in international format, e.g. +14155550123' using errcode = '22023';
+  if v_email is null or char_length(v_email) > 254 or v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+    raise exception 'Enter a valid email address, e.g. name@gmail.com' using errcode = '22023';
   end if;
   if v_label is not null and char_length(v_label) > 80 then
     raise exception 'Label is too long (max 80 characters)' using errcode = '22001';
   end if;
 
-  insert into public.authorized_phone_numbers (phone_e164, label, role, status, added_by)
-  values (v_phone, v_label, 'member', 'active', v_uid)
-  on conflict (phone_e164) do nothing
+  insert into public.authorized_emails (email, label, role, status, added_by)
+  values (v_email, v_label, 'member', 'active', v_uid)
+  on conflict (email) do nothing
   returning * into v_row;
 
   if v_row.id is null then
-    raise exception 'This number is already on the allowlist' using errcode = '23505';
+    raise exception 'This email is already on the allowlist' using errcode = '23505';
   end if;
 
-  perform private.write_audit(v_uid, 'admin.number_added', 'authorized_phone_number', v_row.id::text,
-    jsonb_build_object('phone', private.mask_phone(v_phone)));
+  perform private.write_audit(v_uid, 'admin.email_added', 'authorized_email', v_row.id::text,
+    jsonb_build_object('email', private.mask_email(v_email)));
   return v_row;
 end;
 $$;
 
-create or replace function public.admin_set_number_status(p_id uuid, p_status public.access_status)
-returns public.authorized_phone_numbers
+create or replace function public.admin_set_access_status(p_id uuid, p_status public.access_status)
+returns public.authorized_emails
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
   v_uid  uuid := private.require_admin();
-  v_row  public.authorized_phone_numbers;
+  v_row  public.authorized_emails;
   v_user uuid;
 begin
-  select * into v_row from public.authorized_phone_numbers where id = p_id for update;
+  select * into v_row from public.authorized_emails where id = p_id for update;
   if not found then
     raise exception 'Allowlist entry not found' using errcode = 'P0002';
   end if;
@@ -99,26 +99,26 @@ begin
     return v_row;
   end if;
 
-  update public.authorized_phone_numbers
+  update public.authorized_emails
     set status = p_status,
         disabled_at = case when p_status = 'disabled' then now() else null end
     where id = p_id
     returning * into v_row;
 
-  select id into v_user from public.profiles where authorized_phone_id = p_id;
+  select id into v_user from public.profiles where authorized_email_id = p_id;
   if p_status = 'disabled' and v_user is not null then
     perform private.revoke_user_sessions(v_user);
   end if;
 
   perform private.write_audit(v_uid,
-    case when p_status = 'disabled' then 'admin.number_disabled' else 'admin.number_enabled' end,
-    'authorized_phone_number', p_id::text,
-    jsonb_build_object('phone', private.mask_phone(v_row.phone_e164), 'user_id', v_user));
+    case when p_status = 'disabled' then 'admin.access_disabled' else 'admin.access_enabled' end,
+    'authorized_email', p_id::text,
+    jsonb_build_object('email', private.mask_email(v_row.email), 'user_id', v_user));
   return v_row;
 end;
 $$;
 
-create or replace function public.admin_remove_number(p_id uuid)
+create or replace function public.admin_remove_email(p_id uuid)
 returns void
 language plpgsql
 security definer
@@ -126,10 +126,10 @@ set search_path = ''
 as $$
 declare
   v_uid  uuid := private.require_admin();
-  v_row  public.authorized_phone_numbers;
+  v_row  public.authorized_emails;
   v_user uuid;
 begin
-  select * into v_row from public.authorized_phone_numbers where id = p_id for update;
+  select * into v_row from public.authorized_emails where id = p_id for update;
   if not found then
     raise exception 'Allowlist entry not found' using errcode = 'P0002';
   end if;
@@ -137,14 +137,14 @@ begin
     raise exception 'Administrator entries can only be changed by the database owner' using errcode = '42501';
   end if;
 
-  select id into v_user from public.profiles where authorized_phone_id = p_id;
-  delete from public.authorized_phone_numbers where id = p_id;
+  select id into v_user from public.profiles where authorized_email_id = p_id;
+  delete from public.authorized_emails where id = p_id;
   if v_user is not null then
     perform private.revoke_user_sessions(v_user);
   end if;
 
-  perform private.write_audit(v_uid, 'admin.number_removed', 'authorized_phone_number', p_id::text,
-    jsonb_build_object('phone', private.mask_phone(v_row.phone_e164), 'user_id', v_user));
+  perform private.write_audit(v_uid, 'admin.email_removed', 'authorized_email', p_id::text,
+    jsonb_build_object('email', private.mask_email(v_row.email), 'user_id', v_user));
 end;
 $$;
 
@@ -184,7 +184,7 @@ begin
   end if;
   select a.role into v_role
     from public.profiles p
-    left join public.authorized_phone_numbers a on a.id = p.authorized_phone_id
+    left join public.authorized_emails a on a.id = p.authorized_email_id
     where p.id = p_user_id;
   if not found then
     raise exception 'User not found' using errcode = 'P0002';
@@ -219,12 +219,12 @@ as $$
 begin
   perform private.require_admin();
   return jsonb_build_object(
-    'numbers_total',        (select count(*) from public.authorized_phone_numbers),
-    'numbers_active',       (select count(*) from public.authorized_phone_numbers where status = 'active'),
-    'numbers_disabled',     (select count(*) from public.authorized_phone_numbers where status = 'disabled'),
+    'allowlist_total',       (select count(*) from public.authorized_emails),
+    'allowlist_active',      (select count(*) from public.authorized_emails where status = 'active'),
+    'allowlist_disabled',    (select count(*) from public.authorized_emails where status = 'disabled'),
     'users_registered',     (select count(*) from public.profiles),
     'users_without_access', (select count(*) from public.profiles p
-                               left join public.authorized_phone_numbers a on a.id = p.authorized_phone_id
+                               left join public.authorized_emails a on a.id = p.authorized_email_id
                                where a.id is null or a.status <> 'active'),
     'conversations',        (select count(*) from public.conversations),
     'messages',             (select count(*) from public.messages where deleted_at is null),
@@ -262,7 +262,7 @@ begin
         select jsonb_agg(jsonb_build_object(
                  'user_id', p.id,
                  'display_name', p.display_name,
-                 'phone_e164', p.phone_e164) order by p.phone_e164)
+                 'email', p.email) order by p.email)
         from public.conversation_members cm
         join public.profiles p on p.id = cm.user_id
         where cm.conversation_id = c.id
@@ -371,7 +371,7 @@ $$;
 -- Retention
 -- -----------------------------------------------------------------------------
 -- Hard-deletes messages older than the retention period (only when one is
--- configured), old audit entries and stale rate-limit counters. Returns the
+-- configured) and old audit entries. Returns the
 -- storage paths that must be removed through the Storage API (expired
 -- attachments plus orphaned uploads older than 24 hours).
 create or replace function private.run_retention_purge(p_actor uuid)
@@ -420,8 +420,6 @@ begin
     returning 1
   ) select count(*) into v_audit from deleted;
 
-  delete from private.rate_limits where window_start < now() - interval '1 day';
-
   perform private.write_audit(p_actor, 'system.retention_purge', null, null,
     jsonb_build_object('messages_deleted', v_messages, 'audit_deleted', v_audit,
                        'files_to_remove', coalesce(array_length(v_paths, 1), 0)));
@@ -448,7 +446,7 @@ end;
 $$;
 
 -- -----------------------------------------------------------------------------
--- Server-only functions (service_role). Called by Next.js route handlers.
+-- Server-only functions (service_role). Called by the Vercel Cron route handler.
 -- -----------------------------------------------------------------------------
 create or replace function public.server_run_retention_purge()
 returns jsonb
@@ -459,79 +457,14 @@ as $$
   select private.run_retention_purge(null);
 $$;
 
-create or replace function public.server_phone_is_authorized(p_phone text)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select exists (
-    select 1 from public.authorized_phone_numbers
-    where phone_e164 = private.normalize_phone(p_phone) and status = 'active'
-  );
-$$;
-
--- Fixed-window rate limiter. Returns TRUE if the hit is allowed.
-create or replace function public.server_consume_rate_limit(
-  p_key text,
-  p_window_seconds integer,
-  p_max integer
-)
-returns boolean
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_window timestamptz := to_timestamp(
-    floor(extract(epoch from now()) / p_window_seconds) * p_window_seconds);
-  v_hits integer;
-begin
-  insert into private.rate_limits (key, window_start, hits)
-  values (p_key, v_window, 1)
-  on conflict (key, window_start) do update set hits = private.rate_limits.hits + 1
-  returning hits into v_hits;
-  return v_hits <= p_max;
-end;
-$$;
-
-create or replace function public.server_log_event(
-  p_action text,
-  p_metadata jsonb default '{}'::jsonb
-)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  if p_action not in ('auth.otp_requested', 'auth.otp_denied', 'auth.otp_rate_limited',
-                      'auth.verify_failed', 'auth.verify_rate_limited') then
-    raise exception 'Unsupported event' using errcode = '22023';
-  end if;
-  perform private.write_audit(null, p_action, 'phone', null, p_metadata);
-end;
-$$;
-
-create or replace function public.server_mask_phone(p_phone text)
-returns text
-language sql
-immutable
-security definer
-set search_path = ''
-as $$
-  select private.mask_phone(p_phone);
-$$;
-
 -- -----------------------------------------------------------------------------
 -- Grants
 -- -----------------------------------------------------------------------------
 revoke execute on function
-  public.admin_list_numbers(),
-  public.admin_add_number(text, text),
-  public.admin_set_number_status(uuid, public.access_status),
-  public.admin_remove_number(uuid),
+  public.admin_list_allowlist(),
+  public.admin_add_email(text, text),
+  public.admin_set_access_status(uuid, public.access_status),
+  public.admin_remove_email(uuid),
   public.admin_revoke_sessions(uuid),
   public.admin_prepare_user_deletion(uuid),
   public.admin_stats(),
@@ -540,20 +473,16 @@ revoke execute on function
   public.admin_read_conversation_messages(uuid, integer),
   public.admin_update_settings(integer, integer, boolean, boolean, integer),
   public.admin_run_retention_purge(),
-  public.server_run_retention_purge(),
-  public.server_phone_is_authorized(text),
-  public.server_consume_rate_limit(text, integer, integer),
-  public.server_log_event(text, jsonb),
-  public.server_mask_phone(text)
+  public.server_run_retention_purge()
 from public, anon, authenticated;
 
 -- Admin RPCs are callable by signed-in users; the functions themselves reject
 -- anyone who is not an active administrator.
 grant execute on function
-  public.admin_list_numbers(),
-  public.admin_add_number(text, text),
-  public.admin_set_number_status(uuid, public.access_status),
-  public.admin_remove_number(uuid),
+  public.admin_list_allowlist(),
+  public.admin_add_email(text, text),
+  public.admin_set_access_status(uuid, public.access_status),
+  public.admin_remove_email(uuid),
   public.admin_revoke_sessions(uuid),
   public.admin_prepare_user_deletion(uuid),
   public.admin_stats(),
@@ -564,10 +493,4 @@ grant execute on function
   public.admin_run_retention_purge()
 to authenticated;
 
-grant execute on function
-  public.server_run_retention_purge(),
-  public.server_phone_is_authorized(text),
-  public.server_consume_rate_limit(text, integer, integer),
-  public.server_log_event(text, jsonb),
-  public.server_mask_phone(text)
-to service_role;
+grant execute on function public.server_run_retention_purge() to service_role;

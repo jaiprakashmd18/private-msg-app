@@ -6,8 +6,8 @@ import { getServerEnv } from "@/lib/env.server";
 /**
  * Service-role client. BYPASSES Row Level Security — use only in route
  * handlers, only after the caller has been authorized, and only for the few
- * operations that require it (OTP pre-checks, deleting auth users and storage
- * files, scheduled retention). Never import from client components.
+ * operations that require it (deleting auth users and storage files,
+ * scheduled retention). Never import from client components.
  */
 export function getSupabaseServiceClient(): SupabaseClient {
   const { NEXT_PUBLIC_SUPABASE_URL } = getPublicEnv();

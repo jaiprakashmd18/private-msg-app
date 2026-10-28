@@ -57,8 +57,8 @@ export function formatDateTime(iso: string | null | undefined): string {
   });
 }
 
-export function displayNameOf(name: string | null | undefined, phone: string | null | undefined): string {
+export function displayNameOf(name: string | null | undefined, email: string | null | undefined): string {
   if (name && name.trim()) return name.trim();
-  if (phone) return phone;
+  if (email) return email;
   return "Deleted user";
 }

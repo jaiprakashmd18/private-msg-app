@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AppError, handleRouteError, isAccessRevokedError, toUserMessage } from "@/lib/errors";
 import { assertSameOrigin, clientIp, readJson } from "@/lib/http";
 
@@ -59,35 +59,5 @@ describe("error mapping", () => {
     expect(res.status).toBe(500);
     expect(JSON.stringify(await res.json())).not.toContain("hunter2");
     spy.mockRestore();
-  });
-});
-
-describe("rate-limit keys", () => {
-  const saved = { ...process.env };
-  beforeEach(() => {
-    process.env.SUPABASE_SERVICE_ROLE_KEY = "x".repeat(40);
-    process.env.APP_SECRET = "s".repeat(64);
-    vi.resetModules();
-  });
-  afterEach(() => {
-    process.env = { ...saved };
-  });
-
-  it("never contains the raw phone number or IP", async () => {
-    const { hashKey } = await import("@/lib/rate-limit");
-    const key = hashKey("otp:phone", "+14155550123");
-    expect(key).toMatch(/^otp:phone:[0-9a-f]{32}$/);
-    expect(key).not.toContain("4155550123");
-    expect(hashKey("otp:phone", "+14155550123")).toBe(key);
-    expect(hashKey("otp:phone", "+14155550124")).not.toBe(key);
-  });
-
-  it("fails closed when the limiter cannot be reached", async () => {
-    const { consumeLimits } = await import("@/lib/rate-limit");
-    const failing = { rpc: async () => ({ data: null, error: { message: "down" } }) };
-    const allowed = await consumeLimits(failing as never, [
-      { scope: "otp:ip", value: "1.2.3.4", windowSeconds: 60, max: 5 },
-    ]);
-    expect(allowed).toBe(false);
   });
 });

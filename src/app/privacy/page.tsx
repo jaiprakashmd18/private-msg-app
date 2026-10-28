@@ -17,18 +17,18 @@ export default function PrivacyPage() {
         <section>
           <h2>Who can use this app</h2>
           <p>
-            Only phone numbers approved by the administrator can sign in. Numbers that are not approved cannot create
-            an account and never receive a code.
+            You sign in with your Google account. Only Google accounts whose email address the administrator has
+            approved can sign in; other accounts cannot create an account here.
           </p>
         </section>
 
         <section>
           <h2>What we store</h2>
           <ul>
-            <li>Your phone number, display name and optional bio.</li>
+            <li>Your Google account email address, display name (initially your Google name) and optional bio. We do not receive your Google password.</li>
             <li>Your conversations, messages, attachments, and when messages were delivered and read.</li>
             <li>
-              Security logs: sign-ins, sign-outs, access changes and administrator actions. Phone numbers in logs are
+              Security logs: sign-ins, sign-outs, access changes and administrator actions. Email addresses in logs are
               partially masked. Message content and verification codes are never logged.
             </li>
           </ul>

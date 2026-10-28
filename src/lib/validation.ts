@@ -4,29 +4,14 @@ import {
   MAX_ATTACHMENT_BYTES,
   MAX_MESSAGE_LENGTH,
 } from "./constants";
-import { normalizePhone } from "./phone";
 
-export const phoneSchema = z
+/** Lower-cased, trimmed email address (Google account). */
+export const emailSchema = z
   .string()
-  .max(32)
-  .transform((value, ctx) => {
-    const normalized = normalizePhone(value);
-    if (!normalized) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Enter a valid number in international format, e.g. +14155550123",
-      });
-      return z.NEVER;
-    }
-    return normalized;
-  });
-
-export const otpRequestSchema = z.object({ phone: phoneSchema });
-
-export const otpVerifySchema = z.object({
-  phone: phoneSchema,
-  token: z.string().regex(/^\d{6}$/, "Enter the 6-digit code"),
-});
+  .trim()
+  .toLowerCase()
+  .max(254)
+  .pipe(z.email({ message: "Enter a valid email address, e.g. name@gmail.com" }));
 
 export const messageBodySchema = z
   .string()
@@ -37,8 +22,8 @@ export const profileSchema = z.object({
   bio: z.string().trim().max(280),
 });
 
-export const addNumberSchema = z.object({
-  phone: phoneSchema,
+export const addEmailSchema = z.object({
+  email: emailSchema,
   label: z.string().trim().max(80).optional(),
 });
 

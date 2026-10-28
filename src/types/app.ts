@@ -5,7 +5,7 @@ export type AccessStatus = "active" | "disabled";
 
 export interface Access {
   user_id: string;
-  phone_e164: string;
+  email: string;
   display_name: string;
   bio: string;
   is_active: boolean;
@@ -24,7 +24,7 @@ export interface AppSettings {
 export interface DirectoryEntry {
   id: string;
   display_name: string;
-  phone_e164: string;
+  email: string;
 }
 
 export interface ConversationSummary {
@@ -32,7 +32,7 @@ export interface ConversationSummary {
   created_at: string;
   other_user_id: string | null;
   other_display_name: string | null;
-  other_phone_e164: string | null;
+  other_email: string | null;
   other_is_active: boolean;
   other_last_read_at: string | null;
   other_last_delivered_at: string | null;
@@ -84,9 +84,9 @@ export interface SearchResult {
   created_at: string;
 }
 
-export interface AdminNumber {
+export interface AllowlistEntry {
   id: string;
-  phone_e164: string;
+  email: string;
   label: string | null;
   role: AppRole;
   status: AccessStatus;
@@ -104,13 +104,13 @@ export interface AdminConversation {
   last_message_at: string | null;
   message_count: number;
   attachment_count: number;
-  members: { user_id: string; display_name: string; phone_e164: string }[];
+  members: { user_id: string; display_name: string; email: string }[];
 }
 
 export interface AdminStats {
-  numbers_total: number;
-  numbers_active: number;
-  numbers_disabled: number;
+  allowlist_total: number;
+  allowlist_active: number;
+  allowlist_disabled: number;
   users_registered: number;
   users_without_access: number;
   conversations: number;

@@ -1,48 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { MAX_ATTACHMENT_BYTES } from "@/lib/constants";
-import { maskPhone, normalizePhone } from "@/lib/phone";
 import {
-  addNumberSchema,
+  addEmailSchema,
+  emailSchema,
   messageBodySchema,
-  otpRequestSchema,
-  otpVerifySchema,
   profileSchema,
   sanitizeFileName,
   settingsSchema,
   validateAttachment,
 } from "@/lib/validation";
 
-describe("phone numbers", () => {
-  it("normalizes international input to E.164", () => {
-    expect(normalizePhone("+1 (415) 555-0123")).toBe("+14155550123");
-    expect(normalizePhone("0044 20 7946 0958")).toBe("+442079460958");
-    expect(normalizePhone("  +91 98765 43210 ")).toBe("+919876543210");
+describe("email allowlist input", () => {
+  it("normalizes email addresses", () => {
+    expect(emailSchema.parse("  Alex.Smith@Gmail.com ")).toBe("alex.smith@gmail.com");
+    expect(emailSchema.parse("someone@company.co.uk")).toBe("someone@company.co.uk");
   });
 
-  it("rejects numbers without a country code or with junk", () => {
-    expect(normalizePhone("4155550123")).toBeNull();
-    expect(normalizePhone("+1 12")).toBeNull();
-    expect(normalizePhone("hello")).toBeNull();
-    expect(normalizePhone("")).toBeNull();
+  it("rejects invalid addresses", () => {
+    for (const bad of ["", "alex", "alex@", "@gmail.com", "a b@gmail.com", `${"x".repeat(250)}@gmail.com`]) {
+      expect(emailSchema.safeParse(bad).success).toBe(false);
+    }
   });
 
-  it("validates OTP request and verification payloads", () => {
-    expect(otpRequestSchema.safeParse({ phone: "+14155550123" }).success).toBe(true);
-    expect(otpRequestSchema.safeParse({ phone: "not a phone" }).success).toBe(false);
-    expect(otpRequestSchema.safeParse({ phone: "+1".padEnd(64, "1") }).success).toBe(false);
-    expect(otpVerifySchema.safeParse({ phone: "+14155550123", token: "123456" }).success).toBe(true);
-    expect(otpVerifySchema.safeParse({ phone: "+14155550123", token: "12345" }).success).toBe(false);
-    expect(otpVerifySchema.safeParse({ phone: "+14155550123", token: "12345a" }).success).toBe(false);
-  });
-
-  it("masks phone numbers for logs", () => {
-    expect(maskPhone("+14155550123")).toBe("+14•••••••23");
-    expect(maskPhone("+1")).toBe("***");
-  });
-
-  it("validates admin input for new numbers", () => {
-    expect(addNumberSchema.safeParse({ phone: "+14155550123", label: "Alex" }).success).toBe(true);
-    expect(addNumberSchema.safeParse({ phone: "+14155550123", label: "x".repeat(81) }).success).toBe(false);
+  it("validates admin input for new accounts", () => {
+    expect(addEmailSchema.safeParse({ email: "alex@gmail.com", label: "Alex" }).success).toBe(true);
+    expect(addEmailSchema.safeParse({ email: "alex@gmail.com", label: "x".repeat(81) }).success).toBe(false);
   });
 });
 

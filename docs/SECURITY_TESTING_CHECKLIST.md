@@ -1,32 +1,32 @@
 # Manual security-testing checklist
 
-Run after every production deployment and after changing auth settings. You need: the admin number, two approved member numbers (A, B), one **unapproved** number (U), two browsers (or one normal + one private window), and the browser developer tools.
+Run after every production deployment and after changing auth settings. You need: the admin Google account, two approved member Google accounts (A, B), one **unapproved** Google account (U), two browsers (or one normal + one private window), and the browser developer tools.
 
 Mark each item ✅/❌. Any ❌ is a release blocker.
 
 ## Sign-in and allowlist
-- [ ] U enters their number → sees the generic "If this number is approved…" message and **receives no SMS**.
+- [ ] U clicks **Continue with Google** → returns to the login page with "This Google account isn't approved…".
 - [ ] Supabase → Authentication → Users shows **no** user for U.
-- [ ] Admin → Audit log shows `auth.otp_denied` with a **masked** number.
-- [ ] A signs in with the correct code → lands on `/chat`.
-- [ ] A wrong code shows "invalid or has expired"; ~8 wrong codes in 15 minutes → "Too many attempts".
-- [ ] Requesting codes repeatedly for one number → "Too many attempts" (1/minute, 5/hour).
-- [ ] Direct API bypass: in the browser console on the login page run
-      `await fetch("https://<ref>.supabase.co/auth/v1/otp",{method:"POST",headers:{apikey:"<publishable key>","content-type":"application/json"},body:JSON.stringify({phone:"<U>"})}).then(r=>r.status)` → **403**, and no user is created.
+- [ ] Admin → Audit log shows `auth.signup_rejected` with a **masked** email and provider `google`.
+- [ ] A signs in with Google → lands on `/chat`.
+- [ ] Email sign-up is off: Supabase → Authentication → Sign In / Providers → Email is disabled, and in the browser console
+      `await fetch("https://<ref>.supabase.co/auth/v1/signup",{method:"POST",headers:{apikey:"<publishable key>","content-type":"application/json"},body:JSON.stringify({email:"<A's email>",password:"Long-password-123"})}).then(r=>r.status)`
+      returns an error status (4xx), and no second user appears for A.
+- [ ] Both auth hooks are listed under Authentication → Hooks.
 
 ## Isolation between members
 - [ ] A and B chat; the admin (or a third member C) opens the conversation URL `/chat/<id>` → "Conversation unavailable", no messages.
 - [ ] Signed in as C, open DevTools → Network, copy C's `Authorization: Bearer …` value from any `rest/v1` request, then in the console run
       `fetch("https://<ref>.supabase.co/rest/v1/messages?select=*",{headers:{apikey:"<publishable>",Authorization:"Bearer <C token>"}}).then(r=>r.json())` → returns only C's own conversations' messages.
 - [ ] Same token: `POST /rest/v1/rpc/send_message` with A–B's conversation id → error "not a member".
-- [ ] Same token: `PATCH /rest/v1/authorized_phone_numbers?phone_e164=eq.<C>` body `{"role":"admin"}` → permission denied.
+- [ ] Same token: `PATCH /rest/v1/authorized_emails?email=eq.<C>` body `{"role":"admin"}` → permission denied.
 - [ ] Same token: `POST /rest/v1/rpc/admin_stats` → "Administrator privileges required".
 
 ## Revocation
 - [ ] B is signed in with a conversation open. Admin disables B. B sends a message → redirected to "Access not available".
-- [ ] B reloads / signs in again → code accepted by SMS but sign-in refused ("does not currently have access").
+- [ ] B signs out and tries **Continue with Google** again → refused with "Access … is currently disabled".
 - [ ] Admin re-enables B → B can sign in and sees the full history.
-- [ ] Admin removes B from the allowlist → same as disable; re-adding B restores the account.
+- [ ] Admin removes B's email from the allowlist → same as disable; re-adding the email restores the account.
 
 ## Admin
 - [ ] Member A visits `/admin` → redirected to `/chat`. `DELETE /api/admin/conversations/<id>` as A → 403.

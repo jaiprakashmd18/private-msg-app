@@ -62,7 +62,7 @@ export function ConversationList({
   const needle = filter.trim().toLowerCase();
   const visible = needle
     ? conversations.filter((c) =>
-        `${c.other_display_name ?? ""} ${c.other_phone_e164 ?? ""}`.toLowerCase().includes(needle),
+        `${c.other_display_name ?? ""} ${c.other_email ?? ""}`.toLowerCase().includes(needle),
       )
     : conversations;
 
@@ -85,7 +85,7 @@ export function ConversationList({
   return (
     <ul className="space-y-0.5 px-2 pb-4">
       {visible.map((c) => {
-        const name = displayNameOf(c.other_display_name, c.other_phone_e164);
+        const name = displayNameOf(c.other_display_name, c.other_email);
         const unread = c.unread_count > 0;
         const active = c.id === activeId;
         return (
