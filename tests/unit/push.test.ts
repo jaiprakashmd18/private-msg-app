@@ -17,3 +17,17 @@ describe("push notification payload", () => {
     expect(buildPayload({ ...base, body: "x".repeat(500) }).body).toHaveLength(140);
   });
 });
+
+describe("push payload for groups and media", () => {
+  const group = { ...base, conversation_kind: "group" as const, conversation_title: "Family" };
+
+  it("titles group notifications with the group name and prefixes the sender", () => {
+    expect(buildPayload(group)).toMatchObject({ title: "Family", body: "Alex: See you at 8" });
+    expect(buildPayload({ ...group, show_preview: false }).body).toBe("New message from Alex");
+  });
+
+  it("describes photos and voice notes", () => {
+    expect(buildPayload({ ...base, body: "", has_attachments: true, attachment_kind: "image" }).body).toBe("📷 Photo");
+    expect(buildPayload({ ...base, body: "", has_attachments: true, attachment_kind: "audio" }).body).toBe("🎤 Voice message");
+  });
+});

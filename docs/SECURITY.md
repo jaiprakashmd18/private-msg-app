@@ -30,6 +30,10 @@ Automated test files: `tests/db/security.test.ts` (database, 39 tests), `tests/i
 | 20 | Security headers | CSP (`frame-ancestors 'none'`, connect only to self + Supabase), HSTS, nosniff, no-referrer | api: *sends security headers* |
 | 21 | No sensitive logging | Tokens never logged; audit stores masked emails; server error logs truncate messages and omit bodies | code review (`lib/errors.ts`) |
 | 22 | Push notifications can't be abused | Devices register via `save_push_subscription` (own account, active users only); `server_push_targets` returns devices only for the real sender's undeleted message from the last 10 minutes, once per message, and only for other **active** members; VAPID keys live in the non-exposed `private` schema | db: *push notifications* tests (5); unit: `push.test.ts`, `service-worker.test.ts` |
+| 23 | Groups: only members read/send; only group admins add, remove, rename or promote; removal is immediate | `is_conversation_member()` now means *current* member (`left_at is null`); `create_group`, `add_group_members`, `remove_group_member`, `rename_group`, `set_group_admin` check `is_group_admin()`; members are soft-removed so realtime never broadcasts unfiltered DELETEs; groups always keep an admin | db: *group chats* (7 tests); e2e: removed member sees "Conversation unavailable" |
+| 24 | Replies and reactions stay inside the conversation | `send_message` rejects a `reply_to` from another conversation; `toggle_reaction` requires membership; reactions are readable only by members; "removing" a reaction is an UPDATE (RLS-filtered) | db: *replies and reactions* (2) ; integration: *reactions arrive in real time* |
+| 25 | Typing and online signals are private | Private Realtime channels `conv:<id>` (members only) and `online` (active users only), enforced by RLS on `realtime.messages`; receivers map user ids to names themselves, so names can't be spoofed | integration: *typing signals … reach members only* (outsider refused), *online presence* |
+| 26 | Photo thumbnails and voice notes obey attachment rules | Thumbnails must be the sender's own upload in the same conversation folder; readable only like their attachment; sizes/durations validated; bucket accepts only listed image/audio/document types | db: *photos, thumbnails and voice notes* (3) |
 
 ### How the RLS tests work
 
@@ -59,7 +63,8 @@ Do not advertise the app as end-to-end encrypted until that is implemented and r
 
 - **Security depends on each member's Google account.** Anyone who controls an approved Google account can sign in as that member. Members should turn on 2-Step Verification in their Google account.
 - **Existing access tokens stay cryptographically valid until expiry** (default 1 hour) after revocation. They are useless — RLS denies every read/write and Realtime stops delivering — but tune *Auth → JWT expiry* lower if you want them to expire sooner.
-- **Member directory:** active members can see each other's names and email addresses (needed to start conversations).
+- **Member directory and presence:** active members can see each other's names and email addresses (needed to start conversations), whether they are online, and when they were last seen. There is no option yet to hide "last seen".
+- **Group history:** someone re-added to a group sees its earlier history again.
 - **Infrastructure owners** (whoever controls the Supabase project) can read all data regardless of the in-app admin policy.
 - **Backups** retain deleted messages until the backup expires.
 - **CSP** allows inline scripts because Next.js injects inline bootstrap scripts; switch to nonce-based CSP if you need stricter XSS hardening. All message content is rendered as text (React escapes it); there is no HTML/Markdown rendering.

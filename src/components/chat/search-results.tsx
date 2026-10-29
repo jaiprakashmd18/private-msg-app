@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
+import { conversationName } from "@/components/chat/conversation-list";
 import { Spinner } from "@/components/ui/spinner";
 import { searchMessages } from "@/lib/data/chat";
 import { displayNameOf, formatListTime } from "@/lib/format";
@@ -56,7 +57,7 @@ export function SearchResults({ query, onNavigate }: { query: string; onNavigate
 
   const needle = query.toLowerCase();
   const people = conversations.filter((c) =>
-    `${c.other_display_name ?? ""} ${c.other_email ?? ""}`.toLowerCase().includes(needle),
+    `${c.title ?? ""} ${c.other_display_name ?? ""} ${c.other_email ?? ""}`.toLowerCase().includes(needle),
   );
 
   return (
@@ -72,7 +73,7 @@ export function SearchResults({ query, onNavigate }: { query: string; onNavigate
                   onClick={onNavigate}
                   className="block rounded-xl px-2 py-2 hover:bg-accent/60"
                 >
-                  {displayNameOf(c.other_display_name, c.other_email)}
+                  {conversationName(c)}
                 </Link>
               </li>
             ))}
@@ -91,7 +92,12 @@ export function SearchResults({ query, onNavigate }: { query: string; onNavigate
           <ul>
             {results.map((r) => {
               const conv = conversations.find((c) => c.id === r.conversation_id);
-              const who = r.sender_id === access.user_id ? "You" : displayNameOf(conv?.other_display_name, conv?.other_email);
+              const who =
+                r.sender_id === access.user_id
+                  ? "You: "
+                  : conv?.kind === "direct"
+                    ? `${displayNameOf(conv.other_display_name, conv.other_email)}: `
+                    : "";
               return (
                 <li key={r.message_id}>
                   <Link
@@ -101,14 +107,15 @@ export function SearchResults({ query, onNavigate }: { query: string; onNavigate
                   >
                     <span className="flex items-baseline gap-2">
                       <span className="flex-1 truncate text-sm font-medium">
-                        {displayNameOf(conv?.other_display_name, conv?.other_email)}
+                        {conv ? conversationName(conv) : "Conversation"}
                       </span>
                       <time dateTime={r.created_at} className="text-xs text-muted-foreground">
                         {formatListTime(r.created_at)}
                       </time>
                     </span>
                     <span className="line-clamp-2 text-sm text-muted-foreground">
-                      {who}: <Highlight text={r.body} query={query} />
+                      {who}
+                      <Highlight text={r.body} query={query} />
                     </span>
                   </Link>
                 </li>

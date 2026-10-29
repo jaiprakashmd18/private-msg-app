@@ -760,3 +760,258 @@ describe("push notifications", () => {
     expect(second.vapid_public).toBe(first.vapid_public);
   });
 });
+
+describe("group chats", () => {
+  async function group(admin: string, members: string[], title = "Weekend plans") {
+    const [row] = await asUser<{ id: string }>(admin, "select public.create_group($1, $2) as id", [title, members]);
+    return row.id;
+  }
+  const sendTo = (userId: string, conv: string, body: string) => send(userId, conv, body);
+
+  it("creates a group; members chat, outsiders see nothing", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const c = await createUser();
+    const out = await createUser();
+    const g = await group(a.id, [b.id, c.id]);
+    await sendTo(b.id, g, "hi all");
+    for (const u of [a, b, c]) {
+      const rows = await asUser<{ body: string }>(u.id, "select body from public.messages where conversation_id = $1 and system_event is null", [g]);
+      expect(rows.map((r) => r.body)).toEqual(["hi all"]);
+    }
+    expect(await asUser(out.id, "select 1 from public.messages where conversation_id = $1", [g])).toHaveLength(0);
+    await expect(sendTo(out.id, g, "let me in")).rejects.toThrow(/not a member/i);
+    const [inbox] = await asUser<{ kind: string; title: string; member_count: number; is_group_admin: boolean }>(
+      a.id,
+      "select * from public.list_conversations() where id = $1",
+      [g],
+    );
+    expect(inbox).toMatchObject({ kind: "group", title: "Weekend plans", member_count: 3, is_group_admin: true });
+  });
+
+  it("validates group creation", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    await expect(group(a.id, [b.id], "  ")).rejects.toThrow(/Group name/i);
+    await expect(group(a.id, [a.id])).rejects.toThrow(/at least one other/i);
+    await asOwner("update public.authorized_emails set status = 'disabled' where id = $1", [b.entryId]);
+    await expect(group(a.id, [b.id])).rejects.toThrow(/don't have access/i);
+  });
+
+  it("only group admins add, remove or rename; anyone can leave", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const c = await createUser();
+    const g = await group(a.id, [b.id]);
+    await expect(asUser(b.id, "select public.add_group_members($1, $2)", [g, [c.id]])).rejects.toThrow(/Only group admins/i);
+    await expect(asUser(b.id, "select public.remove_group_member($1, $2)", [g, a.id])).rejects.toThrow(/Only group admins/i);
+    await expect(asUser(b.id, "select public.rename_group($1, 'Hacked')", [g])).rejects.toThrow(/Only group admins/i);
+    await expect(asUser(b.id, "select public.set_group_admin($1, $2, true)", [g, b.id])).rejects.toThrow(/Only group admins/i);
+
+    await asUser(a.id, "select public.add_group_members($1, $2)", [g, [c.id]]);
+    await asUser(a.id, "select public.rename_group($1, 'Renamed')", [g]);
+    const events = await asUser<{ e: { type: string } }>(
+      c.id,
+      "select system_event as e from public.messages where conversation_id = $1 and system_event is not null order by created_at",
+      [g],
+    );
+    expect(events.map((r) => r.e.type)).toEqual(["group_created", "member_added", "renamed"]);
+
+    await asUser(b.id, "select public.remove_group_member($1, $2)", [g, b.id]); // leave
+    expect(await asUser(b.id, "select 1 from public.messages where conversation_id = $1", [g])).toHaveLength(0);
+  });
+
+  it("removed members lose access immediately; re-added members get it back", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const c = await createUser();
+    const g = await group(a.id, [b.id, c.id]);
+    await sendTo(a.id, g, "before");
+    await asUser(a.id, "select public.remove_group_member($1, $2)", [g, b.id]);
+    expect(await asUser(b.id, "select 1 from public.messages where conversation_id = $1", [g])).toHaveLength(0);
+    expect(await asUser(b.id, "select * from public.list_conversations() where id = $1", [g])).toHaveLength(0);
+    await expect(sendTo(b.id, g, "still here?")).rejects.toThrow(/not a member/i);
+    await expect(asUser(b.id, "select * from public.list_conversation_members($1)", [g])).rejects.toThrow(/not a member/i);
+    await asUser(a.id, "select public.add_group_members($1, $2)", [g, [b.id]]);
+    expect((await asUser(b.id, "select 1 from public.messages where conversation_id = $1 and system_event is null", [g])).length).toBe(1);
+  });
+
+  it("keeps an admin when the last admin leaves", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const g = await group(a.id, [b.id]);
+    await asUser(a.id, "select public.remove_group_member($1, $2)", [g, a.id]);
+    const members = await asUser<{ user_id: string; is_admin: boolean; left_at: string | null }>(
+      b.id,
+      "select * from public.list_conversation_members($1)",
+      [g],
+    );
+    expect(members.filter((m) => !m.left_at)).toEqual([expect.objectContaining({ user_id: b.id, is_admin: true })]);
+    // The person who left is still listed (for names in the history), marked as left.
+    expect(members.find((m) => m.user_id === a.id)?.left_at).not.toBeNull();
+  });
+
+  it("group keeps working when one member is disabled; read receipts wait for everyone", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const c = await createUser();
+    const g = await group(a.id, [b.id, c.id]);
+    await sendTo(a.id, g, "ping");
+    await asUser(b.id, "select public.mark_conversation_read($1)", [g]);
+    let [row] = await asUser<{ other_last_read_at: string | null }>(a.id, "select * from public.list_conversations() where id = $1", [g]);
+    expect(row.other_last_read_at).toBeNull(); // C hasn't read yet
+    await asUser(c.id, "select public.mark_conversation_read($1)", [g]);
+    [row] = await asUser<{ other_last_read_at: string | null }>(a.id, "select * from public.list_conversations() where id = $1", [g]);
+    expect(row.other_last_read_at).not.toBeNull();
+
+    await asOwner("update public.authorized_emails set status = 'disabled' where id = $1", [c.entryId]);
+    await expect(sendTo(a.id, g, "still works")).resolves.toBeDefined();
+  });
+
+  it("system messages don't count as unread and can't be edited or deleted", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const g = await group(a.id, [b.id]);
+    const [row] = await asUser<{ unread_count: number }>(b.id, "select * from public.list_conversations() where id = $1", [g]);
+    expect(row.unread_count).toBe(0);
+    const [sys] = await asOwner<{ id: string }>("select id from public.messages where conversation_id = $1 and system_event is not null", [g]);
+    await expect(asUser(a.id, "select public.edit_message($1, 'x')", [sys.id])).rejects.toThrow(/not found/i);
+    await expect(asUser(a.id, "select public.delete_message($1)", [sys.id])).rejects.toThrow(/not found/i);
+  });
+});
+
+describe("replies and reactions", () => {
+  it("replies must point into the same conversation", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const c = await createUser();
+    const ab = await directConversation(a.id, b.id);
+    const ac = await directConversation(a.id, c.id);
+    const original = await send(a.id, ab, "original");
+    const elsewhere = await send(a.id, ac, "elsewhere");
+    const [reply] = await asUser<{ reply_to_id: string }>(
+      b.id,
+      "select * from public.send_message($1, $2, 'reply', '[]', $3)",
+      [ab, randomUUID(), original.id],
+    );
+    expect(reply.reply_to_id).toBe(original.id);
+    await expect(
+      asUser(b.id, "select * from public.send_message($1, $2, 'sneaky', '[]', $3)", [ab, randomUUID(), elsewhere.id]),
+    ).rejects.toThrow(/not in this conversation/i);
+  });
+
+  it("members react (one per person, tap again to remove); outsiders can't", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const c = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    const m = await send(a.id, conv, "react to me");
+    await asUser(b.id, "select public.toggle_reaction($1, '👍')", [m.id]);
+    await asUser(b.id, "select public.toggle_reaction($1, '❤️')", [m.id]); // changes, not adds
+    let rows = await asUser<{ emoji: string | null }>(a.id, "select emoji from public.message_reactions where message_id = $1", [m.id]);
+    expect(rows.map((r) => r.emoji)).toEqual(["❤️"]);
+    await asUser(b.id, "select public.toggle_reaction($1, '❤️')", [m.id]); // same again = remove
+    rows = await asUser<{ emoji: string | null }>(a.id, "select emoji from public.message_reactions where message_id = $1", [m.id]);
+    expect(rows.map((r) => r.emoji)).toEqual([null]);
+
+    await expect(asUser(c.id, "select public.toggle_reaction($1, '😂')", [m.id])).rejects.toThrow(/not found/i);
+    expect(await asUser(c.id, "select 1 from public.message_reactions where message_id = $1", [m.id])).toHaveLength(0);
+    await expect(
+      asUser(c.id, "insert into public.message_reactions (message_id, conversation_id, user_id, emoji) values ($1, $2, $3, '😂')", [
+        m.id,
+        conv,
+        c.id,
+      ]),
+    ).rejects.toThrow(/permission denied/i);
+    await asUser(a.id, "select public.delete_message($1)", [m.id]);
+    await expect(asUser(b.id, "select public.toggle_reaction($1, '👍')", [m.id])).rejects.toThrow(/can't react/i);
+  });
+});
+
+describe("photos, thumbnails and voice notes", () => {
+  async function upload(userId: string, path: string, mimetype = "image/jpeg", size = 2000) {
+    await asUser(
+      userId,
+      "insert into storage.objects (bucket_id, name, owner_id, metadata) values ('attachments', $1, $2, $3)",
+      [path, userId, JSON.stringify({ size, mimetype })],
+    );
+  }
+
+  it("stores size and duration info; thumbnails are readable by members only", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const c = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    const photo = `${conv}/${a.id}/${randomUUID()}-photo.jpg`;
+    const thumb = `${conv}/${a.id}/${randomUUID()}-thumb.jpg`;
+    const voice = `${conv}/${a.id}/${randomUUID()}-voice.webm`;
+    await upload(a.id, photo);
+    await upload(a.id, thumb, "image/jpeg", 300);
+    await upload(a.id, voice, "audio/webm", 5000);
+    await asUser(a.id, "select public.send_message($1, $2, '', $3::jsonb)", [
+      conv,
+      randomUUID(),
+      JSON.stringify([
+        { path: photo, thumb_path: thumb, name: "photo.jpg", width: 1600, height: 1200 },
+        { path: voice, name: "Voice message", duration_ms: 4200 },
+      ]),
+    ]);
+    const atts = await asUser<{ mime_type: string; width: number; duration_ms: number; thumb_path: string }>(
+      b.id,
+      "select * from public.attachments where conversation_id = $1 order by mime_type",
+      [conv],
+    );
+    expect(atts.map((x) => [x.mime_type, x.width, x.duration_ms])).toEqual([
+      ["audio/webm", null, 4200],
+      ["image/jpeg", 1600, null],
+    ]);
+    expect(await asUser(b.id, "select 1 from storage.objects where name = $1", [thumb])).toHaveLength(1);
+    expect(await asUser(c.id, "select 1 from storage.objects where name = $1", [thumb])).toHaveLength(0);
+  });
+
+  it("rejects thumbnails that aren't the sender's own upload", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    const photo = `${conv}/${a.id}/${randomUUID()}-p.jpg`;
+    const bThumb = `${conv}/${b.id}/${randomUUID()}-t.jpg`;
+    await upload(a.id, photo);
+    await upload(b.id, bThumb);
+    await expect(
+      asUser(a.id, "select public.send_message($1, $2, '', $3::jsonb)", [
+        conv,
+        randomUUID(),
+        JSON.stringify([{ path: photo, thumb_path: bThumb, name: "p.jpg" }]),
+      ]),
+    ).rejects.toThrow(/Invalid thumbnail/i);
+  });
+
+  it("deleting a photo message returns both file and thumbnail for removal", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    const photo = `${conv}/${a.id}/${randomUUID()}-p.jpg`;
+    const thumb = `${conv}/${a.id}/${randomUUID()}-t.jpg`;
+    await upload(a.id, photo);
+    await upload(a.id, thumb);
+    const [m] = await asUser<{ id: string }>(a.id, "select * from public.send_message($1, $2, '', $3::jsonb)", [
+      conv,
+      randomUUID(),
+      JSON.stringify([{ path: photo, thumb_path: thumb, name: "p.jpg" }]),
+    ]);
+    const paths = await asUser<{ p: string }>(a.id, "select p from public.delete_message($1) as p", [m.id]);
+    expect(paths.map((r) => r.p).sort()).toEqual([photo, thumb].sort());
+  });
+});
+
+describe("online status", () => {
+  it("heartbeat updates last seen, visible to conversation members", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    await send(a.id, conv, "hi");
+    await asUser(a.id, "select public.heartbeat()");
+    const [row] = await asUser<{ other_last_seen_at: string | null }>(b.id, "select * from public.list_conversations() where id = $1", [conv]);
+    expect(row.other_last_seen_at).not.toBeNull();
+  });
+});

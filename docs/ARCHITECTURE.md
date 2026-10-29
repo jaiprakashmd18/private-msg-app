@@ -41,7 +41,8 @@
 │   │   ├── …0400_admin.sql              # admin RPCs, retention, server-only functions
 │   │   ├── …0500_storage_realtime.sql   # attachments bucket + policies, realtime publication
 │   │   ├── …0600_access_token_hook.sql  # refuse tokens for non-active users
-│   │   └── …0700_push_notifications.sql # device subscriptions, notify-once rules
+│   │   ├── …0700_push_notifications.sql # device subscriptions, notify-once rules
+│   │   └── …0800_chat_features.sql      # groups, replies, reactions, thumbnails, voice, typing/online
 │   ├── seed.sql                     # LOCAL ONLY example allowlist
 │   └── snippets/create_first_admin.sql
 ├── src/
@@ -140,3 +141,12 @@
 - Turning notifications on (Settings) asks permission, subscribes with the server's VAPID public key (`/api/push/key`) and stores the subscription with `save_push_subscription`.
 - After a message is saved, the sender's app calls `/api/push/notify`. The route takes the sender from the session and asks `server_push_targets` (service role) for recipient devices; the database enforces "real sender, recent, once, active recipients only". Payloads are encrypted per device by `web-push`; expired subscriptions (404/410) are deleted.
 - The service worker skips the notification if that exact conversation is open and focused; tapping a notification focuses an open window or opens the chat. The installed app's icon shows the unread total (Badging API, where supported).
+
+## 8. Groups, replies, reactions, media, typing and online
+
+- **Groups** are `conversations.kind = 'group'` with a `title`; `conversation_members` gains `is_admin` and `left_at` (soft removal). Group events are stored as messages with `system_event` (e.g. `{"type":"member_added","user_id":…}`) and rendered as centered notes. Read receipts in groups use the *minimum* watermark of the other members, so ✓✓ blue means everyone has read it.
+- **Replies** use `messages.reply_to_id` (same conversation enforced); the client embeds the quoted message with `reply_to:reply_to_id(...)`.
+- **Reactions** live in `message_reactions` (one per person per message; NULL emoji = removed) and stream via Postgres Changes.
+- **Photos** are processed in the browser (`src/lib/media.ts`): decoded, resized to ≤2048 px when large, and a ≤480 px JPEG thumbnail is uploaded next to the original (`attachments.thumb_path`, `width`, `height`). The chat shows thumbnails; the lightbox loads the full photo.
+- **Voice notes** use `MediaRecorder` (MP4/AAC preferred for iPhone playback, WebM/Opus otherwise) and store `duration_ms`.
+- **Typing** is a Broadcast on the private channel `conv:<id>`; **online** is Presence on the private channel `online`; "last seen" comes from a 60-second `heartbeat()` RPC. Channel access is enforced by RLS policies on `realtime.messages`.

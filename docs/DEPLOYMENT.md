@@ -111,6 +111,15 @@ Notifications are per device: turn them on on each phone/computer you use. *Show
 
 **Already set up the database before this feature existed?** Run `supabase/update_push_notifications.sql` once in the SQL Editor (copy it from GitHub like `setup_all.sql`). New projects don't need it.
 
+## 7c. Updating an existing project
+
+When a new version adds database changes, the repository includes an `update_*.sql` file. Run each one **once**, in this order, in the SQL Editor (only the ones you haven't run yet):
+
+1. `supabase/update_push_notifications.sql` — notifications
+2. `supabase/update_chat_features.sql` — group chats, replies, reactions, photo thumbnails, voice notes, typing and online status
+
+Vercel deploys the new app code automatically when the code on GitHub changes. New projects only need `setup_all.sql`, which always contains everything.
+
 ## 8. Test that access control works
 
 Run the checklist in [SECURITY_TESTING_CHECKLIST.md](SECURITY_TESTING_CHECKLIST.md). At minimum:
@@ -171,4 +180,7 @@ Requires Node.js 20.9+ (https://nodejs.org) and Docker Desktop.
 | "Turn on notifications" fails with an error | Run `supabase/update_push_notifications.sql` (step 7b) if your database predates notifications. |
 | No notifications on iPhone | The app must be opened from the Home Screen icon (iOS 16.4+), and notifications allowed in iPhone Settings → Notifications → (app name). |
 | Notifications stopped | Phone settings may have blocked them, or the subscription expired: Settings → Turn off notifications → Turn on again. |
+| Voice message: "Microphone access was blocked" | Allow the microphone for the site/app in browser or phone settings (iPhone: Settings → Safari → Microphone, or Settings → the installed app). |
+| A voice message shows "Can't play here — download" | It was recorded in a format this device can't play (rare; older iPhones with WebM recordings). Download plays it in another app. |
+| Typing / online status never shows | Make sure `update_chat_features.sql` (or the full setup) ran — it adds the permissions for the private realtime channels. |
 | Messages only appear after refresh | Make sure migration `…0500` ran (it enables Realtime for messages). |

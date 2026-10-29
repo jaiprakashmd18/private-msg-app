@@ -235,6 +235,74 @@ describe.skipIf(!enabled)("Supabase end-to-end", () => {
     expect(forAdmin.error).not.toBeNull();
   });
 
+  it("typing signals on a private conversation channel reach members only", { timeout: 30_000 }, async () => {
+    const topic = `conv:${conversationId}`;
+    const join = (u: TestUser) =>
+      new Promise<{ ch: ReturnType<SupabaseClient["channel"]>; status: string }>((resolve) => {
+        const ch = u.sb.channel(topic, { config: { private: true } });
+        ch.subscribe((status) => {
+          if (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") resolve({ ch, status });
+        });
+      });
+    const got: unknown[] = [];
+    const bobJoin = await join(bob);
+    expect(bobJoin.status).toBe("SUBSCRIBED");
+    bobJoin.ch.on("broadcast", { event: "typing" }, (msg) => got.push(msg.payload));
+    const aliceJoin = await join(alice);
+    expect(aliceJoin.status).toBe("SUBSCRIBED");
+    // The outsider (admin isn't in Alice & Bob's chat) is refused by the channel policy.
+    const outsider = await join(admin);
+    expect(outsider.status).not.toBe("SUBSCRIBED");
+
+    const deadline = Date.now() + 15_000;
+    while (got.length === 0 && Date.now() < deadline) {
+      await aliceJoin.ch.send({ type: "broadcast", event: "typing", payload: { user_id: alice.userId } });
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    expect(got[0]).toEqual({ user_id: alice.userId });
+  });
+
+  it("online presence is shared between active members", { timeout: 30_000 }, async () => {
+    const online = (u: TestUser) => {
+      const ch = u.sb.channel("online", { config: { private: true, presence: { key: u.userId } } });
+      return new Promise<typeof ch>((resolve) =>
+        ch.subscribe(async (status) => {
+          if (status === "SUBSCRIBED") {
+            await ch.track({ at: Date.now() });
+            resolve(ch);
+          }
+        }),
+      );
+    };
+    const aliceCh = await online(alice);
+    await online(bob);
+    const seen = await waitFor(() => (Object.keys(aliceCh.presenceState()).includes(bob.userId) ? true : undefined), 15_000);
+    expect(seen).toBe(true);
+  });
+
+  it("reactions arrive in real time", { timeout: 30_000 }, async () => {
+    const got: { emoji: string | null }[] = [];
+    await new Promise<void>((resolve) => {
+      alice.sb
+        .channel(`reactions-${randomUUID()}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, (p) =>
+          got.push(p.new as { emoji: string | null }),
+        )
+        .subscribe((status) => status === "SUBSCRIBED" && resolve());
+    });
+    const { data: m } = await alice.sb.rpc("send_message", {
+      p_conversation_id: conversationId,
+      p_client_id: randomUUID(),
+      p_body: "react please",
+    });
+    const deadline = Date.now() + 15_000;
+    while (got.length === 0 && Date.now() < deadline) {
+      await bob.sb.rpc("toggle_reaction", { p_message_id: (m as { id: string }).id, p_emoji: "👍" });
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    expect(got.some((r) => r.emoji === "👍" || r.emoji === null)).toBe(true);
+  });
+
   it("revoking access cuts off an existing session immediately", async () => {
     const { data: entries } = await admin.sb.rpc("admin_list_allowlist");
     const bobEntry = (entries as { id: string; email: string }[]).find((e) => e.email === bob.email)!;

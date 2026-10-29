@@ -1,5 +1,6 @@
 export const MAX_MESSAGE_LENGTH = 4000;
-export const MAX_ATTACHMENTS_PER_MESSAGE = 5;
+export const MAX_ATTACHMENTS_PER_MESSAGE = 10;
+export const MAX_VOICE_NOTE_MS = 5 * 60 * 1000;
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export const MESSAGES_PAGE_SIZE = 50;
 export const ATTACHMENTS_BUCKET = "attachments";
@@ -11,6 +12,13 @@ export const ALLOWED_ATTACHMENT_TYPES = [
   "image/gif",
   "image/webp",
   "image/heic",
+  "audio/webm",
+  "audio/ogg",
+  "audio/mp4",
+  "audio/mpeg",
+  "audio/aac",
+  "audio/x-m4a",
+  "audio/wav",
   "application/pdf",
   "text/plain",
   "application/zip",

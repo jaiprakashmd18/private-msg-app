@@ -3,55 +3,100 @@
 import { FileText, ImageOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApp } from "@/components/app-provider";
+import { VoicePlayer } from "@/components/chat/voice-player";
 import { Skeleton } from "@/components/ui/skeleton";
 import { signedAttachmentUrl } from "@/lib/data/chat";
 import { formatBytes } from "@/lib/format";
+import { isAudio, isImage } from "@/lib/media";
 import { cn } from "@/lib/utils";
 import type { Attachment } from "@/types/app";
 
 /**
- * Attachments live in a private bucket. A short-lived signed URL is requested
- * per view; Storage only issues it if the RLS policy allows this user.
+ * Attachments live in a private bucket. Short-lived signed URLs are requested
+ * per file (Storage only issues them if the RLS policy allows this user) and
+ * reused for a few minutes.
  */
-export function AttachmentView({ attachment, mine }: { attachment: Attachment; mine: boolean }) {
+const urlCache = new Map<string, string>();
+
+function remember(key: string, url: string) {
+  urlCache.set(key, url);
+  setTimeout(() => urlCache.delete(key), 20 * 60_000); // signed URLs last 30 minutes
+}
+
+function useSignedUrl(path: string | null, download?: string): { url: string | null; failed: boolean } {
   const { supabase } = useApp();
-  const isImage = attachment.mime_type.startsWith("image/") && attachment.mime_type !== "image/heic";
-  const [url, setUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
+  const key = path ? `${path}|${download ?? ""}` : null;
+  const [fetched, setFetched] = useState<{ key: string; url: string | null; failed: boolean } | null>(null);
 
   useEffect(() => {
+    if (!path || !key || urlCache.has(key)) return;
     let cancelled = false;
-    signedAttachmentUrl(supabase, attachment.storage_path, isImage ? undefined : attachment.file_name)
-      .then((u) => !cancelled && setUrl(u))
-      .catch(() => !cancelled && setFailed(true));
+    signedAttachmentUrl(supabase, path, download)
+      .then((url) => {
+        remember(key, url);
+        if (!cancelled) setFetched({ key, url, failed: false });
+      })
+      .catch(() => !cancelled && setFetched({ key, url: null, failed: true }));
     return () => {
       cancelled = true;
     };
-  }, [supabase, attachment.storage_path, attachment.file_name, isImage]);
+  }, [supabase, path, download, key]);
 
-  if (isImage) {
-    if (failed) {
-      return (
-        <div className="flex items-center gap-2 rounded-lg bg-black/10 p-3 text-xs">
-          <ImageOff className="size-4" aria-hidden /> Image unavailable
-        </div>
-      );
-    }
-    if (!url) return <Skeleton className="h-48 w-64 max-w-full rounded-lg" />;
-    return (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg">
-        {/* eslint-disable-next-line @next/next/no-img-element -- signed, short-lived private URL */}
-        <img
-          src={url}
-          alt={attachment.file_name}
-          className="max-h-80 w-auto max-w-full object-cover"
-          loading="lazy"
-          onError={() => setFailed(true)}
-        />
-      </a>
-    );
-  }
+  const cached = key ? urlCache.get(key) : undefined;
+  if (cached) return { url: cached, failed: false };
+  if (fetched && fetched.key === key) return fetched;
+  return { url: null, failed: false };
+}
 
+function Thumb({
+  attachment,
+  onOpen,
+  className,
+  overlay,
+}: {
+  attachment: Attachment;
+  onOpen: () => void;
+  className?: string;
+  overlay?: string;
+}) {
+  const { url, failed } = useSignedUrl(attachment.thumb_path ?? attachment.storage_path);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={cn("relative block overflow-hidden rounded-lg bg-black/20", className)}
+      aria-label={`Open photo ${attachment.file_name}`}
+    >
+      {failed ? (
+        <span className="flex h-full min-h-24 items-center justify-center gap-2 p-3 text-xs">
+          <ImageOff className="size-4" aria-hidden /> Unavailable
+        </span>
+      ) : url ? (
+        // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL of a private file
+        <img src={url} alt={attachment.file_name} loading="lazy" className="h-full w-full object-cover" />
+      ) : (
+        <Skeleton className="h-full w-full rounded-none" />
+      )}
+      {overlay && (
+        <span className="absolute inset-0 grid place-items-center bg-black/55 text-xl font-semibold text-white">{overlay}</span>
+      )}
+    </button>
+  );
+}
+
+function SingleImage({ attachment, onOpen }: { attachment: Attachment; onOpen: () => void }) {
+  const ratio = attachment.width && attachment.height ? attachment.width / attachment.height : 4 / 3;
+  // Reserve the right space up front so the chat doesn't jump while loading.
+  const style = { aspectRatio: String(Math.min(Math.max(ratio, 0.5), 2)) };
+  return (
+    <div style={style} className="w-64 max-w-full sm:w-72">
+      <Thumb attachment={attachment} onOpen={onOpen} className="h-full w-full" />
+    </div>
+  );
+}
+
+function FileChip({ attachment, mine }: { attachment: Attachment; mine: boolean }) {
+  const { url, failed } = useSignedUrl(attachment.storage_path, attachment.file_name);
   return (
     <a
       href={url ?? undefined}
@@ -65,10 +110,54 @@ export function AttachmentView({ attachment, mine }: { attachment: Attachment; m
       <FileText className="size-5 shrink-0" aria-hidden />
       <span className="min-w-0">
         <span className="block truncate text-sm font-medium">{attachment.file_name}</span>
-        <span className="block text-xs opacity-75">
-          {failed ? "Unavailable" : formatBytes(Number(attachment.size_bytes))}
-        </span>
+        <span className="block text-xs opacity-75">{failed ? "Unavailable" : formatBytes(Number(attachment.size_bytes))}</span>
       </span>
     </a>
+  );
+}
+
+function Voice({ attachment, mine }: { attachment: Attachment; mine: boolean }) {
+  const { url } = useSignedUrl(attachment.storage_path);
+  return <VoicePlayer src={url} durationMs={attachment.duration_ms} mine={mine} />;
+}
+
+/** All attachments of one message: photo grid, voice notes, then files. */
+export function MessageAttachments({
+  attachments,
+  mine,
+  onOpenImage,
+}: {
+  attachments: Attachment[];
+  mine: boolean;
+  onOpenImage: (attachmentId: string) => void;
+}) {
+  const images = attachments.filter((a) => isImage(a.mime_type) && a.mime_type !== "image/heic");
+  const audio = attachments.filter((a) => isAudio(a.mime_type));
+  const files = attachments.filter((a) => !images.includes(a) && !audio.includes(a));
+  const shown = images.slice(0, 4);
+
+  return (
+    <div className="grid gap-1.5">
+      {images.length === 1 && <SingleImage attachment={images[0]!} onOpen={() => onOpenImage(images[0]!.id)} />}
+      {images.length > 1 && (
+        <div className="grid w-64 max-w-full grid-cols-2 gap-1 sm:w-72">
+          {shown.map((a, i) => (
+            <Thumb
+              key={a.id}
+              attachment={a}
+              onOpen={() => onOpenImage(a.id)}
+              className="aspect-square"
+              overlay={i === 3 && images.length > 4 ? `+${images.length - 4}` : undefined}
+            />
+          ))}
+        </div>
+      )}
+      {audio.map((a) => (
+        <Voice key={a.id} attachment={a} mine={mine} />
+      ))}
+      {files.map((a) => (
+        <FileChip key={a.id} attachment={a} mine={mine} />
+      ))}
+    </div>
   );
 }

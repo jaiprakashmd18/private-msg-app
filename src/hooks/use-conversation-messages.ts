@@ -11,12 +11,13 @@ import {
   fetchMessagesSince,
   markConversationRead,
   sendMessage as sendMessageApi,
+  toggleReaction,
   uploadAttachment,
   type UploadedAttachment,
 } from "@/lib/data/chat";
 import { requestPushForMessage } from "@/lib/pwa-client";
 import { MESSAGES_PAGE_SIZE } from "@/lib/constants";
-import type { Message, UiMessage } from "@/types/app";
+import type { Message, PendingFile, Reaction, UiMessage } from "@/types/app";
 
 function sortMessages(list: UiMessage[]): UiMessage[] {
   return [...list].sort((a, b) => {
@@ -34,12 +35,23 @@ function upsert(list: UiMessage[], incoming: Message): UiMessage[] {
   const merged: UiMessage = {
     ...existing,
     ...incoming,
+    // Realtime rows carry no embedded relations; keep what we already have.
     attachments: incoming.attachments ?? existing?.attachments ?? [],
+    message_reactions: incoming.message_reactions ?? existing?.message_reactions ?? [],
+    reply_to: incoming.reply_to !== undefined ? incoming.reply_to : existing?.reply_to,
     local_status: undefined,
     local_files: undefined,
   };
-  if (merged.deleted_at) merged.attachments = [];
+  if (merged.deleted_at) {
+    merged.attachments = [];
+    merged.message_reactions = [];
+  }
   return sortMessages([...filtered, merged]);
+}
+
+/** Replaces one person's reaction in a list (null emoji = no reaction). */
+function withReaction(list: Reaction[] | undefined, r: Reaction): Reaction[] {
+  return [...(list ?? []).filter((x) => x.user_id !== r.user_id), { user_id: r.user_id, emoji: r.emoji }];
 }
 
 export function useConversationMessages(conversationId: string) {
@@ -105,6 +117,14 @@ export function useConversationMessages(conversationId: string) {
           .catch(() => undefined);
         return;
       }
+      if (event.type === "reaction") {
+        const r = event.reaction;
+        if (r.conversation_id !== conversationId) return;
+        setMessages((prev) =>
+          prev.map((m) => (m.id === r.message_id ? { ...m, message_reactions: withReaction(m.message_reactions, r) } : m)),
+        );
+        return;
+      }
       if (event.message.conversation_id !== conversationId) return;
       if (event.type === "insert") {
         // Re-read through the API to include attachments (and RLS re-check).
@@ -118,7 +138,11 @@ export function useConversationMessages(conversationId: string) {
         setMessages((prev) => {
           const existing = prev.find((m) => m.id === event.message.id);
           if (!existing) return prev;
-          return upsert(prev, { ...event.message, attachments: existing.attachments });
+          const { attachments, message_reactions, reply_to, ...row } = event.message;
+          void attachments;
+          void message_reactions;
+          void reply_to;
+          return upsert(prev, row);
         });
       }
     });
@@ -140,19 +164,25 @@ export function useConversationMessages(conversationId: string) {
   }, [supabase, conversationId, loadingOlder, reportError]);
 
   const deliver = useCallback(
-    async (clientId: string, body: string, files: File[]) => {
+    async (clientId: string, body: string, files: PendingFile[], replyTo: string | null) => {
       try {
         let uploaded = uploadedRef.current.get(clientId);
         if (!uploaded) {
           uploaded = [];
-          for (const file of files) {
-            uploaded.push(await uploadAttachment(supabase, conversationId, access.user_id, file));
+          for (const pending of files) {
+            uploaded.push(await uploadAttachment(supabase, conversationId, access.user_id, pending));
           }
           uploadedRef.current.set(clientId, uploaded);
         }
         // Same client_id on retry → the server returns the existing message
         // instead of creating a duplicate.
-        const saved = await sendMessageApi(supabase, { conversationId, clientId, body, attachments: uploaded });
+        const saved = await sendMessageApi(supabase, {
+          conversationId,
+          clientId,
+          body,
+          attachments: uploaded,
+          replyTo,
+        });
         uploadedRef.current.delete(clientId);
         requestPushForMessage(saved.id);
         const full = (await fetchMessage(supabase, saved.id).catch(() => null)) ?? saved;
@@ -169,7 +199,7 @@ export function useConversationMessages(conversationId: string) {
   );
 
   const send = useCallback(
-    (body: string, files: File[] = []) => {
+    (body: string, files: PendingFile[] = [], replyTo: UiMessage | null = null) => {
       const clientId = crypto.randomUUID();
       const optimistic: UiMessage = {
         id: `local-${clientId}`,
@@ -180,12 +210,24 @@ export function useConversationMessages(conversationId: string) {
         created_at: new Date().toISOString(),
         edited_at: null,
         deleted_at: null,
+        reply_to_id: replyTo?.id ?? null,
+        reply_to: replyTo
+          ? {
+              id: replyTo.id,
+              body: replyTo.body,
+              sender_id: replyTo.sender_id,
+              deleted_at: replyTo.deleted_at,
+              attachments: replyTo.attachments?.map((a) => ({ mime_type: a.mime_type })),
+            }
+          : null,
+        system_event: null,
         attachments: [],
+        message_reactions: [],
         local_status: "sending",
         local_files: files,
       };
       setMessages((prev) => sortMessages([...prev, optimistic]));
-      void deliver(clientId, body, files);
+      void deliver(clientId, body, files, replyTo?.id ?? null);
     },
     [conversationId, access.user_id, deliver],
   );
@@ -195,7 +237,7 @@ export function useConversationMessages(conversationId: string) {
       const msg = messagesRef.current.find((m) => m.client_id === clientId && m.local_status === "failed");
       if (!msg) return;
       setMessages((prev) => prev.map((m) => (m.client_id === clientId ? { ...m, local_status: "sending" } : m)));
-      void deliver(clientId, msg.body, msg.local_files ?? []);
+      void deliver(clientId, msg.body, msg.local_files ?? [], msg.reply_to_id);
     },
     [deliver],
   );
@@ -238,5 +280,36 @@ export function useConversationMessages(conversationId: string) {
     [supabase, reportError, refreshSoon],
   );
 
-  return { messages, loading, loadingOlder, hasMore, error, loadOlder, send, retry, discard, edit, remove, markRead };
+  const react = useCallback(
+    async (messageId: string, emoji: string) => {
+      const before = messagesRef.current.find((m) => m.id === messageId)?.message_reactions ?? [];
+      const mine = before.find((r) => r.user_id === access.user_id)?.emoji ?? null;
+      const next = mine === emoji ? null : emoji;
+      const apply = (list: Reaction[] | undefined) => withReaction(list, { user_id: access.user_id, emoji: next });
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, message_reactions: apply(m.message_reactions) } : m)));
+      try {
+        await toggleReaction(supabase, messageId, emoji);
+      } catch (err) {
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, message_reactions: before } : m)));
+        reportError(err, "Could not react to the message.");
+      }
+    },
+    [supabase, access.user_id, reportError],
+  );
+
+  return {
+    messages,
+    loading,
+    loadingOlder,
+    hasMore,
+    error,
+    loadOlder,
+    send,
+    retry,
+    discard,
+    edit,
+    remove,
+    react,
+    markRead,
+  };
 }

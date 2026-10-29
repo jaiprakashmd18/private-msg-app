@@ -32,9 +32,12 @@ interface PushTarget {
   auth: string;
   show_preview: boolean;
   conversation_id: string;
+  conversation_kind?: "direct" | "group";
+  conversation_title?: string | null;
   sender_name: string;
   body: string;
   has_attachments: boolean;
+  attachment_kind?: "image" | "audio" | "file" | null;
 }
 
 export interface PushPayload {
@@ -45,10 +48,14 @@ export interface PushPayload {
 }
 
 export function buildPayload(t: Omit<PushTarget, "endpoint" | "p256dh" | "auth">): PushPayload {
-  const preview = t.body.trim() ? t.body.trim().slice(0, 140) : t.has_attachments ? "📎 Attachment" : "New message";
+  const media =
+    t.attachment_kind === "image" ? "📷 Photo" : t.attachment_kind === "audio" ? "🎤 Voice message" : "📎 Attachment";
+  const preview = t.body.trim() ? t.body.trim().slice(0, 140) : t.has_attachments ? media : "New message";
+  const sender = t.sender_name || "Someone";
+  const group = t.conversation_kind === "group";
   return {
-    title: t.sender_name || "New message",
-    body: t.show_preview ? preview : "New message",
+    title: group ? (t.conversation_title ?? "Group") : sender,
+    body: group ? (t.show_preview ? `${sender}: ${preview}` : `New message from ${sender}`) : t.show_preview ? preview : "New message",
     url: `/chat/${t.conversation_id}`,
     tag: t.conversation_id,
   };

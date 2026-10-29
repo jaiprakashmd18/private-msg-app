@@ -62,3 +62,23 @@ export function displayNameOf(name: string | null | undefined, email: string | n
   if (email) return email;
   return "Deleted user";
 }
+
+/** "online", "last seen today at 14:05", "last seen yesterday at …", "last seen 3 Mar". */
+export function formatLastSeen(iso: string | null, now = new Date()): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  if (sameDay(date, now)) return `last seen today at ${time}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (sameDay(date, yesterday)) return `last seen yesterday at ${time}`;
+  return `last seen ${date.toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
+}
+
+/** "Alex is typing…", "Alex and Sam are typing…", "3 people are typing…". */
+export function formatTyping(names: string[]): string {
+  if (names.length === 0) return "";
+  if (names.length === 1) return `${names[0]} is typing…`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
+  return `${names.length} people are typing…`;
+}

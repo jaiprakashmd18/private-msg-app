@@ -55,8 +55,11 @@ export function ConversationsManager({
     setViewMessages(((data ?? []) as Message[]).reverse());
   }
 
-  const names = (c: AdminConversation) =>
-    c.members.map((m) => displayNameOf(m.display_name, m.email)).join(" ↔ ") || "Deleted users";
+  const names = (c: AdminConversation) => {
+    const people = c.members.map((m) => displayNameOf(m.display_name, m.email));
+    if (c.kind === "group") return `${c.title ?? "Group"} · ${people.length} member${people.length === 1 ? "" : "s"}`;
+    return people.join(" ↔ ") || "Deleted users";
+  };
 
   return (
     <div className="grid gap-6">

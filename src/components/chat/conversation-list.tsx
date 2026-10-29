@@ -1,6 +1,6 @@
 "use client";
 
-import { Paperclip } from "lucide-react";
+import { ImageIcon, Mic, Paperclip, Users } from "lucide-react";
 import Link from "next/link";
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
@@ -8,24 +8,57 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { displayNameOf, formatListTime } from "@/lib/format";
+import { describeSystemEvent } from "@/lib/system-events";
 import { cn } from "@/lib/utils";
 import type { ConversationSummary } from "@/types/app";
 
+/** The name shown for a conversation in lists and search. */
+export function conversationName(c: ConversationSummary): string {
+  return c.kind === "group" ? (c.title ?? "Group") : displayNameOf(c.other_display_name, c.other_email);
+}
+
 function preview(c: ConversationSummary, myId: string) {
   if (!c.last_message_id) return <span className="italic">No messages yet</span>;
-  const prefix = c.last_message_sender_id === myId ? "You: " : "";
-  if (c.last_message_deleted) return <span className="italic">{prefix}Message deleted</span>;
+  if (c.last_message_system_event) {
+    return (
+      <span className="italic">
+        {describeSystemEvent(c.last_message_system_event, c.last_message_sender_id, (id) =>
+          id === myId ? "You" : id === c.last_message_sender_id ? (c.last_message_sender_name ?? "Someone") : "someone",
+        )}
+      </span>
+    );
+  }
+  const sender =
+    c.last_message_sender_id === myId
+      ? "You: "
+      : c.kind === "group" && c.last_message_sender_name
+        ? `${c.last_message_sender_name.split(" ")[0]}: `
+        : "";
+  if (c.last_message_deleted) return <span className="italic">{sender}Message deleted</span>;
   if (!c.last_message_body && c.last_message_has_attachments) {
+    const kind = c.last_message_attachment_kind;
     return (
       <span className="inline-flex items-center gap-1">
-        {prefix}
-        <Paperclip className="size-3.5" aria-hidden /> Attachment
+        {sender}
+        {kind === "image" ? (
+          <>
+            <ImageIcon className="size-3.5" aria-hidden /> Photo
+          </>
+        ) : kind === "audio" ? (
+          <>
+            <Mic className="size-3.5" aria-hidden /> Voice message
+          </>
+        ) : (
+          <>
+            <Paperclip className="size-3.5" aria-hidden /> Attachment
+          </>
+        )}
       </span>
     );
   }
   return (
     <>
-      {prefix}
+      {sender}
       {c.last_message_body}
     </>
   );
@@ -41,7 +74,7 @@ export function ConversationList({
   onNew: () => void;
 }) {
   const { access } = useApp();
-  const { conversations, loading } = useChat();
+  const { conversations, loading, onlineIds } = useChat();
 
   if (loading) {
     return (
@@ -62,7 +95,7 @@ export function ConversationList({
   const needle = filter.trim().toLowerCase();
   const visible = needle
     ? conversations.filter((c) =>
-        `${c.other_display_name ?? ""} ${c.other_email ?? ""}`.toLowerCase().includes(needle),
+        `${c.title ?? ""} ${c.other_display_name ?? ""} ${c.other_email ?? ""}`.toLowerCase().includes(needle),
       )
     : conversations;
 
@@ -85,7 +118,8 @@ export function ConversationList({
   return (
     <ul className="space-y-0.5 px-2 pb-4">
       {visible.map((c) => {
-        const name = displayNameOf(c.other_display_name, c.other_email);
+        const name = conversationName(c);
+        const online = c.kind === "direct" && c.other_user_id !== null && onlineIds.has(c.other_user_id) && c.other_is_active;
         const unread = c.unread_count > 0;
         const active = c.id === activeId;
         return (
@@ -98,7 +132,20 @@ export function ConversationList({
                 active && "bg-accent",
               )}
             >
-              <Avatar name={name} seed={c.other_user_id} className={cn("size-11", !c.other_is_active && "opacity-50")} />
+              <span className="relative shrink-0">
+                {c.kind === "group" ? (
+                  <span className="grid size-11 place-items-center rounded-full bg-primary/20 text-primary">
+                    <Users className="size-5" aria-hidden />
+                  </span>
+                ) : (
+                  <Avatar name={name} seed={c.other_user_id} className={cn("size-11", !c.other_is_active && "opacity-50")} />
+                )}
+                {online && (
+                  <span className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-sidebar bg-success">
+                    <span className="sr-only">online</span>
+                  </span>
+                )}
+              </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
                   <span className={cn("flex-1 truncate", unread ? "font-semibold" : "font-medium")}>{name}</span>

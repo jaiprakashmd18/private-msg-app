@@ -8,8 +8,9 @@ A minimal, dark-mode messaging app for a closed group of people. People sign in 
 
 - **Invitation-only Google sign-in** — no passwords, no SMS costs; unapproved Google accounts can't create an account or obtain a token, and other sign-in methods are refused.
 - **Instant revocation** — disabling an account cuts off existing sessions immediately (checked on every query), ends refresh tokens, and blocks new tokens.
-- **1:1 conversations** with realtime delivery, sent/delivered/read indicators, unread counts, last-message previews, infinite history (paginated), search, multiline messages, edit (time-limited) and delete-for-everyone.
-- **Attachments** (images, PDFs, office docs; 10 MB) in a private bucket served by short-lived signed URLs.
+- **1:1 and group chats** (up to 50 people, group admins, add/remove/rename, leave) with realtime delivery, sent/delivered/read indicators, unread counts, previews, paginated history, search, multiline messages, edit (time-limited) and delete-for-everyone.
+- **Replies, reactions, typing, online** — swipe or tap to reply with a quote, one emoji reaction per person, "typing…" and "online / last seen" over private realtime channels.
+- **Photos & voice notes** — big photos are shrunk to 2048 px with chat thumbnails, up to 10 per message, full-screen viewer (swipe, zoom, download), phone camera button; hold-free voice recording (up to 5 min) with a player. Files (PDF, office docs) too; everything in a private bucket via short-lived signed URLs.
 - **Duplicate-safe sending** — every message carries a client-generated id; retries can't create duplicates. Failed sends can be retried or discarded.
 - **Reconnect handling** — automatic catch-up after network loss or tab sleep.
 - **Installable phone app (PWA)** — "Add to Home Screen" on iPhone/Android/desktop with its own icon, full-screen mode, unread badge and an offline page. No app store needed.
@@ -38,7 +39,7 @@ Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). It takes about 30–45 minutes,
 | `npm run dev` / `build` / `start` | Develop, build, run |
 | `npm run lint` · `npm run typecheck` | ESLint · TypeScript strict check |
 | `npm test` | Unit tests (validation, CSRF checks, error mapping, notifications, service worker) |
-| `npm run test:db` | Database security suite (46 tests) — RLS, RPCs, allowlist, revocation, storage policies |
+| `npm run test:db` | Database security suite (59 tests) — RLS, RPCs, allowlist, revocation, storage policies |
 | `npm run test:integration` | End-to-end against a running local Supabase (+ app, for API tests) |
 
 ## Honest status

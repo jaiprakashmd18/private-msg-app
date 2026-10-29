@@ -3,15 +3,16 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "@/components/app-provider";
-import { listConversations, markAllDelivered } from "@/lib/data/chat";
+import { heartbeat, listConversations, markAllDelivered } from "@/lib/data/chat";
 import { setAppBadge } from "@/lib/pwa-client";
-import type { ConversationSummary, Message } from "@/types/app";
+import type { ConversationSummary, Message, Reaction } from "@/types/app";
 
 export type ConnectionState = "connecting" | "online" | "reconnecting";
 
 type MessageEvent =
   | { type: "insert"; message: Message }
   | { type: "update"; message: Message }
+  | { type: "reaction"; reaction: Reaction & { message_id: string; conversation_id: string } }
   | { type: "resync" };
 
 type Listener = (event: MessageEvent) => void;
@@ -25,6 +26,8 @@ interface ChatContextValue {
   refreshSoon: () => void;
   subscribe: (listener: Listener) => () => void;
   getConversation: (id: string) => ConversationSummary | undefined;
+  /** Members currently online (Realtime Presence on a private channel). */
+  onlineIds: ReadonlySet<string>;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -40,6 +43,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
+  const [onlineIds, setOnlineIds] = useState<ReadonlySet<string>>(() => new Set());
   const listeners = useRef(new Set<Listener>());
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deliveredTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,8 +100,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         emit({ type: "update", message: payload.new as Message });
         scheduleRefresh();
       })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversation_members" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversation_members" }, () => {
         scheduleRefresh();
+      })
+      // "Subscribed to PostgreSQL" arrives a moment after SUBSCRIBED; changes made
+      // in between are only caught by refreshing once the feed is really live.
+      .on("system", {}, (payload: { extension?: string; status?: string }) => {
+        if (payload.extension === "postgres_changes" && payload.status === "ok") {
+          scheduleRefresh();
+          emit({ type: "resync" });
+        }
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, (payload) => {
+        const r = payload.new as Reaction & { message_id?: string; conversation_id?: string };
+        if (r.message_id && r.conversation_id) {
+          emit({ type: "reaction", reaction: r as Reaction & { message_id: string; conversation_id: string } });
+        }
       })
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
@@ -128,6 +146,34 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     };
   }, [supabase, access.user_id, emit, scheduleRefresh, scheduleDelivered]);
 
+  // Online presence. Private channel: only active members can join (RLS on
+  // realtime.messages); each tab tracks itself under its user id.
+  useEffect(() => {
+    const channel = supabase.channel("online", {
+      config: { private: true, presence: { key: access.user_id } },
+    });
+    channel
+      .on("presence", { event: "sync" }, () => {
+        setOnlineIds(new Set(Object.keys(channel.presenceState())));
+      })
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") void channel.track({ online_at: new Date().toISOString() });
+      });
+
+    // "Last seen" for when the app is closed.
+    const beat = () => {
+      if (document.visibilityState === "visible") void heartbeat(supabase);
+    };
+    beat();
+    const interval = setInterval(beat, 60_000);
+    document.addEventListener("visibilitychange", beat);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", beat);
+      void supabase.removeChannel(channel);
+    };
+  }, [supabase, access.user_id]);
+
   useEffect(
     () => () => {
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
@@ -154,8 +200,17 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ conversations, loading, connection, refresh, refreshSoon: scheduleRefresh, subscribe, getConversation }),
-    [conversations, loading, connection, refresh, scheduleRefresh, subscribe, getConversation],
+    () => ({
+      conversations,
+      loading,
+      connection,
+      refresh,
+      refreshSoon: scheduleRefresh,
+      subscribe,
+      getConversation,
+      onlineIds,
+    }),
+    [conversations, loading, connection, refresh, scheduleRefresh, subscribe, getConversation, onlineIds],
   );
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }

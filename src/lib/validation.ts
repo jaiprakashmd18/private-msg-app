@@ -40,7 +40,7 @@ export const uuidSchema = z.uuid();
 export function validateAttachment(file: { size: number; type: string }): string | null {
   if (file.size <= 0) return "File is empty";
   if (file.size > MAX_ATTACHMENT_BYTES) return "Files can be at most 10 MB";
-  if (!(ALLOWED_ATTACHMENT_TYPES as readonly string[]).includes(file.type)) {
+  if (!(ALLOWED_ATTACHMENT_TYPES as readonly string[]).includes(file.type.split(";")[0]!.trim())) {
     return "This file type is not supported";
   }
   return null;

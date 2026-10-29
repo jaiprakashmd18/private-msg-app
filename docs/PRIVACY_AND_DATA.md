@@ -10,6 +10,9 @@ The in-app privacy notice lives at `/privacy` (`src/app/privacy/page.tsx`). This
 | Messages (text, timestamps, edit/delete markers) | `messages` | Members of that conversation only; admin **only if** the audited policy is on |
 | Files | Storage bucket `attachments` + `attachments` table | Members of that conversation only |
 | Push notification subscriptions (an opaque address + keys per device, "show preview" choice, browser name) | `push_subscriptions` | Only the owner; used by the server to send notifications |
+| Reactions, replies, group names and membership changes | `message_reactions`, `messages`, `conversations`, `conversation_members` | Members of that conversation |
+| Voice notes and photos (photos are resized to max 2048 px with a small thumbnail) | Storage bucket `attachments` | Members of that conversation |
+| Online status and "last seen" | Realtime presence (not stored); `profiles.last_seen_at` | Active members |
 | Delivery/read watermarks | `conversation_members` | Members of that conversation |
 | Security events (masked email addresses, actor ids, admin actions) | `audit_logs` | Admin |
 
