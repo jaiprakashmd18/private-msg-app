@@ -9,6 +9,7 @@
 -- =============================================================================
 
 
+
 -- >>>>> 20261028000100_schema.sql
 -- =============================================================================
 -- 0100 — Core schema
@@ -539,7 +540,10 @@ create trigger prevent_email_change
   before update of email on auth.users
   for each row execute function private.prevent_email_change();
 
--- Re-adding a previously removed email re-links the existing account.
+-- Adding an email to the allowlist (re-)links the matching account:
+--  * a previously removed email re-links the existing profile;
+--  * a Google login that exists without a profile (e.g. the person signed in
+--    before the database setup was run) gets its profile created now.
 create or replace function private.link_profile_to_allowlist()
 returns trigger
 language plpgsql
@@ -551,6 +555,17 @@ begin
     set authorized_email_id = new.id
     where email = new.email
       and authorized_email_id is null;
+
+  insert into public.profiles (id, email, authorized_email_id, display_name)
+  select u.id, new.email, new.id,
+         left(coalesce(nullif(btrim(new.label), ''),
+                       nullif(btrim(u.raw_user_meta_data ->> 'full_name'), ''),
+                       nullif(btrim(u.raw_user_meta_data ->> 'name'), ''), ''), 60)
+    from auth.users u
+    where private.normalize_email(u.email) = new.email
+      and private.is_allowed_provider(u.raw_app_meta_data ->> 'provider', u.is_anonymous)
+      and not exists (select 1 from public.profiles p where p.id = u.id or p.email = new.email)
+    limit 1;
   return new;
 end;
 $$;

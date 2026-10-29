@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { getAccess } from "@/lib/access";
+import { getAccessState } from "@/lib/access";
 
 export default async function Home() {
-  const access = await getAccess();
-  if (!access) redirect("/login");
-  redirect(access.is_active ? "/chat" : "/unauthorized");
+  const state = await getAccessState();
+  if (state.status === "signed_out") redirect("/login");
+  redirect(state.status === "ok" && state.access.is_active ? "/chat" : "/unauthorized");
 }
