@@ -29,6 +29,7 @@ Automated test files: `tests/db/security.test.ts` (database, 39 tests), `tests/i
 | 19 | Secrets never reach the browser | Service key only in `env.server.ts` (`server-only` import guard), never `NEXT_PUBLIC_` | build fails if imported client-side |
 | 20 | Security headers | CSP (`frame-ancestors 'none'`, connect only to self + Supabase), HSTS, nosniff, no-referrer | api: *sends security headers* |
 | 21 | No sensitive logging | Tokens never logged; audit stores masked emails; server error logs truncate messages and omit bodies | code review (`lib/errors.ts`) |
+| 22 | Push notifications can't be abused | Devices register via `save_push_subscription` (own account, active users only); `server_push_targets` returns devices only for the real sender's undeleted message from the last 10 minutes, once per message, and only for other **active** members; VAPID keys live in the non-exposed `private` schema | db: *push notifications* tests (5); unit: `push.test.ts`, `service-worker.test.ts` |
 
 ### How the RLS tests work
 
@@ -63,6 +64,9 @@ Do not advertise the app as end-to-end encrypted until that is implemented and r
 - **Backups** retain deleted messages until the backup expires.
 - **CSP** allows inline scripts because Next.js injects inline bootstrap scripts; switch to nonce-based CSP if you need stricter XSS hardening. All message content is rendered as text (React escapes it); there is no HTML/Markdown rendering.
 - **Edit history** is not kept; only the latest text and an "edited" marker.
+
+- **Notification content travels through Google/Apple/Mozilla push services.** It is end-to-end encrypted to the device (Web Push encryption, RFC 8291), so those services can't read it, but they see that a notification was sent. The message preview appears on the lock screen unless the member turns *Show message text* off.
+- **The service worker caches no messages or user data** — only a static offline page.
 
 ## 4. Secrets handling
 

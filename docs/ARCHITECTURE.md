@@ -29,6 +29,8 @@
 ├── .github/workflows/ci.yml         # lint, typecheck, unit tests, build, DB security tests
 ├── next.config.ts                   # CSP and security headers
 ├── vercel.json                      # daily retention cron
+├── public/                          # sw.js (push + offline page only), offline.html, icons/
+├── public/sw.js, offline.html, icons/  # PWA: service worker (push + offline page only), app icons
 ├── scripts/test-db.sh               # runs the DB security suite (throwaway Postgres or given DB)
 ├── supabase/
 │   ├── config.toml                  # local stack config: Google provider, auth hooks
@@ -38,7 +40,8 @@
 │   │   ├── …0300_messaging.sql          # chat RPCs (send/edit/delete/read/search)
 │   │   ├── …0400_admin.sql              # admin RPCs, retention, server-only functions
 │   │   ├── …0500_storage_realtime.sql   # attachments bucket + policies, realtime publication
-│   │   └── …0600_access_token_hook.sql  # refuse tokens for non-active users
+│   │   ├── …0600_access_token_hook.sql  # refuse tokens for non-active users
+│   │   └── …0700_push_notifications.sql # device subscriptions, notify-once rules
 │   ├── seed.sql                     # LOCAL ONLY example allowlist
 │   └── snippets/create_first_admin.sql
 ├── src/
@@ -55,6 +58,8 @@
 │   │   └── api/
 │   │       ├── auth/signout/route.ts
 │   │       ├── admin/{users/[id],conversations/[id],retention}/route.ts
+│   │       ├── push/{key,notify}/route.ts  # Web Push (VAPID key auto-created in DB)
+│   │       ├── push/{key,notify}/route.ts  # Web Push (VAPID key auto-created in DB)
 │   │       └── cron/retention/route.ts
 │   ├── components/
 │   │   ├── ui/                      # shadcn/ui-style primitives (Radix based)
@@ -128,3 +133,10 @@
 4. Realtime `INSERT` reaches the other member (RLS-filtered); their client fetches the full row (with attachments), marks it delivered, and — if the conversation is open and visible — read.
 5. Receipt watermark updates arrive via Realtime on `conversation_members`, turning ✓ into ✓✓ and then blue ✓✓.
 6. On reconnect / tab focus / channel (re)subscribe, the client fetches anything newer than its last message.
+
+## 7. Installable app and push notifications
+
+- `src/app/manifest.ts` + `public/icons/*` make the site installable (standalone display, start at `/chat`). `public/sw.js` is registered on every page; it serves `offline.html` when a page load fails and displays pushes. It caches no user data.
+- Turning notifications on (Settings) asks permission, subscribes with the server's VAPID public key (`/api/push/key`) and stores the subscription with `save_push_subscription`.
+- After a message is saved, the sender's app calls `/api/push/notify`. The route takes the sender from the session and asks `server_push_targets` (service role) for recipient devices; the database enforces "real sender, recent, once, active recipients only". Payloads are encrypted per device by `web-push`; expired subscriptions (404/410) are deleted.
+- The service worker skips the notification if that exact conversation is open and focused; tapping a notification focuses an open window or opens the chat. The installed app's icon shows the unread total (Badging API, where supported).

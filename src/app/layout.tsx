@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
+import { ServiceWorker } from "@/components/pwa/service-worker";
 import { APP_NAME } from "@/lib/env";
 import "./globals.css";
 
@@ -8,6 +9,10 @@ export const metadata: Metadata = {
   description: "Private, invitation-only messaging.",
   robots: { index: false, follow: false },
   referrer: "no-referrer",
+  applicationName: APP_NAME,
+  appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "black-translucent" },
+  icons: { icon: "/icon.svg", apple: "/icons/apple-touch-icon.png" },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
@@ -35,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
         {children}
         <Toaster theme="dark" position="top-center" richColors closeButton />
+        <ServiceWorker />
       </body>
     </html>
   );

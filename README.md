@@ -12,6 +12,8 @@ A minimal, dark-mode messaging app for a closed group of people. People sign in 
 - **Attachments** (images, PDFs, office docs; 10 MB) in a private bucket served by short-lived signed URLs.
 - **Duplicate-safe sending** — every message carries a client-generated id; retries can't create duplicates. Failed sends can be retried or discarded.
 - **Reconnect handling** — automatic catch-up after network loss or tab sleep.
+- **Installable phone app (PWA)** — "Add to Home Screen" on iPhone/Android/desktop with its own icon, full-screen mode, unread badge and an offline page. No app store needed.
+- **Push notifications** — per device, with an option to hide message text on the lock screen; sent only to active members, once per message.
 - **Admin dashboard** — allowlist management, account deletion, conversation metadata, storage usage, retention settings, and an append-only audit log.
 - **Explicit privacy policy for admins** — administrators *cannot* read messages unless an audited, member-visible policy is switched on.
 
@@ -35,8 +37,8 @@ Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). It takes about 30–45 minutes,
 | --- | --- |
 | `npm run dev` / `build` / `start` | Develop, build, run |
 | `npm run lint` · `npm run typecheck` | ESLint · TypeScript strict check |
-| `npm test` | Unit tests (validation, CSRF checks, error mapping) |
-| `npm run test:db` | Database security suite (41 tests) — RLS, RPCs, allowlist, revocation, storage policies |
+| `npm test` | Unit tests (validation, CSRF checks, error mapping, notifications, service worker) |
+| `npm run test:db` | Database security suite (46 tests) — RLS, RPCs, allowlist, revocation, storage policies |
 | `npm run test:integration` | End-to-end against a running local Supabase (+ app, for API tests) |
 
 ## Honest status

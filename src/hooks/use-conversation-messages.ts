@@ -14,6 +14,7 @@ import {
   uploadAttachment,
   type UploadedAttachment,
 } from "@/lib/data/chat";
+import { requestPushForMessage } from "@/lib/pwa-client";
 import { MESSAGES_PAGE_SIZE } from "@/lib/constants";
 import type { Message, UiMessage } from "@/types/app";
 
@@ -153,6 +154,7 @@ export function useConversationMessages(conversationId: string) {
         // instead of creating a duplicate.
         const saved = await sendMessageApi(supabase, { conversationId, clientId, body, attachments: uploaded });
         uploadedRef.current.delete(clientId);
+        requestPushForMessage(saved.id);
         const full = (await fetchMessage(supabase, saved.id).catch(() => null)) ?? saved;
         setMessages((prev) => upsert(prev, full));
         refreshSoon();

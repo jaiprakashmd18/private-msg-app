@@ -660,3 +660,103 @@ describe("attachments", () => {
     }
   });
 });
+
+describe("push notifications", () => {
+  const sub = () => ({ endpoint: `https://push.example.com/${randomUUID()}`, p256dh: "BPk3x", auth: "a1b2" });
+  const save = (userId: string, s: ReturnType<typeof sub>, preview = true) =>
+    asUser(userId, "select public.save_push_subscription($1, $2, $3, $4, 'test-agent')", [
+      s.endpoint,
+      s.p256dh,
+      s.auth,
+      preview,
+    ]);
+
+  it("members manage only their own device subscriptions", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const s = sub();
+    await save(a.id, s);
+    expect(await asUser(a.id, "select endpoint from public.push_subscriptions")).toHaveLength(1);
+    expect(await asUser(b.id, "select endpoint from public.push_subscriptions")).toHaveLength(0);
+    await expect(
+      asUser(b.id, "insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) values ($1, $2, 'x', 'y')", [
+        b.id,
+        sub().endpoint,
+      ]),
+    ).rejects.toThrow(/permission denied/i);
+    // B cannot delete A's subscription.
+    await asUser(b.id, "select public.delete_push_subscription($1)", [s.endpoint]);
+    expect(await asOwner("select 1 from public.push_subscriptions where endpoint = $1", [s.endpoint])).toHaveLength(1);
+    await asUser(a.id, "select public.delete_push_subscription($1)", [s.endpoint]);
+    expect(await asOwner("select 1 from public.push_subscriptions where endpoint = $1", [s.endpoint])).toHaveLength(0);
+  });
+
+  it("rejects invalid subscriptions and users without access", async () => {
+    const a = await createUser();
+    await expect(
+      asUser(a.id, "select public.save_push_subscription('http://insecure.example', 'k', 'a')"),
+    ).rejects.toThrow(/Invalid push subscription/i);
+    await asOwner("update public.authorized_emails set status = 'disabled' where id = $1", [a.entryId]);
+    await expect(save(a.id, sub())).rejects.toThrow(/revoked/i);
+  });
+
+  it("server functions are not callable by signed-in users", async () => {
+    const a = await createUser();
+    await expect(asUser(a.id, "select * from public.server_push_targets($1, $2)", [randomUUID(), a.id])).rejects.toThrow(
+      /permission denied/i,
+    );
+    await expect(asUser(a.id, "select * from public.server_get_or_create_vapid('x', 'y')")).rejects.toThrow(
+      /permission denied/i,
+    );
+  });
+
+  it("notifies only the other active members, only once, only for the real sender's recent message", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const conv = await directConversation(a.id, b.id);
+    const aSub = sub();
+    const bSub = sub();
+    await save(a.id, aSub);
+    await save(b.id, bSub, false);
+
+    const m = await send(a.id, conv, "hello there");
+    // Someone else claiming to be the sender gets nothing (and doesn't use up the notification).
+    expect(await asOwner("select * from public.server_push_targets($1, $2)", [m.id, b.id])).toHaveLength(0);
+
+    const targets = await asOwner<{ endpoint: string; show_preview: boolean; body: string; sender_name: string }>(
+      "select * from public.server_push_targets($1, $2)",
+      [m.id, a.id],
+    );
+    expect(targets.map((t) => t.endpoint)).toEqual([bSub.endpoint]); // not the sender's own device
+    expect(targets[0].show_preview).toBe(false);
+    expect(targets[0].body).toBe("hello there");
+    expect(targets[0].sender_name).toBe("Test User");
+
+    // Second call for the same message: nothing (no duplicate notifications).
+    expect(await asOwner("select * from public.server_push_targets($1, $2)", [m.id, a.id])).toHaveLength(0);
+
+    // Old messages can't be used to spam notifications.
+    const old = await send(a.id, conv, "old news");
+    await asOwner("update public.messages set created_at = now() - interval '1 hour' where id = $1", [old.id]);
+    expect(await asOwner("select * from public.server_push_targets($1, $2)", [old.id, a.id])).toHaveLength(0);
+
+    // Disabled recipients are not notified.
+    await asOwner("update public.authorized_emails set status = 'disabled' where id = $1", [b.entryId]);
+    const m2 = await send(b.id, conv, "x").catch(() => null); // B can't send any more
+    expect(m2).toBeNull();
+    await asOwner("update public.authorized_emails set status = 'active' where id = $1", [b.entryId]);
+    const m3 = await send(a.id, conv, "while b disabled");
+    await asOwner("update public.authorized_emails set status = 'disabled' where id = $1", [b.entryId]);
+    expect(await asOwner("select * from public.server_push_targets($1, $2)", [m3.id, a.id])).toHaveLength(0);
+  });
+
+  it("keeps the first VAPID key pair", async () => {
+    const [first] = await asOwner<{ vapid_public: string }>(
+      "select * from public.server_get_or_create_vapid('pub-1', 'priv-1')",
+    );
+    const [second] = await asOwner<{ vapid_public: string }>(
+      "select * from public.server_get_or_create_vapid('pub-2', 'priv-2')",
+    );
+    expect(second.vapid_public).toBe(first.vapid_public);
+  });
+});

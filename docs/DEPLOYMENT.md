@@ -99,6 +99,18 @@ Without this, Google sign-in returns to the wrong place.
 
 Any Google account works, including Google Workspace (company) addresses; it doesn't have to end in `@gmail.com`.
 
+## 7b. Install on phones and turn on notifications
+
+The app is an installable web app (PWA): no app store, nothing extra to host or configure.
+
+- **Android (Chrome):** open the app → **Settings → App & notifications → Install app** (or Chrome menu ⋮ → *Install app*). Then tap **Turn on notifications** and allow.
+- **iPhone / iPad (iOS 16.4+):** open the app in **Safari** → Share button → **Add to Home Screen**. Open the app **from the new icon**, then **Settings → Turn on notifications** and allow. (Apple only allows notifications for apps added to the Home Screen.)
+- **Computer (Chrome/Edge):** the install icon in the address bar, or Settings → Install app.
+
+Notifications are per device: turn them on on each phone/computer you use. *Show message text in notifications* can be switched off if others can see your lock screen. Signing out turns notifications off for that device.
+
+**Already set up the database before this feature existed?** Run `supabase/update_push_notifications.sql` once in the SQL Editor (copy it from GitHub like `setup_all.sql`). New projects don't need it.
+
 ## 8. Test that access control works
 
 Run the checklist in [SECURITY_TESTING_CHECKLIST.md](SECURITY_TESTING_CHECKLIST.md). At minimum:
@@ -156,4 +168,7 @@ Requires Node.js 20.9+ (https://nodejs.org) and Docker Desktop.
 | After Google you land on the Vercel home page or localhost | Fix Site URL / Redirect URLs (step 6). |
 | Google says the app is in testing / access blocked | Publish the app (step 4a.3) or add the person as a test user. |
 | "Invalid public environment configuration" | A `NEXT_PUBLIC_*` variable is missing in Vercel; add it and redeploy. |
+| "Turn on notifications" fails with an error | Run `supabase/update_push_notifications.sql` (step 7b) if your database predates notifications. |
+| No notifications on iPhone | The app must be opened from the Home Screen icon (iOS 16.4+), and notifications allowed in iPhone Settings → Notifications → (app name). |
+| Notifications stopped | Phone settings may have blocked them, or the subscription expired: Settings → Turn off notifications → Turn on again. |
 | Messages only appear after refresh | Make sure migration `…0500` ran (it enables Realtime for messages). |

@@ -4,6 +4,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { listConversations, markAllDelivered } from "@/lib/data/chat";
+import { setAppBadge } from "@/lib/pwa-client";
 import type { ConversationSummary, Message } from "@/types/app";
 
 export type ConnectionState = "connecting" | "online" | "reconnecting";
@@ -134,6 +135,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     },
     [],
   );
+
+  // Unread total on the installed app's icon.
+  useEffect(() => {
+    setAppBadge(conversations.reduce((sum, c) => sum + c.unread_count, 0));
+  }, [conversations]);
 
   const subscribe = useCallback((listener: Listener) => {
     listeners.current.add(listener);

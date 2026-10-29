@@ -1,9 +1,15 @@
 "use client";
 
+import { disablePush } from "@/lib/pwa-client";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 /** Signs out on the server (clears cookies, logs the event) and locally. */
 export async function signOut(everywhere = false) {
+  // Stop this device receiving notifications for the account being signed out.
+  await Promise.race([
+    disablePush(getSupabaseBrowserClient()).catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, 2000)),
+  ]);
   try {
     await fetch("/api/auth/signout", {
       method: "POST",

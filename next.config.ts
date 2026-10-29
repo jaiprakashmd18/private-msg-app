@@ -19,12 +19,22 @@ const csp = [
   "base-uri 'self'",
   "form-action 'self'",
   "object-src 'none'",
+  "worker-src 'self'",
+  "manifest-src 'self'",
 ].join("; ");
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
     return [
+      {
+        // Always fetch the newest service worker so app updates reach installed devices.
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
       {
         source: "/:path*",
         headers: [
