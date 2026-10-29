@@ -27,11 +27,9 @@ There are **no SMS costs**: people sign in with their Google (Gmail) account.
 
 ## 2. Create the database tables and security rules
 
-1. In Supabase open **SQL Editor**.
-2. In your GitHub repository, open the folder `supabase/migrations`. It contains six files.
-3. For each file **in order** (`…0100`, `…0200`, `…0300`, `…0400`, `…0500`, `…0600`): open it, copy the whole contents, paste into the SQL Editor, click **Run**, and check it says *Success*.
-
-   (Using the Supabase CLI instead: `npx supabase login`, `npx supabase link --project-ref <ref>`, `npx supabase db push`.)
+1. In GitHub, open the file `supabase/setup_all.sql`, click the **Copy raw file** button (two overlapping squares, top right of the file).
+2. In Supabase open **SQL Editor → New query**, paste, and click **Run**. It should say *Success* (this file is all six files from `supabase/migrations` combined).
+3. (Alternative: run the six files in `supabase/migrations` one by one in filename order, or use the CLI: `npx supabase link --project-ref <ref>` then `npx supabase db push`.)
 4. Check **Database → Tables** shows `authorized_emails`, `profiles`, `conversations`, `conversation_members`, `messages`, `attachments`, `app_settings`, `audit_logs`, and **Storage** shows a private `attachments` bucket.
 
 > **Already ran the older phone-number version of these files?** Create a new, empty Supabase project and run the six current files there. They are not designed to be applied on top of the old ones.
