@@ -17,7 +17,7 @@ import type {
 
 const MESSAGE_SELECT =
   "*, attachments(*), message_reactions(user_id, emoji), " +
-  "reply_to:reply_to_id(id, body, sender_id, deleted_at, attachments(mime_type, view_once))";
+  "reply_to:reply_to_id(id, body, sender_id, deleted_at, attachments(*))";
 
 export async function listConversations(supabase: SupabaseClient): Promise<ConversationSummary[]> {
   const { data, error } = await supabase.rpc("list_conversations");

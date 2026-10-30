@@ -172,17 +172,27 @@ export async function clearDoneItems(supabase: SupabaseClient, conversationId: s
 export const MEMORIES_PAGE_SIZE = 60;
 
 /** Photos shared in a chat, newest first (view-once photos are never included). */
-export async function listMemories(supabase: SupabaseClient, conversationId: string, before?: string): Promise<Attachment[]> {
+export async function listMemories(
+  supabase: SupabaseClient,
+  conversationId: string,
+  before?: string,
+): Promise<{ photos: Attachment[]; hasMore: boolean; cursor: string | null }> {
   let query = supabase
     .from("attachments")
     .select("*")
     .eq("conversation_id", conversationId)
-    .eq("view_once", false)
     .in("mime_type", ["image/jpeg", "image/png", "image/webp", "image/gif"])
     .order("created_at", { ascending: false })
     .limit(MEMORIES_PAGE_SIZE);
   if (before) query = query.lt("created_at", before);
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []) as Attachment[];
+  const rows = (data ?? []) as Attachment[];
+  // View-once photos never appear here (filtered here, not in the query, so
+  // this also works before the database update that adds the column).
+  return {
+    photos: rows.filter((a) => !a.view_once),
+    hasMore: rows.length === MEMORIES_PAGE_SIZE,
+    cursor: rows[rows.length - 1]?.created_at ?? null,
+  };
 }

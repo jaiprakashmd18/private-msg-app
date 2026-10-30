@@ -62,6 +62,7 @@ export function useConversationMessages(conversationId: string) {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const messagesRef = useRef<UiMessage[]>([]);
   const uploadedRef = useRef(new Map<string, UploadedAttachment[]>());
   const readTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -101,7 +102,13 @@ export function useConversationMessages(conversationId: string) {
       cancelled = true;
       if (readTimer.current) clearTimeout(readTimer.current);
     };
-  }, [supabase, conversationId, reportError, markRead]);
+  }, [supabase, conversationId, reportError, markRead, attempt]);
+
+  const reload = useCallback(() => {
+    setError(null);
+    setLoading(true);
+    setAttempt((n) => n + 1);
+  }, []);
 
   // Realtime + resync.
   useEffect(() => {
@@ -303,6 +310,7 @@ export function useConversationMessages(conversationId: string) {
     loadingOlder,
     hasMore,
     error,
+    reload,
     loadOlder,
     send,
     retry,

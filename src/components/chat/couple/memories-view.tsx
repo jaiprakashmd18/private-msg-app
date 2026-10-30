@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useSignedUrl } from "@/hooks/use-signed-url";
 import { ATTACHMENTS_BUCKET } from "@/lib/constants";
-import { listMemories, MEMORIES_PAGE_SIZE } from "@/lib/data/couple";
+import { listMemories } from "@/lib/data/couple";
 import { displayNameOf } from "@/lib/format";
 import type { Attachment } from "@/types/app";
 
@@ -43,16 +43,18 @@ export function MemoriesView({ conversationId }: { conversationId: string }) {
   const summary = getConversation(conversationId);
   const [photos, setPhotos] = useState<Attachment[] | null>(null);
   const [hasMore, setHasMore] = useState(false);
+  const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [index, setIndex] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     listMemories(supabase, conversationId)
-      .then((rows) => {
+      .then((page) => {
         if (cancelled) return;
-        setPhotos(rows);
-        setHasMore(rows.length === MEMORIES_PAGE_SIZE);
+        setPhotos(page.photos);
+        setHasMore(page.hasMore);
+        setCursor(page.cursor);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -65,19 +67,19 @@ export function MemoriesView({ conversationId }: { conversationId: string }) {
   }, [supabase, conversationId, reportError]);
 
   const loadMore = useCallback(async () => {
-    const last = photos?.[photos.length - 1];
-    if (!last) return;
+    if (!cursor) return;
     setLoadingMore(true);
     try {
-      const rows = await listMemories(supabase, conversationId, last.created_at);
-      setPhotos((prev) => [...(prev ?? []), ...rows]);
-      setHasMore(rows.length === MEMORIES_PAGE_SIZE);
+      const page = await listMemories(supabase, conversationId, cursor);
+      setPhotos((prev) => [...(prev ?? []), ...page.photos]);
+      setHasMore(page.hasMore);
+      setCursor(page.cursor);
     } catch (err) {
       reportError(err, "Could not load more photos.");
     } finally {
       setLoadingMore(false);
     }
-  }, [photos, supabase, conversationId, reportError]);
+  }, [cursor, supabase, conversationId, reportError]);
 
   const months = useMemo(() => {
     const groups: { label: string; items: { a: Attachment; i: number }[] }[] = [];

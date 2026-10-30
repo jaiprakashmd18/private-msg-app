@@ -172,6 +172,22 @@
 }
 
 /*
+ * Full-screen chat. `inset: 0` reaches the very bottom of the screen in the
+ * installed iPhone app, where 100dvh / the visual viewport can come up short
+ * by the status bar's height. Only while the keyboard is open does it follow
+ * the visible area reported by ViewportSync.
+ */
+.app-shell {
+  position: fixed;
+  inset: 0;
+}
+html[data-keyboard="open"] .app-shell {
+  bottom: auto;
+  top: var(--vv-top, 0px);
+  height: var(--vv-height, 100dvh);
+}
+
+/*
  * Bottom padding that clears the iPhone home indicator, except while the
  * on-screen keyboard is open (the keyboard covers that area anyway).
  * html[data-keyboard] is set by <ViewportSync />.

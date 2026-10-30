@@ -67,7 +67,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const searchParams = useSearchParams();
   const isGroup = summary?.kind === "group";
 
-  const { messages, loading, loadingOlder, hasMore, error, loadOlder, send, retry, discard, edit, remove, react } =
+  const { messages, loading, loadingOlder, hasMore, error, reload, loadOlder, send, retry, discard, edit, remove, react } =
     useConversationMessages(conversationId);
   const { typingIds, notifyTyping, notifyStopped, clearUser } = useTyping(conversationId);
 
@@ -427,7 +427,18 @@ export function ConversationView({ conversationId }: { conversationId: string })
                     <p className="py-3 text-center text-xs text-muted-foreground">Beginning of your conversation</p>
                   )
                 )}
-                {messages.length === 0 && (
+                {messages.length === 0 && error && (
+              <div className="grid flex-1 place-items-center px-6 text-center">
+                <div>
+                  <p className="font-medium">Couldn&apos;t load messages</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Check your connection and try again.</p>
+                  <Button variant="outline" className="mt-4" onClick={reload}>
+                    Try again
+                  </Button>
+                </div>
+              </div>
+            )}
+            {messages.length === 0 && !error && (
                   <div className="grid flex-1 place-items-center px-6 text-center">
                     <div>
                       <p className="font-medium">No messages yet</p>

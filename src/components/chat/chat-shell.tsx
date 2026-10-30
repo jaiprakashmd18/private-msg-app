@@ -9,8 +9,9 @@ import { cn } from "@/lib/utils";
  * Tablet/desktop: sidebar + conversation side by side.
  * Phone (also sideways): inbox OR conversation, full screen.
  *
- * The shell is pinned to the visible area (see ViewportSync), so on iPhone the
- * header and message box stay on screen while the keyboard is open.
+ * The shell fills the screen (edge to edge in the installed app) and, while
+ * the keyboard is open, shrinks to the visible area (see ViewportSync and
+ * .app-shell), so the header and message box stay on screen.
  */
 export function ChatShell({ children }: { children: React.ReactNode }) {
   const params = useParams<{ conversationId?: string }>();
@@ -18,7 +19,7 @@ export function ChatShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ChatProvider>
-      <div className="fixed inset-x-0 top-[var(--vv-top,0px)] flex h-[var(--vv-height,100dvh)] overflow-hidden pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+      <div className="app-shell flex overflow-hidden pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         <aside
           aria-label="Conversations"
           className={cn(
