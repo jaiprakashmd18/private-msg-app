@@ -8,6 +8,7 @@ export interface Access {
   email: string;
   display_name: string;
   bio: string;
+  avatar_path: string | null;
   is_active: boolean;
   role: AppRole | null;
 }
@@ -25,6 +26,7 @@ export interface DirectoryEntry {
   id: string;
   display_name: string;
   email: string;
+  avatar_path: string | null;
 }
 
 export type ConversationKind = "direct" | "group";
@@ -36,13 +38,17 @@ export type SystemEvent =
   | { type: "member_added"; user_id: string }
   | { type: "member_removed"; user_id: string }
   | { type: "member_left"; user_id: string }
-  | { type: "renamed"; title: string };
+  | { type: "renamed"; title: string }
+  | { type: "photo_changed" }
+  | { type: "photo_removed" };
 
 export interface ConversationSummary {
   id: string;
   kind: ConversationKind;
   /** Group name (groups only). */
   title: string | null;
+  /** Group photo (groups only). */
+  avatar_path: string | null;
   created_at: string;
   member_count: number;
   is_group_admin: boolean;
@@ -50,6 +56,7 @@ export interface ConversationSummary {
   other_user_id: string | null;
   other_display_name: string | null;
   other_email: string | null;
+  other_avatar_path: string | null;
   other_is_active: boolean;
   other_last_seen_at: string | null;
   /** Earliest read/delivered watermark among the other members. */
@@ -72,6 +79,7 @@ export interface ConversationMember {
   user_id: string;
   display_name: string;
   email: string;
+  avatar_path: string | null;
   is_admin: boolean;
   is_active: boolean;
   last_seen_at: string | null;
@@ -175,6 +183,7 @@ export interface AdminConversation {
 }
 
 export interface AdminStats {
+  requests_pending?: number;
   allowlist_total: number;
   allowlist_active: number;
   allowlist_disabled: number;
@@ -196,4 +205,16 @@ export interface AuditLog {
   target_id: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
+}
+
+export interface AccessRequest {
+  id: string;
+  email: string;
+  display_name: string | null;
+  picture_url: string | null;
+  status: "pending" | "accepted" | "declined";
+  attempts: number;
+  first_requested_at: string;
+  last_requested_at: string;
+  decided_at: string | null;
 }

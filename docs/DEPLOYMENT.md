@@ -95,7 +95,9 @@ Without this, Google sign-in returns to the wrong place.
 
 1. Open your app → **Continue with Google** → choose the Gmail account from step 3.
 2. Click the **shield icon** → **Members & access** → enter each person's Gmail address → **Approve**.
-3. They open the same link and click **Continue with Google**. Anyone not on your list sees *"This Google account isn't approved"*, and no account is created for them.
+3. They open the same link and click **Continue with Google**. Anyone not on your list sees *"This Google account isn't approved yet"*, and no account is created for them.
+
+**Or let people ask:** if someone who isn't on the list tries to sign in, their request appears under **shield icon → Access requests** (a red number on the shield shows how many are waiting). Click **Accept** and they can sign in straight away by pressing *Continue with Google* again; **Decline** keeps them out. This needs the *Before User Created* hook from step 4b to be switched on.
 
 Any Google account works, including Google Workspace (company) addresses; it doesn't have to end in `@gmail.com`.
 
@@ -117,6 +119,7 @@ When a new version adds database changes, the repository includes an `update_*.s
 
 1. `supabase/update_push_notifications.sql` — notifications
 2. `supabase/update_chat_features.sql` — group chats, replies, reactions, photo thumbnails, voice notes, typing and online status
+3. `supabase/update_photos_and_requests.sql` — profile and group photos, access requests in the admin page
 
 Vercel deploys the new app code automatically when the code on GitHub changes. New projects only need `setup_all.sql`, which always contains everything.
 
@@ -183,4 +186,6 @@ Requires Node.js 20.9+ (https://nodejs.org) and Docker Desktop.
 | Voice message: "Microphone access was blocked" | Allow the microphone for the site/app in browser or phone settings (iPhone: Settings → Safari → Microphone, or Settings → the installed app). |
 | A voice message shows "Can't play here — download" | It was recorded in a format this device can't play (rare; older iPhones with WebM recordings). Download plays it in another app. |
 | Typing / online status never shows | Make sure `update_chat_features.sql` (or the full setup) ran — it adds the permissions for the private realtime channels. |
+| No access requests ever appear | Check step 4b: **Authentication → Hooks → Before User Created** must point to `before_user_created_hook` and be enabled. Also run `update_photos_and_requests.sql` (step 7c). |
+| "Change photo" fails | Run `update_photos_and_requests.sql` (step 7c) — it creates the `avatars` storage bucket. |
 | Messages only appear after refresh | Make sure migration `…0500` ran (it enables Realtime for messages). |

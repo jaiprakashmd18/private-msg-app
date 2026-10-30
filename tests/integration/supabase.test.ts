@@ -109,11 +109,9 @@ describe.skipIf(!enabled)("Supabase end-to-end", () => {
     await db.query("insert into public.authorized_emails (email) values ($1)", [email]);
     const { error } = await service.auth.admin.createUser({ email, email_confirm: true });
     expect(error).not.toBeNull();
-    // The hook received the provider from Supabase Auth and logged the refusal.
-    const { rows } = await db.query(
-      "select metadata from public.audit_logs where action = 'auth.signup_rejected' order by id desc limit 1",
-    );
-    expect(rows[0]?.metadata.provider).toBe("email");
+    // The auth.users trigger refuses the row, so no account exists afterwards.
+    const { rows } = await db.query("select 1 from auth.users where lower(email) = $1", [email]);
+    expect(rows).toHaveLength(0);
   });
 
   it("gives an approved Google account active access", async () => {

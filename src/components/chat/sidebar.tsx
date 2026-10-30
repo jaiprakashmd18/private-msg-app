@@ -12,6 +12,7 @@ import { SearchResults } from "@/components/chat/search-results";
 import { UserMenu } from "@/components/chat/user-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { usePendingRequests } from "@/hooks/use-pending-requests";
 import { APP_NAME } from "@/lib/env";
 
 export function Sidebar() {
@@ -20,15 +21,23 @@ export function Sidebar() {
   const params = useParams<{ conversationId?: string }>();
   const [query, setQuery] = useState("");
   const [newOpen, setNewOpen] = useState(false);
+  const pendingRequests = usePendingRequests();
 
   return (
     <>
       <header className="flex items-center gap-2 px-4 pb-2 pt-[max(1rem,env(safe-area-inset-top))]">
         <h1 className="flex-1 text-lg font-semibold tracking-tight">{APP_NAME}</h1>
         {access.role === "admin" && (
-          <Button asChild variant="ghost" size="icon-sm" aria-label="Admin dashboard" title="Admin dashboard">
+          <Button asChild variant="ghost" size="icon-sm" aria-label={pendingRequests ? `Admin dashboard, ${pendingRequests} access requests waiting` : "Admin dashboard"} title="Admin dashboard">
             <Link href="/admin">
-              <Shield />
+              <span className="relative">
+                <Shield />
+                {pendingRequests > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 grid size-4 place-items-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                    {pendingRequests > 9 ? "9+" : pendingRequests}
+                  </span>
+                )}
+              </span>
             </Link>
           </Button>
         )}

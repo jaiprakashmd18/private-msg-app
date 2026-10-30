@@ -13,6 +13,8 @@ The in-app privacy notice lives at `/privacy` (`src/app/privacy/page.tsx`). This
 | Reactions, replies, group names and membership changes | `message_reactions`, `messages`, `conversations`, `conversation_members` | Members of that conversation |
 | Voice notes and photos (photos are resized to max 2048 px with a small thumbnail) | Storage bucket `attachments` | Members of that conversation |
 | Online status and "last seen" | Realtime presence (not stored); `profiles.last_seen_at` | Active members |
+| Profile photos and group photos (cropped to 320 px squares) | Storage bucket `avatars`; `profiles.avatar_path`, `conversations.avatar_path` | Active members |
+| Access requests from people not on the list: Google email, Google name, Google profile-picture link, number of attempts, dates, decision | `access_requests` | Admin only |
 | Delivery/read watermarks | `conversation_members` | Members of that conversation |
 | Security events (masked email addresses, actor ids, admin actions) | `audit_logs` | Admin |
 
@@ -30,6 +32,7 @@ Not stored by the app: Google passwords (sign-in happens on Google's own page), 
 ## Retention
 
 - Messages: kept until deleted, unless *Delete messages older than N days* is set; then a daily job (and *Run retention now*) hard-deletes older messages and their files.
+- Access requests: pending requests stay until accepted or declined; decided requests are deleted 90 days after the decision by the daily job. At most 500 pending requests are kept, so the list can't be flooded.
 - Audit log: 365 days by default (30–3650 configurable).
 - Orphaned uploads (files never attached, or whose message was deleted): removed after 24 hours by the same job.
 

@@ -1015,3 +1015,122 @@ describe("online status", () => {
     expect(row.other_last_seen_at).not.toBeNull();
   });
 });
+
+describe("access requests", () => {
+  const google = { provider: "google", providers: ["google"] };
+  const tryGoogleSignIn = (email: string, name = "New Person") =>
+    asOwner("select public.before_user_created_hook($1::jsonb) as r", [
+      JSON.stringify({
+        user: { email, app_metadata: google, user_metadata: { full_name: name, avatar_url: "https://lh3.googleusercontent.com/a/x" } },
+      }),
+    ]);
+
+  it("an unapproved Google sign-in creates a request (no account); repeats are counted", async () => {
+    const email = freshEmail();
+    await tryGoogleSignIn(email);
+    await tryGoogleSignIn(email);
+    const [req] = await asOwner<{ status: string; attempts: number; display_name: string; picture_url: string }>(
+      "select * from public.access_requests where email = $1",
+      [email],
+    );
+    expect(req).toMatchObject({ status: "pending", attempts: 2, display_name: "New Person" });
+    expect(req.picture_url).toMatch(/^https:\/\//);
+    expect(await asOwner("select 1 from auth.users where email = $1", [email])).toHaveLength(0);
+  });
+
+  it("non-Google sign-up attempts don't create requests", async () => {
+    const email = freshEmail();
+    await asOwner("select public.before_user_created_hook($1::jsonb)", [
+      JSON.stringify({ user: { email, app_metadata: { provider: "email" } } }),
+    ]);
+    expect(await asOwner("select 1 from public.access_requests where email = $1", [email])).toHaveLength(0);
+  });
+
+  it("only admins see and decide requests; accepting lets the person sign in", async () => {
+    const admin = await createUser({ role: "admin" });
+    const member = await createUser();
+    const email = freshEmail();
+    await tryGoogleSignIn(email, "Dana");
+    const [req] = await asOwner<{ id: string }>("select id from public.access_requests where email = $1", [email]);
+
+    expect(await asUser(member.id, "select * from public.access_requests")).toHaveLength(0);
+    await expect(asUser(member.id, "select public.admin_accept_request($1)", [req.id])).rejects.toThrow(
+      /Administrator privileges required/i,
+    );
+    const [count] = await asUser<{ n: number }>(admin.id, "select public.admin_pending_request_count() as n");
+    expect(count.n).toBeGreaterThan(0);
+
+    await asUser(admin.id, "select public.admin_accept_request($1)", [req.id]);
+    const [entry] = await asOwner<{ status: string; label: string }>(
+      "select status, label from public.authorized_emails where email = $1",
+      [email],
+    );
+    expect(entry).toEqual({ status: "active", label: "Dana" });
+    // Now the real sign-in goes through.
+    const id = randomUUID();
+    await insertAuthUser(id, email);
+    const [access] = await asUser<{ is_active: boolean }>(id, "select * from public.my_access()");
+    expect(access.is_active).toBe(true);
+    const logs = await asOwner("select 1 from public.audit_logs where action = 'admin.request_accepted' and actor_id = $1", [admin.id]);
+    expect(logs).toHaveLength(1);
+  });
+
+  it("declined requests stay declined when the person tries again", async () => {
+    const admin = await createUser({ role: "admin" });
+    const email = freshEmail();
+    await tryGoogleSignIn(email);
+    const [req] = await asOwner<{ id: string }>("select id from public.access_requests where email = $1", [email]);
+    await asUser(admin.id, "select public.admin_decline_request($1)", [req.id]);
+    await tryGoogleSignIn(email);
+    const [after] = await asOwner<{ status: string; attempts: number }>(
+      "select status, attempts from public.access_requests where id = $1",
+      [req.id],
+    );
+    expect(after).toEqual({ status: "declined", attempts: 2 });
+    await expect(insertAuthUser(randomUUID(), email)).rejects.toThrow(/not authorized/i);
+  });
+});
+
+describe("profile and group photos", () => {
+  const putAvatar = (userId: string, path: string) =>
+    asUser(userId, "insert into storage.objects (bucket_id, name, owner_id, metadata) values ('avatars', $1, $2, $3)", [
+      path,
+      userId,
+      JSON.stringify({ size: 5000, mimetype: "image/jpeg" }),
+    ]);
+
+  it("people set only their own photo; other members can see it", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const own = `users/${a.id}/${randomUUID()}.jpg`;
+    await putAvatar(a.id, own);
+    await expect(putAvatar(a.id, `users/${b.id}/${randomUUID()}.jpg`)).rejects.toThrow(/row-level security/i);
+    await asUser(a.id, "select public.set_avatar($1)", [own]);
+    await expect(asUser(b.id, "select public.set_avatar($1)", [own])).rejects.toThrow(/Invalid photo/i);
+    const [row] = await asUser<{ avatar_path: string }>(b.id, "select avatar_path from public.list_directory() where id = $1", [a.id]);
+    expect(row.avatar_path).toBe(own);
+    expect(await asUser(b.id, "select 1 from storage.objects where name = $1", [own])).toHaveLength(1);
+  });
+
+  it("people without access can't see photos", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const own = `users/${a.id}/${randomUUID()}.jpg`;
+    await putAvatar(a.id, own);
+    await asOwner("update public.authorized_emails set status = 'disabled' where id = $1", [b.entryId]);
+    expect(await asUser(b.id, "select 1 from storage.objects where name = $1", [own])).toHaveLength(0);
+  });
+
+  it("only group admins change the group photo", async () => {
+    const a = await createUser();
+    const b = await createUser();
+    const [g] = await asUser<{ id: string }>(a.id, "select public.create_group('Photo club', $1) as id", [[b.id]]);
+    const path = `groups/${g.id}/${randomUUID()}.jpg`;
+    await expect(putAvatar(b.id, `groups/${g.id}/${randomUUID()}.jpg`)).rejects.toThrow(/row-level security/i);
+    await putAvatar(a.id, path);
+    await expect(asUser(b.id, "select public.set_group_avatar($1, $2)", [g.id, path])).rejects.toThrow(/Only group admins/i);
+    await asUser(a.id, "select public.set_group_avatar($1, $2)", [g.id, path]);
+    const [row] = await asUser<{ avatar_path: string }>(b.id, "select avatar_path from public.list_conversations() where id = $1", [g.id]);
+    expect(row.avatar_path).toBe(path);
+  });
+});

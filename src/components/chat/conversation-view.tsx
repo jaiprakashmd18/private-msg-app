@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Eye, Users } from "lucide-react";
+import { ArrowLeft, Eye } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Avatar } from "@/components/ui/avatar";
+import { Avatar, GroupAvatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -233,11 +233,9 @@ export function ConversationView({ conversationId }: { conversationId: string })
           >
             <span className="relative">
               {isGroup ? (
-                <span className="grid size-10 place-items-center rounded-full bg-primary/20 text-primary">
-                  <Users className="size-5" aria-hidden />
-                </span>
+                <GroupAvatar path={summary.avatar_path} name={title} />
               ) : (
-                <Avatar name={title} seed={summary.other_user_id} />
+                <Avatar name={title} seed={summary.other_user_id} path={summary.other_avatar_path} />
               )}
               {!isGroup && summary.other_user_id && onlineIds.has(summary.other_user_id) && !otherInactive && (
                 <span className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-background bg-success" aria-hidden />

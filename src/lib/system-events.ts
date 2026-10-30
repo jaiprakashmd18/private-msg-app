@@ -18,6 +18,10 @@ export function describeSystemEvent(
       return `${nameOf(event.user_id)} left`;
     case "renamed":
       return `${actor} renamed the group to "${event.title}"`;
+    case "photo_changed":
+      return `${actor} changed the group photo`;
+    case "photo_removed":
+      return `${actor} removed the group photo`;
     default:
       return "Group updated";
   }

@@ -23,7 +23,11 @@ function Stat({ label, value, hint }: { label: string; value: string | number; h
 
 export default async function AdminOverviewPage() {
   const supabase = await getSupabaseServerClient();
-  const [{ data, error }, settings] = await Promise.all([supabase.rpc("admin_stats"), getSettings()]);
+  const [{ data, error }, settings, { data: pending }] = await Promise.all([
+    supabase.rpc("admin_stats"),
+    getSettings(),
+    supabase.rpc("admin_pending_request_count"),
+  ]);
   if (error || !data) {
     return <p className="text-sm text-destructive">Could not load statistics.</p>;
   }
@@ -35,8 +39,9 @@ export default async function AdminOverviewPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
         <p className="text-sm text-muted-foreground">Usage and access at a glance. No message content is shown here.</p>
       </div>
-      <section aria-label="Access" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section aria-label="Access" className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Stat label="Approved accounts" value={stats.allowlist_total} />
+        <Stat label="Access requests waiting" value={typeof pending === "number" ? pending : 0} hint="See Access requests" />
         <Stat label="Active" value={stats.allowlist_active} />
         <Stat label="Disabled" value={stats.allowlist_disabled} />
         <Stat label="Registered accounts" value={stats.users_registered} hint={`${stats.users_without_access} without access`} />

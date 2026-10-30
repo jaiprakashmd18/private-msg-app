@@ -4,7 +4,7 @@ This document explains every security control, how it works, how it is tested, a
 
 ## 1. Controls and how each one is tested
 
-Automated test files: `tests/db/security.test.ts` (database, 39 tests), `tests/integration/supabase.test.ts` (live Supabase stack), `tests/integration/api.test.ts` (live app), `tests/unit/*`.
+Automated test files: `tests/db/security.test.ts` (database, 66 tests), `tests/integration/supabase.test.ts` (live Supabase stack), `tests/integration/api.test.ts` (live app), `tests/unit/*`.
 
 | # | Requirement | Mechanism | Automated test |
 | --- | --- | --- | --- |
@@ -34,6 +34,8 @@ Automated test files: `tests/db/security.test.ts` (database, 39 tests), `tests/i
 | 24 | Replies and reactions stay inside the conversation | `send_message` rejects a `reply_to` from another conversation; `toggle_reaction` requires membership; reactions are readable only by members; "removing" a reaction is an UPDATE (RLS-filtered) | db: *replies and reactions* (2) ; integration: *reactions arrive in real time* |
 | 25 | Typing and online signals are private | Private Realtime channels `conv:<id>` (members only) and `online` (active users only), enforced by RLS on `realtime.messages`; receivers map user ids to names themselves, so names can't be spoofed | integration: *typing signals … reach members only* (outsider refused), *online presence* |
 | 26 | Photo thumbnails and voice notes obey attachment rules | Thumbnails must be the sender's own upload in the same conversation folder; readable only like their attachment; sizes/durations validated; bucket accepts only listed image/audio/document types | db: *photos, thumbnails and voice notes* (3) |
+| 27 | Access requests can't be used to get in or to flood the admin | Requests are recorded only by the sign-up hook, only for Google-verified emails, and create **no** account; only `admin_accept_request` (admin-only, audited) adds the email to the allowlist; table readable by admins only; at most 500 pending requests; https-only picture URLs | db: *access requests* (4) |
+| 28 | Profile and group photos | Private `avatars` bucket (2 MB, JPEG/PNG/WebP); members write only `users/<own id>/`, only group admins write `groups/<conversation>/`; reads for active members only; `set_avatar`/`set_group_avatar` accept only paths in the caller's own folder | db: *profile and group photos* (3) |
 
 ### How the RLS tests work
 

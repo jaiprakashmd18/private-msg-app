@@ -1,6 +1,6 @@
 import { authorizeAdminRequest } from "@/lib/admin-route";
 import { AppError, handleRouteError, toUserMessage } from "@/lib/errors";
-import { removeStorageObjects } from "@/lib/storage.server";
+import { removeAvatarFolder, removeStorageObjects } from "@/lib/storage.server";
 import { getSupabaseServiceClient } from "@/lib/supabase/admin";
 import { uuidSchema } from "@/lib/validation";
 
@@ -17,7 +17,9 @@ export async function DELETE(request: Request, ctx: RouteContext<"/api/admin/con
     });
     if (error) throw new AppError(toUserMessage(error), 400, "rejected");
 
-    const filesRemoved = await removeStorageObjects(getSupabaseServiceClient(), (paths as string[] | null) ?? []);
+    const service = getSupabaseServiceClient();
+    const filesRemoved = await removeStorageObjects(service, (paths as string[] | null) ?? []);
+    await removeAvatarFolder(service, `groups/${conversationId}`);
     return Response.json({ ok: true, filesRemoved });
   } catch (error) {
     return handleRouteError("admin/conversations/delete", error);

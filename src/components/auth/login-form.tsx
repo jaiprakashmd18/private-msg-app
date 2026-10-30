@@ -7,7 +7,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const ERRORS: Record<string, string> = {
   not_authorized:
-    "This Google account isn't approved to use this app. Ask the administrator to add your email address.",
+    "This Google account isn't approved yet. We've sent an access request to the administrator — you can sign in once they accept it.",
   no_access: "Access for this Google account is currently disabled. Contact the administrator.",
   failed: "Sign-in didn't complete. Please try again.",
 };

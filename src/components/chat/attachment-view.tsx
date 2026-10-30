@@ -1,11 +1,10 @@
 "use client";
 
 import { FileText, ImageOff } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useApp } from "@/components/app-provider";
 import { VoicePlayer } from "@/components/chat/voice-player";
 import { Skeleton } from "@/components/ui/skeleton";
-import { signedAttachmentUrl } from "@/lib/data/chat";
+import { useSignedUrl as useSignedUrlFor } from "@/hooks/use-signed-url";
+import { ATTACHMENTS_BUCKET } from "@/lib/constants";
 import { formatBytes } from "@/lib/format";
 import { isAudio, isImage } from "@/lib/media";
 import { cn } from "@/lib/utils";
@@ -16,36 +15,8 @@ import type { Attachment } from "@/types/app";
  * per file (Storage only issues them if the RLS policy allows this user) and
  * reused for a few minutes.
  */
-const urlCache = new Map<string, string>();
-
-function remember(key: string, url: string) {
-  urlCache.set(key, url);
-  setTimeout(() => urlCache.delete(key), 20 * 60_000); // signed URLs last 30 minutes
-}
-
-function useSignedUrl(path: string | null, download?: string): { url: string | null; failed: boolean } {
-  const { supabase } = useApp();
-  const key = path ? `${path}|${download ?? ""}` : null;
-  const [fetched, setFetched] = useState<{ key: string; url: string | null; failed: boolean } | null>(null);
-
-  useEffect(() => {
-    if (!path || !key || urlCache.has(key)) return;
-    let cancelled = false;
-    signedAttachmentUrl(supabase, path, download)
-      .then((url) => {
-        remember(key, url);
-        if (!cancelled) setFetched({ key, url, failed: false });
-      })
-      .catch(() => !cancelled && setFetched({ key, url: null, failed: true }));
-    return () => {
-      cancelled = true;
-    };
-  }, [supabase, path, download, key]);
-
-  const cached = key ? urlCache.get(key) : undefined;
-  if (cached) return { url: cached, failed: false };
-  if (fetched && fetched.key === key) return fetched;
-  return { url: null, failed: false };
+function useSignedUrl(path: string | null, download?: string) {
+  return useSignedUrlFor(ATTACHMENTS_BUCKET, path, download);
 }
 
 function Thumb({

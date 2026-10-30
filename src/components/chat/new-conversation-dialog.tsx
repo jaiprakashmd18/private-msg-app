@@ -178,7 +178,7 @@ function PeoplePicker({ mode, onGroupMode, onDone }: { mode: Mode; onGroupMode: 
                     }}
                     className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-accent disabled:opacity-60"
                   >
-                    <Avatar name={name} seed={p.id} />
+                    <Avatar name={name} seed={p.id} path={p.avatar_path} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium">{name}</span>
                       <span className="block truncate text-xs text-muted-foreground">{p.email}</span>

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ATTACHMENTS_BUCKET, MESSAGES_PAGE_SIZE } from "@/lib/constants";
+import { ATTACHMENTS_BUCKET, AVATARS_BUCKET, MESSAGES_PAGE_SIZE } from "@/lib/constants";
 import { sanitizeFileName } from "@/lib/validation";
 import type {
   ConversationMember,
@@ -234,5 +234,31 @@ export async function setGroupAdmin(supabase: SupabaseClient, conversationId: st
     p_user_id: userId,
     p_is_admin: isAdmin,
   });
+  if (error) throw error;
+}
+
+/** Uploads a cropped photo to the avatars bucket and returns its path. */
+export async function uploadAvatarFile(supabase: SupabaseClient, folder: string, blob: Blob): Promise<string> {
+  const path = `${folder}/${crypto.randomUUID()}.jpg`;
+  const { error } = await supabase.storage.from(AVATARS_BUCKET).upload(path, blob, {
+    contentType: "image/jpeg",
+    upsert: false,
+    cacheControl: "86400",
+  });
+  if (error) throw error;
+  return path;
+}
+
+export async function removeAvatarFile(supabase: SupabaseClient, path: string | null | undefined) {
+  if (path) await supabase.storage.from(AVATARS_BUCKET).remove([path]);
+}
+
+export async function setAvatar(supabase: SupabaseClient, path: string | null) {
+  const { error } = await supabase.rpc("set_avatar", { p_path: path });
+  if (error) throw error;
+}
+
+export async function setGroupAvatar(supabase: SupabaseClient, conversationId: string, path: string | null) {
+  const { error } = await supabase.rpc("set_group_avatar", { p_conversation_id: conversationId, p_path: path });
   if (error) throw error;
 }

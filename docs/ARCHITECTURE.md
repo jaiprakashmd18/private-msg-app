@@ -92,8 +92,11 @@
 | `conversation_members` | Membership + `last_delivered_at` / `last_read_at` watermarks. | PK (conversation, user). No client INSERT/UPDATE/DELETE. |
 | `messages` | Body ≤ 4000 chars, `client_id` for idempotency, `edited_at`, `deleted_at` (soft delete), generated `search_vector`. | `unique (sender_id, client_id)`; index `(conversation_id, created_at desc, id desc)` for paging; GIN on `search_vector`. |
 | `attachments` | Metadata for files in the `attachments` bucket. | Size ≤ 10 MB, `storage_path` unique, cascades with message. |
+| `access_requests` | Sign-in attempts by Google accounts not on the allowlist: lower-cased email, Google name and picture URL (https only), `status` (`pending`/`accepted`/`declined`), attempt count, decision. | `email` unique; readable by admins only; written only by the sign-up hook and admin RPCs. |
 | `app_settings` | Single row: retention, audit retention, admin message access, attachments, edit window. | Bounded checks on every value. |
 | `audit_logs` | Append-only security log (masked emails, no message content). | No client write grants at all. |
+
+`profiles.avatar_path` and `conversations.avatar_path` point into the private `avatars` bucket (`users/<user id>/…`, `groups/<conversation id>/…`).
 
 **Why receipts are watermarks, not a `message_receipts` table:** in 1:1 chats, "delivered/read up to time T" per member is equivalent to per-message receipts, needs one row per member instead of one per message, makes unread counts a single indexed range count, and generates one realtime event per read instead of one per message.
 
@@ -107,6 +110,7 @@
 2. Before Supabase Auth creates an account for a first-time user:
    - **`before_user_created_hook`** refuses anything that isn't a Google sign-in for an **active** allowlisted email;
    - **`enforce_allowlist_on_signup` trigger** on `auth.users` performs the same check inside the insert transaction (with `FOR SHARE` on the allowlist row, so approval can't be raced). This holds even if the hook isn't configured, and it also blocks email/password, magic-link, phone and anonymous users even when an admin enables those methods by mistake (or uses the service-role admin API);
+   - when it refuses a **Google** sign-in, the hook records (or bumps) a row in `access_requests`. The admin sees it in *Admin → Access requests*; `admin_accept_request()` adds the email to the allowlist (audited `admin.request_accepted`), so the next Google sign-in succeeds. `admin_decline_request()` marks it declined;
    - **`custom_access_token_hook`** refuses to issue or refresh any token for a user whose email is not active.
 3. `/auth/callback` exchanges the code for a session on the server, logs `auth.sign_in`, and redirects to `/chat` or `/unauthorized`. Refusals come back as `/login?error=not_authorized|no_access|failed` with a friendly message.
 4. The session is stored in `SameSite=Lax` cookies managed by `@supabase/ssr`. They are intentionally readable by JavaScript (the browser Supabase client needs the access token for REST and Realtime), so XSS prevention (React escaping, no HTML rendering of messages, CSP) matters.
@@ -150,3 +154,4 @@
 - **Photos** are processed in the browser (`src/lib/media.ts`): decoded, resized to ≤2048 px when large, and a ≤480 px JPEG thumbnail is uploaded next to the original (`attachments.thumb_path`, `width`, `height`). The chat shows thumbnails; the lightbox loads the full photo.
 - **Voice notes** use `MediaRecorder` (MP4/AAC preferred for iPhone playback, WebM/Opus otherwise) and store `duration_ms`.
 - **Typing** is a Broadcast on the private channel `conv:<id>`; **online** is Presence on the private channel `online`; "last seen" comes from a 60-second `heartbeat()` RPC. Channel access is enforced by RLS policies on `realtime.messages`.
+- **Profile and group photos** are cropped to a 320 px JPEG square in the browser (`prepareAvatar`), uploaded to the `avatars` bucket, then saved with `set_avatar()` / `set_group_avatar()` (group admins only; posts a "changed the group photo" note). Storage policies let active members read avatars and only the owner (or a group admin) write them. Signed URLs are cached for 20 minutes (`useSignedUrl`).

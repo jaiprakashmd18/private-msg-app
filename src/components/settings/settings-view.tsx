@@ -7,6 +7,7 @@ import { useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { PhotoEditor } from "@/components/photo-editor";
 import { AppSettingsCard } from "@/components/pwa/app-settings-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { removeAvatarFile, setAvatar, uploadAvatarFile } from "@/lib/data/chat";
 import { profileSchema } from "@/lib/validation";
 
 function subscribeTheme(onChange: () => void) {
@@ -49,6 +51,19 @@ export function SettingsView() {
   const [fieldError, setFieldError] = useState<string | null>(null);
   const { dark, toggle } = useTheme();
 
+  async function changePhoto(photo: Blob | null) {
+    try {
+      const old = access.avatar_path;
+      const path = photo ? await uploadAvatarFile(supabase, `users/${access.user_id}`, photo) : null;
+      await setAvatar(supabase, path);
+      await removeAvatarFile(supabase, old).catch(() => undefined);
+      toast.success(photo ? "Photo updated" : "Photo removed");
+      router.refresh();
+    } catch (err) {
+      reportError(err, "Could not update your photo.");
+    }
+  }
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
     const parsed = profileSchema.safeParse({ display_name: displayName, bio });
@@ -83,7 +98,13 @@ export function SettingsView() {
             <CardTitle>Profile</CardTitle>
             <CardDescription>Visible to other members of this app.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="grid gap-5">
+            <PhotoEditor
+              name={displayName || access.email}
+              seed={access.user_id}
+              path={access.avatar_path}
+              onChange={changePhoto}
+            />
             <form onSubmit={save} className="grid gap-4" noValidate>
               <div className="grid gap-2">
                 <Label htmlFor="email">Google account</Label>

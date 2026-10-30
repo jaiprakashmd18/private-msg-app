@@ -83,3 +83,27 @@ export function pickAudioMime(): string | null {
   const candidates = ["audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
   return candidates.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
 }
+
+/** Square, centre-cropped JPEG for profile and group photos. */
+export async function prepareAvatar(file: File, size = 320): Promise<Blob> {
+  if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
+    throw new Error("Please choose a JPG, PNG or WebP photo.");
+  }
+  const bitmap = await createImageBitmap(file);
+  try {
+    const side = Math.min(bitmap.width, bitmap.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas unavailable");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, size, size);
+    ctx.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, size, size);
+    return await new Promise((resolve, reject) =>
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Encoding failed"))), "image/jpeg", 0.85),
+    );
+  } finally {
+    bitmap.close();
+  }
+}

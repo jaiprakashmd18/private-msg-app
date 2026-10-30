@@ -4,6 +4,7 @@ export const MAX_VOICE_NOTE_MS = 5 * 60 * 1000;
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export const MESSAGES_PAGE_SIZE = 50;
 export const ATTACHMENTS_BUCKET = "attachments";
+export const AVATARS_BUCKET = "avatars";
 
 /** Must match allowed_mime_types of the `attachments` bucket (migration 0500). */
 export const ALLOWED_ATTACHMENT_TYPES = [

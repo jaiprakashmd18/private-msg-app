@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
+import { PhotoEditor } from "@/components/photo-editor";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,9 +17,12 @@ import { Spinner } from "@/components/ui/spinner";
 import {
   addGroupMembers,
   listDirectory,
+  removeAvatarFile,
   removeGroupMember,
   renameGroup,
   setGroupAdmin,
+  setGroupAvatar,
+  uploadAvatarFile,
 } from "@/lib/data/chat";
 import { displayNameOf, formatLastSeen } from "@/lib/format";
 import type { ConversationMember, ConversationSummary, DirectoryEntry } from "@/types/app";
@@ -86,6 +90,26 @@ export function ConversationInfoDialog({
         </DialogHeader>
 
         {amAdmin && (
+          <PhotoEditor
+            group
+            name={summary.title ?? "Group"}
+            path={summary.avatar_path}
+            onChange={async (photo) => {
+              await run(
+                "photo",
+                async () => {
+                  const old = summary.avatar_path;
+                  const path = photo ? await uploadAvatarFile(supabase, `groups/${summary.id}`, photo) : null;
+                  await setGroupAvatar(supabase, summary.id, path);
+                  await removeAvatarFile(supabase, old).catch(() => undefined);
+                },
+                photo ? "Group photo updated" : "Group photo removed",
+              );
+            }}
+          />
+        )}
+
+        {amAdmin && (
           <div>
             {renaming ? (
               <form
@@ -130,7 +154,7 @@ export function ConversationInfoDialog({
             return (
               <li key={m.user_id} className="flex items-center gap-3 rounded-xl px-2 py-2">
                 <span className="relative">
-                  <Avatar name={name} seed={m.user_id} />
+                  <Avatar name={name} seed={m.user_id} path={m.avatar_path} />
                   {onlineIds.has(m.user_id) && m.is_active && (
                     <span className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-popover bg-success" aria-hidden />
                   )}

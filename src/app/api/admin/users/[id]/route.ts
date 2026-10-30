@@ -1,6 +1,6 @@
 import { authorizeAdminRequest } from "@/lib/admin-route";
 import { AppError, handleRouteError, toUserMessage } from "@/lib/errors";
-import { removeStorageObjects } from "@/lib/storage.server";
+import { removeAvatarFolder, removeStorageObjects } from "@/lib/storage.server";
 import { getSupabaseServiceClient } from "@/lib/supabase/admin";
 import { uuidSchema } from "@/lib/validation";
 
@@ -24,6 +24,7 @@ export async function DELETE(request: Request, ctx: RouteContext<"/api/admin/use
 
     const service = getSupabaseServiceClient();
     const filesRemoved = await removeStorageObjects(service, (paths as string[] | null) ?? []);
+    await removeAvatarFolder(service, `users/${userId}`);
     const { error: deleteError } = await service.auth.admin.deleteUser(userId);
     if (deleteError) throw deleteError;
 

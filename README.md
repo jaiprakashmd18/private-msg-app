@@ -15,6 +15,8 @@ A minimal, dark-mode messaging app for a closed group of people. People sign in 
 - **Reconnect handling** — automatic catch-up after network loss or tab sleep.
 - **Installable phone app (PWA)** — "Add to Home Screen" on iPhone/Android/desktop with its own icon, full-screen mode, unread badge and an offline page. No app store needed.
 - **Push notifications** — per device, with an option to hide message text on the lock screen; sent only to active members, once per message.
+- **Profile and group photos** — members pick their own photo (cropped to a square in the browser); group admins set the group photo. Stored in a private bucket, visible only to active members.
+- **Access requests** — when someone not on the list tries to sign in with Google, a request appears in *Admin → Access requests* (with a badge on the shield icon). Accept lets them in on their next sign-in; Decline keeps them out. No account is created until you accept.
 - **Admin dashboard** — allowlist management, account deletion, conversation metadata, storage usage, retention settings, and an append-only audit log.
 - **Explicit privacy policy for admins** — administrators *cannot* read messages unless an audited, member-visible policy is switched on.
 

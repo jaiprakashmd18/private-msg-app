@@ -1,10 +1,10 @@
 "use client";
 
-import { ImageIcon, Mic, Paperclip, Users } from "lucide-react";
+import { ImageIcon, Mic, Paperclip } from "lucide-react";
 import Link from "next/link";
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
-import { Avatar } from "@/components/ui/avatar";
+import { Avatar, GroupAvatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { displayNameOf, formatListTime } from "@/lib/format";
@@ -134,11 +134,14 @@ export function ConversationList({
             >
               <span className="relative shrink-0">
                 {c.kind === "group" ? (
-                  <span className="grid size-11 place-items-center rounded-full bg-primary/20 text-primary">
-                    <Users className="size-5" aria-hidden />
-                  </span>
+                  <GroupAvatar path={c.avatar_path} name={name} className="size-11" />
                 ) : (
-                  <Avatar name={name} seed={c.other_user_id} className={cn("size-11", !c.other_is_active && "opacity-50")} />
+                  <Avatar
+                    name={name}
+                    seed={c.other_user_id}
+                    path={c.other_avatar_path}
+                    className={cn("size-11", !c.other_is_active && "opacity-50")}
+                  />
                 )}
                 {online && (
                   <span className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-sidebar bg-success">
