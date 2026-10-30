@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
 import { ServiceWorker } from "@/components/pwa/service-worker";
+import { ViewportSync } from "@/components/pwa/viewport-sync";
 import { APP_NAME } from "@/lib/env";
 import "./globals.css";
 
@@ -20,6 +21,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // Android: the keyboard shrinks the page, so the message box stays visible.
+  interactiveWidget: "resizes-content",
 };
 
 // Applies the saved theme before paint. Dark is the default.
@@ -39,8 +42,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to content
         </a>
         {children}
-        <Toaster theme="dark" position="top-center" richColors closeButton />
+        <Toaster
+          theme="dark"
+          position="top-center"
+          richColors
+          closeButton
+          offset={{ top: "max(16px, calc(env(safe-area-inset-top) + 8px))" }}
+          mobileOffset={{ top: "max(12px, calc(env(safe-area-inset-top) + 8px))" }}
+        />
         <ServiceWorker />
+        <ViewportSync />
       </body>
     </html>
   );

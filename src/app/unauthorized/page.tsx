@@ -21,7 +21,7 @@ export default async function UnauthorizedPage() {
         <h1 className="text-xl font-semibold">Access not available</h1>
         {state.status === "ok" ? (
           <p className="mt-2 text-sm text-muted-foreground">
-            The Google account <span className="font-medium text-foreground">{email}</span> is not currently
+            The account <span className="font-medium text-foreground">{email}</span> is not currently
             approved to use this app. If you think this is a mistake, contact the administrator.
           </p>
         ) : (

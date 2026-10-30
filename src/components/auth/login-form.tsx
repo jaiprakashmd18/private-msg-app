@@ -2,13 +2,18 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Spinner } from "@/components/ui/spinner";
+import { passwordSignInError } from "@/lib/password";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { emailSchema } from "@/lib/validation";
 
 const ERRORS: Record<string, string> = {
   not_authorized:
     "This Google account isn't approved yet. We've sent an access request to the administrator — you can sign in once they accept it.",
-  no_access: "Access for this Google account is currently disabled. Contact the administrator.",
+  no_access: "Access for this account is currently disabled. Contact the administrator.",
   failed: "Sign-in didn't complete. Please try again.",
 };
 
@@ -24,11 +29,13 @@ function GoogleIcon() {
 }
 
 export function LoginForm({ errorKey }: { errorKey?: string }) {
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"google" | "password" | null>(null);
   const [error, setError] = useState<string | null>(errorKey ? (ERRORS[errorKey] ?? ERRORS.failed!) : null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   async function signIn() {
-    setBusy(true);
+    setBusy("google");
     setError(null);
     const { error: oauthError } = await getSupabaseBrowserClient().auth.signInWithOAuth({
       provider: "google",
@@ -39,30 +46,98 @@ export function LoginForm({ errorKey }: { errorKey?: string }) {
     });
     // On success the browser is already on its way to Google.
     if (oauthError) {
-      setBusy(false);
+      setBusy(null);
       setError(ERRORS.failed!);
     }
   }
 
+  async function signInWithPassword(e: React.FormEvent) {
+    e.preventDefault();
+    const parsed = emailSchema.safeParse(email);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "Enter a valid email address");
+      return;
+    }
+    if (!password) {
+      setError("Enter your password");
+      return;
+    }
+    setBusy("password");
+    setError(null);
+    const supabase = getSupabaseBrowserClient();
+    // Straight from the browser to Supabase Auth, so its per-IP rate limits
+    // apply to each person rather than to our server.
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email: parsed.data, password });
+    if (signInError) {
+      setBusy(null);
+      setError(passwordSignInError(signInError));
+      return;
+    }
+    await supabase.rpc("log_auth_event", { p_action: "auth.sign_in" });
+    // A full navigation so the server sees the new session cookies. The app
+    // sends people with a temporary password to /set-password first.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full reload picks up the new session
+    window.location.assign("/chat");
+  }
+
   return (
-    <div className="grid gap-4 rounded-2xl border bg-card/80 p-6 shadow-xl backdrop-blur">
+    <div className="grid gap-5 rounded-2xl border bg-card/80 p-5 shadow-xl backdrop-blur sm:p-6">
       <Button
         size="lg"
         variant="outline"
         className="h-12 bg-background/60 text-base"
         onClick={() => void signIn()}
-        disabled={busy}
+        disabled={busy !== null}
       >
-        {busy ? <Spinner label="Redirecting to Google" /> : <GoogleIcon />}
+        {busy === "google" ? <Spinner label="Redirecting to Google" /> : <GoogleIcon />}
         Continue with Google
       </Button>
+
+      <div className="flex items-center gap-3 text-xs uppercase tracking-wider text-muted-foreground" aria-hidden>
+        <span className="h-px flex-1 bg-border" />
+        or
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <form onSubmit={signInWithPassword} className="grid gap-3" noValidate aria-label="Sign in with email and password">
+        <div className="grid gap-2">
+          <Label htmlFor="login-email">Email</Label>
+          <Input
+            id="login-email"
+            type="email"
+            inputMode="email"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="name@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="h-11"
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="login-password">Password</Label>
+          <PasswordInput
+            id="login-password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="h-11"
+          />
+        </div>
+        <Button type="submit" size="lg" className="mt-1 h-11" disabled={busy !== null}>
+          {busy === "password" && <Spinner />} Sign in
+        </Button>
+      </form>
+
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       ) : (
         <p className="text-center text-xs text-muted-foreground">
-          Only Google accounts approved by the administrator can sign in.
+          Only accounts approved by the administrator can sign in. Forgot your password? Ask the administrator to
+          reset it.
         </p>
       )}
     </div>

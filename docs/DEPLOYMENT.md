@@ -57,7 +57,8 @@ There are **no SMS costs**: people sign in with their Google (Gmail) account.
 ### 4b. Supabase
 1. **Authentication → Sign In / Providers** (older UI: *Providers*):
    - **Google**: enable it, paste the **Client ID** and **Client secret**, and save. (Here you can also copy the *Callback URL* for step 4a.)
-   - **Email**: turn **off**. **Phone**: leave **off**. **Anonymous sign-ins**: **off**.
+   - **Email**: turn **on** (needed for email + password sign-in). Strangers still can't sign themselves up: the database only accepts password accounts that you create from the admin page. *Confirm email* can stay as it is. **Phone**: leave **off**. **Anonymous sign-ins**: **off**.
+   - Optional: **Authentication → Sign In / Providers → Email → Minimum password length**: set to **10** (the app already asks for at least 10).
    - Keep **Allow new users to sign up** **ON**. New approved people need it the first time; everyone else is still refused by the database rules.
 2. **Authentication → Hooks** → add two hooks, both type **Postgres**, schema `public`:
    - **Before User Created** → function `before_user_created_hook`
@@ -97,6 +98,8 @@ Without this, Google sign-in returns to the wrong place.
 2. Click the **shield icon** → **Members & access** → enter each person's Gmail address → **Approve**.
 3. They open the same link and click **Continue with Google**. Anyone not on your list sees *"This Google account isn't approved yet"*, and no account is created for them.
 
+**People without Google (or who prefer a password):** approve their email the same way, then press **Set password** on their entry. You get a temporary password (shown once) with a **Copy message** button; send it to them privately. They open the app, type their email and that password under *Sign in*, and are asked to choose their own password straight away. **Reset password** works the same way if someone forgets theirs (their old password stops working and they're signed out everywhere). Members who use Google can also add a password themselves in **Settings → Sign-in**.
+
 **Or let people ask:** if someone who isn't on the list tries to sign in, their request appears under **shield icon → Access requests** (a red number on the shield shows how many are waiting). Click **Accept** and they can sign in straight away by pressing *Continue with Google* again; **Decline** keeps them out. This needs the *Before User Created* hook from step 4b to be switched on.
 
 Any Google account works, including Google Workspace (company) addresses; it doesn't have to end in `@gmail.com`.
@@ -120,6 +123,7 @@ When a new version adds database changes, the repository includes an `update_*.s
 1. `supabase/update_push_notifications.sql` — notifications
 2. `supabase/update_chat_features.sql` — group chats, replies, reactions, photo thumbnails, voice notes, typing and online status
 3. `supabase/update_photos_and_requests.sql` — profile and group photos, access requests in the admin page
+4. `supabase/update_password_sign_in.sql` — email + password sign-in (also turn the **Email** provider **on**, step 4b)
 
 Vercel deploys the new app code automatically when the code on GitHub changes. New projects only need `setup_all.sql`, which always contains everything.
 
@@ -186,6 +190,9 @@ Requires Node.js 20.9+ (https://nodejs.org) and Docker Desktop.
 | Voice message: "Microphone access was blocked" | Allow the microphone for the site/app in browser or phone settings (iPhone: Settings → Safari → Microphone, or Settings → the installed app). |
 | A voice message shows "Can't play here — download" | It was recorded in a format this device can't play (rare; older iPhones with WebM recordings). Download plays it in another app. |
 | Typing / online status never shows | Make sure `update_chat_features.sql` (or the full setup) ran — it adds the permissions for the private realtime channels. |
+| "Password sign-in isn't switched on for this app yet" | Supabase → Authentication → Sign In / Providers → **Email** → enable (step 4b). |
+| "Set password" says something went wrong | Run `update_password_sign_in.sql` (step 7c), and check `SUPABASE_SERVICE_ROLE_KEY` is set in Vercel. |
+| Someone forgot their password | Admin → Members & access → **Reset password** on their entry, and send them the new temporary password. |
 | No access requests ever appear | Check step 4b: **Authentication → Hooks → Before User Created** must point to `before_user_created_hook` and be enabled. Also run `update_photos_and_requests.sql` (step 7c). |
 | "Change photo" fails | Run `update_photos_and_requests.sql` (step 7c) — it creates the `avatars` storage bucket. |
 | Messages only appear after refresh | Make sure migration `…0500` ran (it enables Realtime for messages). |

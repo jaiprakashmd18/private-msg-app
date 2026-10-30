@@ -43,7 +43,7 @@ describe("allowlist enforcement at sign-up", () => {
     await expect(insertAuthUser(randomUUID(), freshEmail())).rejects.toThrow(/not authorized/i);
   });
 
-  it("rejects non-Google sign-ups (email/password, magic link, anonymous) even for approved emails", async () => {
+  it("rejects self-service sign-ups (email/password, magic link, phone, anonymous) even for approved emails", async () => {
     const email = freshEmail();
     await asOwner("insert into public.authorized_emails (email) values ($1)", [email]);
     await expect(insertAuthUser(randomUUID(), email, "email")).rejects.toThrow(/Only Google sign-in/i);
@@ -68,7 +68,7 @@ describe("allowlist enforcement at sign-up", () => {
     expect(p.email).toBe(email);
   });
 
-  it("auth hook rejects unapproved or non-Google accounts and accepts approved Google accounts", async () => {
+  it("auth hook rejects unapproved or phone accounts and accepts approved Google/email accounts", async () => {
     const google = { provider: "google", providers: ["google"] };
     const [denied] = await hook({ email: freshEmail(), app_metadata: google });
     expect(denied.r.error?.http_code).toBe(403);
@@ -78,8 +78,14 @@ describe("allowlist enforcement at sign-up", () => {
     const [allowed] = await hook({ email, app_metadata: google });
     expect(allowed.r).toEqual({});
 
-    const [wrongProvider] = await hook({ email, app_metadata: { provider: "email", providers: ["email"] } });
-    expect(wrongProvider.r.error?.http_code).toBe(403);
+    // Email accounts pass the hook only when approved; the auth.users trigger
+    // then accepts only administrator-created ones (see "password sign-in").
+    const [emailAccount] = await hook({ email, app_metadata: { provider: "email", providers: ["email"] } });
+    expect(emailAccount.r).toEqual({});
+    const [unapprovedEmail] = await hook({ email: freshEmail(), app_metadata: { provider: "email" } });
+    expect(unapprovedEmail.r.error?.http_code).toBe(403);
+    const [phone] = await hook({ email, app_metadata: { provider: "phone", providers: ["phone"] } });
+    expect(phone.r.error?.http_code).toBe(403);
   });
 
   it("access-token hook refuses tokens for disabled or unknown users", async () => {
@@ -1132,5 +1138,102 @@ describe("profile and group photos", () => {
     await asUser(a.id, "select public.set_group_avatar($1, $2)", [g.id, path]);
     const [row] = await asUser<{ avatar_path: string }>(b.id, "select avatar_path from public.list_conversations() where id = $1", [g.id]);
     expect(row.avatar_path).toBe(path);
+  });
+});
+
+describe("password sign-in", () => {
+  const passwordAccount = (email: string, id = randomUUID()) =>
+    asOwner(
+      `insert into auth.users (id, email, email_confirmed_at, encrypted_password, raw_app_meta_data)
+       values ($1, $2, now(), '$2a$10$initialhash', '{"provider":"email","providers":["email"]}')`,
+      [id, email],
+    ).then(() => id);
+
+  it("accepts a new password account only right after an admin prepared it, once", async () => {
+    const admin = await createUser({ role: "admin" });
+    const email = freshEmail();
+    const [entry] = await asOwner<{ id: string }>(
+      "insert into public.authorized_emails (email, label) values ($1, 'Pat') returning id",
+      [email],
+    );
+    // Self-service password sign-up for an approved email: refused.
+    await expect(passwordAccount(email)).rejects.toThrow(/Only Google sign-in/i);
+
+    const [prep] = await asUser<{ user_id: string | null; email: string }>(
+      admin.id,
+      "select * from public.admin_prepare_password($1)",
+      [entry.id],
+    );
+    expect(prep).toEqual({ user_id: null, email });
+    const id = await passwordAccount(email);
+    // The grant is single-use.
+    await expect(passwordAccount(email)).rejects.toThrow(/Only Google sign-in/i);
+
+    const [access] = await asUser<{ is_active: boolean; has_password: boolean; has_google: boolean; display_name: string }>(
+      id,
+      "select * from public.my_access()",
+    );
+    expect(access).toMatchObject({ is_active: true, has_password: true, has_google: false, display_name: "Pat" });
+  });
+
+  it("an expired grant doesn't work", async () => {
+    const email = freshEmail();
+    await asOwner("insert into public.authorized_emails (email) values ($1)", [email]);
+    await asOwner("insert into private.password_account_grants (email, expires_at) values ($1, now() - interval '1 second')", [email]);
+    await expect(passwordAccount(email)).rejects.toThrow(/Only Google sign-in/i);
+  });
+
+  it("only admins can prepare a password, never for admin or disabled entries, and the flag clears once the member changes it", async () => {
+    const admin = await createUser({ role: "admin" });
+    const member = await createUser();
+    const other = await createUser();
+
+    await expect(
+      asUser(member.id, "select * from public.admin_prepare_password($1)", [other.entryId]),
+    ).rejects.toThrow(/Administrator privileges required/);
+    await expect(
+      asUser(admin.id, "select * from public.admin_prepare_password($1)", [admin.entryId]),
+    ).rejects.toThrow(/database owner/);
+    await asOwner("update public.authorized_emails set status = 'disabled' where id = $1", [other.entryId]);
+    await expect(
+      asUser(admin.id, "select * from public.admin_prepare_password($1)", [other.entryId]),
+    ).rejects.toThrow(/Re-enable/);
+    await expect(
+      asUser(member.id, "select public.server_record_admin_password($1, $2, false)", [member.id, member.id]),
+    ).rejects.toThrow(/permission denied/i);
+
+    const [prep] = await asUser<{ user_id: string; email: string }>(
+      admin.id,
+      "select * from public.admin_prepare_password($1)",
+      [member.entryId],
+    );
+    expect(prep.user_id).toBe(member.id);
+
+    // Supabase Auth stores the password, then the server records it.
+    await asOwner("update auth.users set encrypted_password = '$2a$10$temporary' where id = $1", [member.id]);
+    await asUser(null, "select public.server_record_admin_password($1, $2, false)", [member.id, admin.id], "service_role");
+    const [sessions] = await asOwner<{ n: number }>("select count(*)::int as n from auth.sessions where user_id = $1", [member.id]);
+    expect(sessions.n).toBe(0);
+    const myAccess = () =>
+      asUser<{ must_change_password: boolean; has_password: boolean; has_google: boolean }>(
+        member.id,
+        "select * from public.my_access()",
+      );
+    expect((await myAccess())[0]).toMatchObject({ must_change_password: true, has_password: true, has_google: true });
+    const [listed] = await asUser<{ password_pending: boolean }>(
+      admin.id,
+      "select password_pending from public.admin_list_allowlist() where id = $1",
+      [member.entryId],
+    );
+    expect(listed.password_pending).toBe(true);
+    const [audit] = await asOwner<{ actor_id: string }>(
+      "select actor_id from public.audit_logs where action = 'admin.password_reset' and target_id = $1",
+      [member.id],
+    );
+    expect(audit.actor_id).toBe(admin.id);
+
+    // The member picks their own password → the hash changes → flag clears.
+    await asOwner("update auth.users set encrypted_password = '$2a$10$chosenbymember' where id = $1", [member.id]);
+    expect((await myAccess())[0].must_change_password).toBe(false);
   });
 });

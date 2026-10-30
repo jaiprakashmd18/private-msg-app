@@ -4,12 +4,12 @@ This document explains every security control, how it works, how it is tested, a
 
 ## 1. Controls and how each one is tested
 
-Automated test files: `tests/db/security.test.ts` (database, 66 tests), `tests/integration/supabase.test.ts` (live Supabase stack), `tests/integration/api.test.ts` (live app), `tests/unit/*`.
+Automated test files: `tests/db/security.test.ts` (database, 69 tests), `tests/integration/supabase.test.ts` (live Supabase stack), `tests/integration/api.test.ts` (live app), `tests/unit/*`.
 
 | # | Requirement | Mechanism | Automated test |
 | --- | --- | --- | --- |
-| 1 | Only approved Google accounts can create an account | Auth hook `before_user_created_hook` + `BEFORE INSERT` trigger on `auth.users` (`enforce_allowlist_on_signup`), emails compared lower-cased | db: *rejects a Google account whose email is not approved*, *auth hook rejects…*, *matches emails case-insensitively* |
-| 2 | No bypass via email/password, magic link, phone or anonymous sign-up, even for an approved email | Trigger and hook accept only `provider = google`; email/phone providers disabled in config; also blocks the service-role admin API | db: *rejects non-Google sign-ups…*; integration: *refuses email/password sign-up…*, *refuses non-Google accounts even when created with the service-role admin API* |
+| 1 | Only approved emails can create an account | Auth hook `before_user_created_hook` + `BEFORE INSERT` trigger on `auth.users` (`enforce_allowlist_on_signup`), emails compared lower-cased | db: *rejects a Google account whose email is not approved*, *auth hook rejects…*, *matches emails case-insensitively* |
+| 2 | No self-service sign-up by password, magic link, phone or anonymous, even for an approved email | The `auth.users` trigger accepts `google`, or `email` only with a one-time grant that `admin_prepare_password` (admin-only) leaves for that exact email for 60 seconds, consumed on use; phone/anonymous always refused | db: *rejects self-service sign-ups…*, *accepts a new password account only right after an admin prepared it, once*, *an expired grant doesn't work*; integration: *refuses email/password sign-up…*, *refuses password accounts from the service-role admin API unless an admin prepared them* |
 | 3 | Sign-in refusals are clear but leak nothing | `/auth/callback` maps Auth refusals to `/login?error=not_authorized\|no_access\|failed` | api: *sends refused Google sign-ins back to the login page with a reason* |
 | 4 | Approval can't be raced | Allowlist row locked `FOR SHARE` inside the sign-up transaction | (by construction; covered by #1 tests) |
 | 5 | Revocation is immediate, including existing sessions | RLS calls `private.is_active_user()` on every query; `admin_set_access_status` deletes `auth.sessions` (refresh tokens); `custom_access_token_hook` refuses new/refreshed tokens | db: *disabling an email cuts off an existing session immediately…*, *access-token hook refuses tokens for disabled or unknown users*; integration: *revoking access cuts off an existing session immediately* (same JWT) |
@@ -36,6 +36,7 @@ Automated test files: `tests/db/security.test.ts` (database, 66 tests), `tests/i
 | 26 | Photo thumbnails and voice notes obey attachment rules | Thumbnails must be the sender's own upload in the same conversation folder; readable only like their attachment; sizes/durations validated; bucket accepts only listed image/audio/document types | db: *photos, thumbnails and voice notes* (3) |
 | 27 | Access requests can't be used to get in or to flood the admin | Requests are recorded only by the sign-up hook, only for Google-verified emails, and create **no** account; only `admin_accept_request` (admin-only, audited) adds the email to the allowlist; table readable by admins only; at most 500 pending requests; https-only picture URLs | db: *access requests* (4) |
 | 28 | Profile and group photos | Private `avatars` bucket (2 MB, JPEG/PNG/WebP); members write only `users/<own id>/`, only group admins write `groups/<conversation>/`; reads for active members only; `set_avatar`/`set_group_avatar` accept only paths in the caller's own folder | db: *profile and group photos* (3) |
+| 29 | Password accounts | Created/reset only through `/api/admin/allowlist/[id]/password` (same-origin, active admin, never for admin entries or disabled emails); random 12-character temporary password (~68 bits) returned once with `no-store`; Supabase Auth stores a bcrypt hash; `my_access().must_change_password` (hash still equals the admin-set one) sends the member to `/set-password` before anything else; a reset revokes all their sessions; audited. Password sign-in goes from the browser straight to Supabase Auth, so its per-IP rate limits apply per person. The access-token hook refuses tokens for disabled emails exactly as for Google | db: *password sign-in* (3); integration: *signs in with an administrator-set password…*; unit: `password.test.ts` |
 
 ### How the RLS tests work
 
@@ -63,7 +64,10 @@ Do not advertise the app as end-to-end encrypted until that is implemented and r
 
 ## 3. Known limitations and residual risks
 
-- **Security depends on each member's Google account.** Anyone who controls an approved Google account can sign in as that member. Members should turn on 2-Step Verification in their Google account.
+- **Security depends on each member's Google account or password.** Anyone who controls an approved Google account, or knows a member's password, can sign in as that member. Members should turn on 2-Step Verification in their Google account and use a password they don't use anywhere else. There is no two-factor authentication for password sign-in.
+- **Administrator-set passwords** are known to the administrator until the member replaces them (forced at first sign-in). A **reset** therefore gives the administrator a way to sign in as a member — it is audited and signs the member out, but it is not prevented. Infrastructure owners can do more than that anyway (below).
+- **No self-service "forgot password" email** (it would need an email-sending service); the administrator resets passwords instead.
+- **Changing a password in Settings** asks for the current password in the app; Supabase Auth itself only requires a signed-in session (Supabase's default), so someone holding an unlocked, signed-in device could change it with developer tools.
 - **Existing access tokens stay cryptographically valid until expiry** (default 1 hour) after revocation. They are useless — RLS denies every read/write and Realtime stops delivering — but tune *Auth → JWT expiry* lower if you want them to expire sooner.
 - **Member directory and presence:** active members can see each other's names and email addresses (needed to start conversations), whether they are online, and when they were last seen. There is no option yet to hide "last seen".
 - **Group history:** someone re-added to a group sees its earlier history again.

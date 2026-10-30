@@ -1,12 +1,12 @@
 # Ghostline — private, invitation-only messaging
 
-A minimal, dark-mode messaging app for a closed group of people. People sign in with their Google (Gmail) account, but only accounts whose email the administrator has approved get in, and the database itself enforces who can read and send what.
+A minimal, dark-mode messaging app for a closed group of people. People sign in with their Google (Gmail) account, or with an email and password, but only emails the administrator has approved get in, and the database itself enforces who can read and send what.
 
-**Stack:** Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui-style components · Supabase (Postgres, Google Auth, Realtime, Storage) · Vercel
+**Stack:** Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui-style components · Supabase (Postgres, Auth with Google + password, Realtime, Storage) · Vercel
 
 ## Features
 
-- **Invitation-only Google sign-in** — no passwords, no SMS costs; unapproved Google accounts can't create an account or obtain a token, and other sign-in methods are refused.
+- **Invitation-only sign-in** — *Continue with Google*, or **email + password** for people without a Google account (or who prefer it). Nobody can sign themselves up: password accounts are created only by the administrator, with a temporary password the member must replace on first sign-in. Members can add or change a password in Settings. Unapproved accounts can't create an account or obtain a token.
 - **Instant revocation** — disabling an account cuts off existing sessions immediately (checked on every query), ends refresh tokens, and blocks new tokens.
 - **1:1 and group chats** (up to 50 people, group admins, add/remove/rename, leave) with realtime delivery, sent/delivered/read indicators, unread counts, previews, paginated history, search, multiline messages, edit (time-limited) and delete-for-everyone.
 - **Replies, reactions, typing, online** — swipe or tap to reply with a quote, one emoji reaction per person, "typing…" and "online / last seen" over private realtime channels.
@@ -14,6 +14,7 @@ A minimal, dark-mode messaging app for a closed group of people. People sign in 
 - **Duplicate-safe sending** — every message carries a client-generated id; retries can't create duplicates. Failed sends can be retried or discarded.
 - **Reconnect handling** — automatic catch-up after network loss or tab sleep.
 - **Installable phone app (PWA)** — "Add to Home Screen" on iPhone/Android/desktop with its own icon, full-screen mode, unread badge and an offline page. No app store needed.
+- **Fits every screen** — phones (also sideways), tablets, laptops and big monitors; respects the notch and home indicator, keeps the message box above the on-screen keyboard (iPhone and Android), no zoom-on-tap on iPhone, readable line lengths on wide screens. Checked automatically at 9 screen sizes from 320 px phones to 1920 px desktops.
 - **Push notifications** — per device, with an option to hide message text on the lock screen; sent only to active members, once per message.
 - **Profile and group photos** — members pick their own photo (cropped to a square in the browser); group admins set the group photo. Stored in a private bucket, visible only to active members.
 - **Access requests** — when someone not on the list tries to sign in with Google, a request appears in *Admin → Access requests* (with a badge on the shield icon). Accept lets them in on their next sign-in; Decline keeps them out. No account is created until you accept.

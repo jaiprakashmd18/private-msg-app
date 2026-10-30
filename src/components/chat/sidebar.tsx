@@ -90,7 +90,7 @@ export function Sidebar() {
         </div>
       )}
 
-      <nav aria-label="Conversation list" className="min-h-0 flex-1 overflow-y-auto">
+      <nav aria-label="Conversation list" className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
         {query.trim().length >= 2 ? (
           <SearchResults query={query.trim()} onNavigate={() => setQuery("")} />
         ) : (

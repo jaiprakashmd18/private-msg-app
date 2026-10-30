@@ -9,9 +9,12 @@ Mark each item ✅/❌. Any ❌ is a release blocker.
 - [ ] Supabase → Authentication → Users shows **no** user for U.
 - [ ] Admin → Audit log shows `auth.signup_rejected` with a **masked** email and provider `google`.
 - [ ] A signs in with Google → lands on `/chat`.
-- [ ] Email sign-up is off: Supabase → Authentication → Sign In / Providers → Email is disabled, and in the browser console
-      `await fetch("https://<ref>.supabase.co/auth/v1/signup",{method:"POST",headers:{apikey:"<publishable key>","content-type":"application/json"},body:JSON.stringify({email:"<A's email>",password:"Long-password-123"})}).then(r=>r.status)`
-      returns an error status (4xx), and no second user appears for A.
+- [ ] Nobody can sign themselves up with a password: in the browser console
+      `await fetch("https://<ref>.supabase.co/auth/v1/signup",{method:"POST",headers:{apikey:"<publishable key>","content-type":"application/json"},body:JSON.stringify({email:"<an approved email that has no account yet>",password:"Long-password-123"})}).then(r=>r.status)`
+      returns an error status (4xx/5xx), and no user appears in Authentication → Users.
+- [ ] Admin → Members & access → **Set password** for a test email → sign in with it in a private window → you're sent to *Choose your password* and can't reach `/chat` until you do.
+- [ ] A wrong password shows "That email and password don't match"; disabling the email makes the right password fail with "currently disabled".
+- [ ] **Reset password** signs that person out on their other devices; the audit log shows `admin.password_reset`.
 - [ ] Both auth hooks are listed under Authentication → Hooks.
 
 ## Isolation between members

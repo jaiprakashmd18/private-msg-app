@@ -104,7 +104,7 @@ describe.skipIf(!enabled)("Supabase end-to-end", () => {
     expect(rows).toHaveLength(0);
   });
 
-  it("refuses non-Google accounts even when created with the service-role admin API", async () => {
+  it("refuses password accounts from the service-role admin API unless an admin prepared them", async () => {
     const email = `it-${randomUUID().slice(0, 8)}@example.com`;
     await db.query("insert into public.authorized_emails (email) values ($1)", [email]);
     const { error } = await service.auth.admin.createUser({ email, email_confirm: true });
@@ -112,6 +112,55 @@ describe.skipIf(!enabled)("Supabase end-to-end", () => {
     // The auth.users trigger refuses the row, so no account exists afterwards.
     const { rows } = await db.query("select 1 from auth.users where lower(email) = $1", [email]);
     expect(rows).toHaveLength(0);
+  });
+
+  it("signs in with an administrator-set password, which must then be replaced", async () => {
+    const email = `it-${randomUUID().slice(0, 8)}@example.com`;
+    const { rows } = await db.query<{ id: string }>(
+      "insert into public.authorized_emails (email) values ($1) returning id",
+      [email],
+    );
+    // What /api/admin/allowlist/[id]/password does.
+    const { data: prep, error: prepError } = await admin.sb
+      .rpc("admin_prepare_password", { p_entry_id: rows[0]!.id })
+      .single<{ user_id: string | null; email: string }>();
+    expect(prepError).toBeNull();
+    expect(prep?.user_id).toBeNull();
+    const temporary = "Temp-Pass-1234";
+    const { data: created, error: createError } = await service.auth.admin.createUser({
+      email,
+      password: temporary,
+      email_confirm: true,
+    });
+    expect(createError).toBeNull();
+    const { error: recordError } = await service.rpc("server_record_admin_password", {
+      p_user_id: created.user!.id,
+      p_admin_id: admin.userId,
+      p_created: true,
+    });
+    expect(recordError).toBeNull();
+
+    const member = createClient(url!, anonKey!, { auth: { persistSession: false } });
+    const wrong = await member.auth.signInWithPassword({ email, password: "not-the-password" });
+    expect(wrong.error?.code).toBe("invalid_credentials");
+    const { error: signInError } = await member.auth.signInWithPassword({ email, password: temporary });
+    expect(signInError).toBeNull();
+    const access = async () =>
+      (await member.rpc("my_access").single<{ is_active: boolean; must_change_password: boolean; has_password: boolean }>())
+        .data;
+    expect(await access()).toMatchObject({ is_active: true, must_change_password: true, has_password: true });
+
+    const { error: updateError } = await member.auth.updateUser({ password: "my-own-password-77" });
+    expect(updateError).toBeNull();
+    expect((await access())?.must_change_password).toBe(false);
+
+    // Revocation applies to password accounts too.
+    await db.query("update public.authorized_emails set status = 'disabled' where email = $1", [email]);
+    const again = await createClient(url!, anonKey!, { auth: { persistSession: false } }).auth.signInWithPassword({
+      email,
+      password: "my-own-password-77",
+    });
+    expect(again.error?.message).toMatch(/does not currently have access/);
   });
 
   it("gives an approved Google account active access", async () => {

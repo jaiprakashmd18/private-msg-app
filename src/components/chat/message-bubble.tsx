@@ -192,7 +192,7 @@ export function MessageBubble({
         />
       )}
       <div
-        className={cn("flex max-w-[85%] flex-col sm:max-w-[70%]", mine ? "items-end" : "items-start")}
+        className={cn("flex min-w-0 max-w-[85%] flex-col sm:max-w-[70%]", mine ? "items-end" : "items-start")}
         style={{ transform: dragX ? `translateX(${dragX}px)` : undefined, transition: dragX ? "none" : "transform 150ms" }}
       >
         {senderName && !mine && !grouped && (
@@ -250,7 +250,7 @@ export function MessageBubble({
                   </div>
                 )}
                 {message.body && (
-                  <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{message.body}</p>
+                  <p className="whitespace-pre-wrap text-[15px] leading-relaxed [overflow-wrap:anywhere]">{message.body}</p>
                 )}
               </>
             )}
@@ -288,7 +288,7 @@ export function MessageBubble({
             <DropdownMenu>
               <DropdownMenuTrigger
                 aria-label="Message actions"
-                className="rounded-full p-1.5 text-muted-foreground transition-opacity hover:bg-accent focus-visible:opacity-100 data-[state=open]:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                className="rounded-full p-1.5 text-muted-foreground transition-opacity hover:bg-accent focus-visible:opacity-100 data-[state=open]:opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100"
               >
                 <MoreHorizontal className="size-4" />
               </DropdownMenuTrigger>

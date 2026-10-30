@@ -6,7 +6,10 @@ export const metadata: Metadata = { title: "Privacy notice" };
 
 export default function PrivacyPage() {
   return (
-    <main id="main" className="mx-auto max-w-2xl px-4 py-12">
+    <main
+      id="main"
+      className="mx-auto max-w-2xl px-4 pb-[max(3rem,env(safe-area-inset-bottom))] pt-[max(3rem,env(safe-area-inset-top))]"
+    >
       <Link href="/chat" className="text-sm text-muted-foreground hover:text-foreground">
         ← Back
       </Link>
@@ -17,15 +20,19 @@ export default function PrivacyPage() {
         <section>
           <h2>Who can use this app</h2>
           <p>
-            You sign in with your Google account. Only Google accounts whose email address the administrator has
-            approved can sign in; other accounts cannot create an account here.
+            You sign in with your Google account, or with your email and a password. Only email addresses the
+            administrator has approved can sign in; nobody can create an account here by themselves.
           </p>
         </section>
 
         <section>
           <h2>What we store</h2>
           <ul>
-            <li>Your Google account email address, display name (initially your Google name) and optional bio. We do not receive your Google password.</li>
+            <li>
+              Your email address, display name (initially your Google name or the name the administrator gave you) and
+              optional bio. We never receive your Google password. If you use a password here, only a one-way
+              (bcrypt) hash of it is stored, never the password itself.
+            </li>
             <li>Your conversations, messages, attachments, and when messages were delivered and read.</li>
             <li>
               Security logs: sign-ins, sign-outs, access changes and administrator actions. Email addresses in logs are

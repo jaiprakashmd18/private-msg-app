@@ -2,6 +2,9 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+/* Inbox and conversation side by side: wide enough AND tall enough (a phone
+   turned sideways keeps the one-screen-at-a-time layout). */
+@custom-variant split (@media (min-width: 768px) and (min-height: 500px));
 
 /*
  * Design tokens. Dark is the default theme (the <html> element carries
@@ -106,13 +109,50 @@
   html,
   body {
     height: 100%;
+    /* No rubber-band bounce or pull-to-refresh fighting the chat's own scrolling. */
+    overscroll-behavior: none;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv11", "ss01";
+    /* Keep content clear of the notch / rounded corners in landscape. */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  /* Single-column grids shrink to the screen instead of growing to fit long
+     unbreakable text (emails, links, tables). grid-cols-* utilities override. */
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* No double-tap-to-zoom delay on controls. */
+  a,
+  button,
+  input,
+  label,
+  select,
+  textarea,
+  [role="button"] {
+    touch-action: manipulation;
   }
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-ring;
+  }
+}
+
+/*
+ * Bottom padding that clears the iPhone home indicator, except while the
+ * on-screen keyboard is open (the keyboard covers that area anyway).
+ * html[data-keyboard] is set by <ViewportSync />.
+ */
+@utility pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  html[data-keyboard="open"] & {
+    padding-bottom: 0.75rem;
   }
 }
 

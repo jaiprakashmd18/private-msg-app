@@ -9,6 +9,7 @@ import { useApp } from "@/components/app-provider";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { PhotoEditor } from "@/components/photo-editor";
 import { AppSettingsCard } from "@/components/pwa/app-settings-card";
+import { PasswordCard } from "@/components/settings/password-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -84,7 +85,10 @@ export function SettingsView() {
   }
 
   return (
-    <main id="main" className="mx-auto w-full max-w-2xl px-4 pb-16 pt-[max(1.5rem,env(safe-area-inset-top))]">
+    <main
+      id="main"
+      className="mx-auto w-full max-w-2xl px-4 pb-[max(4rem,calc(env(safe-area-inset-bottom)+2rem))] pt-[max(1.5rem,env(safe-area-inset-top))]"
+    >
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link href="/chat">
           <ArrowLeft /> Messages
@@ -107,9 +111,9 @@ export function SettingsView() {
             />
             <form onSubmit={save} className="grid gap-4" noValidate>
               <div className="grid gap-2">
-                <Label htmlFor="email">Google account</Label>
+                <Label htmlFor="email">Account email</Label>
                 <Input id="email" value={access.email} disabled readOnly />
-                <p className="text-xs text-muted-foreground">Your Google account is your identity and can&apos;t be changed here.</p>
+                <p className="text-xs text-muted-foreground">Your approved email is your identity and can&apos;t be changed here.</p>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="display_name">Display name</Label>
@@ -139,6 +143,8 @@ export function SettingsView() {
             </form>
           </CardContent>
         </Card>
+
+        <PasswordCard />
 
         <Card>
           <CardHeader>

@@ -106,12 +106,13 @@
 
 ### Sign-up and sign-in (allowlist)
 
-1. The login page calls `supabase.auth.signInWithOAuth({ provider: "google" })` (PKCE). The user picks a Google account; Google returns them to Supabase Auth, which redirects to `/auth/callback?code=…`.
+1. **Google:** the login page calls `supabase.auth.signInWithOAuth({ provider: "google" })` (PKCE). The user picks a Google account; Google returns them to Supabase Auth, which redirects to `/auth/callback?code=…`.
 2. Before Supabase Auth creates an account for a first-time user:
    - **`before_user_created_hook`** refuses anything that isn't a Google sign-in for an **active** allowlisted email;
    - **`enforce_allowlist_on_signup` trigger** on `auth.users` performs the same check inside the insert transaction (with `FOR SHARE` on the allowlist row, so approval can't be raced). This holds even if the hook isn't configured, and it also blocks email/password, magic-link, phone and anonymous users even when an admin enables those methods by mistake (or uses the service-role admin API);
    - when it refuses a **Google** sign-in, the hook records (or bumps) a row in `access_requests`. The admin sees it in *Admin → Access requests*; `admin_accept_request()` adds the email to the allowlist (audited `admin.request_accepted`), so the next Google sign-in succeeds. `admin_decline_request()` marks it declined;
    - **`custom_access_token_hook`** refuses to issue or refresh any token for a user whose email is not active.
+   - **Email + password:** accounts are created only by `/api/admin/allowlist/[id]/password`: `admin_prepare_password()` (as the admin) checks the entry and leaves a 60-second, single-use grant for that email; the service role then creates the account (or sets the password of an existing one); `server_record_admin_password()` stores the hash in `private.admin_set_passwords`, ends the member's sessions on a reset and audits it. The trigger refuses any `email` account without a grant, so public sign-up stays closed even with the Email provider on. Members sign in with `signInWithPassword` straight from the browser. While their password hash still equals the admin-set one, `my_access().must_change_password` is true and `(app)/layout.tsx` redirects to `/set-password`.
 3. `/auth/callback` exchanges the code for a session on the server, logs `auth.sign_in`, and redirects to `/chat` or `/unauthorized`. Refusals come back as `/login?error=not_authorized|no_access|failed` with a friendly message.
 4. The session is stored in `SameSite=Lax` cookies managed by `@supabase/ssr`. They are intentionally readable by JavaScript (the browser Supabase client needs the access token for REST and Realtime), so XSS prevention (React escaping, no HTML rendering of messages, CSP) matters.
 5. Users cannot change the email on their account (trigger), because the approved address *is* the identity.
@@ -155,3 +156,11 @@
 - **Voice notes** use `MediaRecorder` (MP4/AAC preferred for iPhone playback, WebM/Opus otherwise) and store `duration_ms`.
 - **Typing** is a Broadcast on the private channel `conv:<id>`; **online** is Presence on the private channel `online`; "last seen" comes from a 60-second `heartbeat()` RPC. Channel access is enforced by RLS policies on `realtime.messages`.
 - **Profile and group photos** are cropped to a 320 px JPEG square in the browser (`prepareAvatar`), uploaded to the `avatars` bucket, then saved with `set_avatar()` / `set_group_avatar()` (group admins only; posts a "changed the group photo" note). Storage policies let active members read avatars and only the owner (or a group admin) write them. Signed URLs are cached for 20 minutes (`useSignedUrl`).
+
+## 9. Layout on phones, tablets and desktops
+
+- One layout for every device, no separate "mobile site". The chat is single-screen (inbox **or** conversation) until the custom `split` breakpoint — at least 768 px wide **and** 500 px tall — so a phone turned sideways keeps the phone layout while tablets and computers get both side by side.
+- `ViewportSync` (`src/components/pwa/viewport-sync.tsx`) publishes the visible area as `--vv-height` / `--vv-top` and sets `html[data-keyboard="open"]`; the chat shell and dialogs size themselves from it, so on iPhone the header and message box stay visible above the keyboard. Android uses `interactive-widget=resizes-content`.
+- Safe areas (`viewport-fit=cover`): headers pad for the notch/status bar, bottoms for the home indicator (`pb-safe` utility, dropped while the keyboard is open), sides for landscape notches.
+- Inputs are 16 px on touch screens (iOS zooms into smaller fields); hover-only controls are always visible on touch screens (`pointer-fine:` variants).
+- Single-column grids use `minmax(0, 1fr)` globally, and long words/links wrap (`overflow-wrap: anywhere`), so nothing pushes the page sideways. Messages and the composer are capped at a readable width on large monitors.

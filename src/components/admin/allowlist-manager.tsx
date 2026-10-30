@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, CheckCircle2, LogOut, Plus, Trash2, UserX } from "lucide-react";
+import { Ban, CheckCircle2, Copy, KeyRound, LogOut, Plus, Trash2, UserX } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmButton } from "@/components/ui/confirm-button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
@@ -26,6 +27,7 @@ export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
   const [formError, setFormError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [issued, setIssued] = useState<{ email: string; password: string; created: boolean } | null>(null);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -45,7 +47,9 @@ export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
       reportError(error, "Could not add the email.");
       return;
     }
-    toast.success(`${parsed.data.email} can now sign in with Google`);
+    toast.success(`${parsed.data.email} can now sign in with Google`, {
+      description: "To let them use a password instead, choose “Set password” on their entry.",
+    });
     setEmail("");
     setLabel("");
     router.refresh();
@@ -75,20 +79,23 @@ export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Members &amp; access</h1>
         <p className="text-sm text-muted-foreground">
-          Only Google accounts on this list can sign in. Disabling or removing an email signs the person out everywhere and
-          blocks access immediately.
+          Only emails on this list can sign in — with Google, or with a password you set for them. Disabling or removing
+          an email signs the person out everywhere and blocks access immediately.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Approve a Google account</CardTitle>
-          <CardDescription>They can click “Continue with Google” and sign in right away.</CardDescription>
+          <CardTitle>Approve an email</CardTitle>
+          <CardDescription>
+            Gmail / Google accounts can click “Continue with Google” right away. For any other email, approve it and then
+            choose “Set password”.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={add} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end" noValidate>
             <div className="grid gap-2">
-              <Label htmlFor="new-email">Gmail / Google account email</Label>
+              <Label htmlFor="new-email">Email</Label>
               <Input
                 id="new-email"
                 type="email"
@@ -149,7 +156,7 @@ export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
                   <li key={n.id} className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium tabular-nums">{n.email}</span>
+                        <span className="break-all font-medium">{n.email}</span>
                         {n.status === "active" ? (
                           <Badge variant="success">Active</Badge>
                         ) : (
@@ -158,6 +165,11 @@ export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
                         {isAdminEntry && <Badge>Admin</Badge>}
                         {isSelf && <Badge variant="outline">You</Badge>}
                         {!n.user_id && <Badge variant="outline">Not registered yet</Badge>}
+                        {n.password_pending ? (
+                          <Badge variant="outline">Temporary password</Badge>
+                        ) : (
+                          n.has_password && <Badge variant="secondary">Password</Badge>
+                        )}
                       </div>
                       <p className="mt-0.5 truncate text-sm text-muted-foreground">
                         {[n.label, n.display_name && n.display_name !== n.label ? `“${n.display_name}”` : null]
@@ -210,6 +222,40 @@ export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
                             <CheckCircle2 /> Re-enable
                           </Button>
                         )}
+                        {n.status === "active" && (
+                          <ConfirmButton
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            destructive={false}
+                            title={n.has_password ? `Reset the password for ${n.email}?` : `Set a password for ${n.email}?`}
+                            description={
+                              <>
+                                You&apos;ll get a temporary password to send them. They sign in with their email and that
+                                password, then must choose their own.
+                                {n.user_id && " They're signed out on all devices now."}
+                                {n.has_password && " Their current password stops working."} This is recorded in the
+                                audit log.
+                              </>
+                            }
+                            confirmLabel={n.has_password ? "Reset password" : "Set password"}
+                            onConfirm={() =>
+                              run(
+                                n.id,
+                                async () => {
+                                  const res = await adminRequest<{ email: string; password: string; created: boolean }>(
+                                    `/api/admin/allowlist/${n.id}/password`,
+                                    "POST",
+                                  );
+                                  setIssued({ email: res.email, password: res.password, created: res.created });
+                                },
+                                "Temporary password created",
+                              )
+                            }
+                          >
+                            <KeyRound /> {n.has_password ? "Reset password" : "Set password"}
+                          </ConfirmButton>
+                        )}
                         {n.user_id && (
                           <ConfirmButton
                             size="sm"
@@ -217,7 +263,7 @@ export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
                             disabled={busy}
                             destructive={false}
                             title="Sign out all sessions?"
-                            description="Ends every active session for this person. They can sign in again with Google while their email is approved."
+                            description="Ends every active session for this person. They can sign in again while their email is approved."
                             confirmLabel="Sign out everywhere"
                             onConfirm={() =>
                               run(
@@ -279,6 +325,68 @@ export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
           )}
         </CardContent>
       </Card>
+      <TemporaryPasswordDialog issued={issued} onClose={() => setIssued(null)} />
     </div>
+  );
+}
+
+function TemporaryPasswordDialog({
+  issued,
+  onClose,
+}: {
+  issued: { email: string; password: string; created: boolean } | null;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const loginUrl = typeof window === "undefined" ? "" : `${window.location.origin}/login`;
+  const message = issued
+    ? `Sign in at ${loginUrl}\nEmail: ${issued.email}\nTemporary password: ${issued.password}\nYou'll be asked to choose your own password.`
+    : "";
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopied(true);
+      toast.success("Copied");
+    } catch {
+      toast.error("Couldn't copy — select the text and copy it by hand.");
+    }
+  }
+
+  return (
+    <Dialog
+      open={issued !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          setCopied(false);
+          onClose();
+        }
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Temporary password</DialogTitle>
+          <DialogDescription>
+            Send this to {issued?.email} privately (for example in person or by text message). It is shown only once.
+          </DialogDescription>
+        </DialogHeader>
+        {issued && (
+          <div className="grid gap-3">
+            <p
+              className="select-all break-all rounded-xl border bg-muted px-4 py-3 text-center font-mono text-xl tracking-wider"
+              aria-label="Temporary password"
+            >
+              {issued.password}
+            </p>
+            <pre className="whitespace-pre-wrap break-words rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">
+              {message}
+            </pre>
+            <Button onClick={() => void copy()}>
+              <Copy /> {copied ? "Copied" : "Copy message"}
+            </Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

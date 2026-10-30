@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { usePendingRequests } from "@/hooks/use-pending-requests";
 import { cn } from "@/lib/utils";
 
@@ -17,9 +18,20 @@ const LINKS = [
 export function AdminNav() {
   const pathname = usePathname();
   const pending = usePendingRequests(pathname);
+  const navRef = useRef<HTMLElement>(null);
+
+  // On phones the tabs scroll sideways: keep the current one in view.
+  useEffect(() => {
+    navRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [pathname]);
+
   return (
-    <nav aria-label="Admin sections" className="mx-auto max-w-6xl overflow-x-auto px-2">
-      <ul className="flex gap-1 py-2">
+    <nav
+      ref={navRef}
+      aria-label="Admin sections"
+      className="relative mx-auto max-w-6xl overflow-x-auto overscroll-x-contain px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <ul className="flex w-max gap-1 py-2">
         {LINKS.map((l) => {
           const active = l.href === "/admin" ? pathname === "/admin" : pathname.startsWith(l.href);
           return (

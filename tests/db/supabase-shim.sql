@@ -25,6 +25,7 @@ create table if not exists auth.users (
   raw_app_meta_data jsonb,
   raw_user_meta_data jsonb,
   is_anonymous boolean not null default false,
+  encrypted_password text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

@@ -6,7 +6,7 @@ The in-app privacy notice lives at `/privacy` (`src/app/privacy/page.tsx`). This
 
 | Data | Where | Who can read it in the app |
 | --- | --- | --- |
-| Google account email, display name (initially the Google name), bio, last seen | `profiles`, `authorized_emails`, `auth.users` | Active members (directory); admin |
+| Account email, display name (initially the admin's label or the Google name), bio, last seen | `profiles`, `authorized_emails`, `auth.users` | Active members (directory); admin |
 | Messages (text, timestamps, edit/delete markers) | `messages` | Members of that conversation only; admin **only if** the audited policy is on |
 | Files | Storage bucket `attachments` + `attachments` table | Members of that conversation only |
 | Push notification subscriptions (an opaque address + keys per device, "show preview" choice, browser name) | `push_subscriptions` | Only the owner; used by the server to send notifications |
@@ -15,10 +15,11 @@ The in-app privacy notice lives at `/privacy` (`src/app/privacy/page.tsx`). This
 | Online status and "last seen" | Realtime presence (not stored); `profiles.last_seen_at` | Active members |
 | Profile photos and group photos (cropped to 320 px squares) | Storage bucket `avatars`; `profiles.avatar_path`, `conversations.avatar_path` | Active members |
 | Access requests from people not on the list: Google email, Google name, Google profile-picture link, number of attempts, dates, decision | `access_requests` | Admin only |
+| Passwords (only for people who use email + password) — stored by Supabase Auth as a bcrypt hash, never in plain text; the app also remembers the hash of an administrator-set temporary password, only to know whether it has been replaced | `auth.users`, `private.admin_set_passwords` | Nobody can read a password; the administrator sees only whether one is set |
 | Delivery/read watermarks | `conversation_members` | Members of that conversation |
 | Security events (masked email addresses, actor ids, admin actions) | `audit_logs` | Admin |
 
-Not stored by the app: Google passwords (sign-in happens on Google's own page), message content in logs, IP addresses. Supabase and Vercel keep their own operational logs (including IPs) per their policies.
+Not stored by the app: Google passwords (sign-in happens on Google's own page), plain-text passwords (temporary passwords are shown to the administrator once and never saved), message content in logs, IP addresses. Supabase and Vercel keep their own operational logs (including IPs) per their policies.
 
 ## Administrator access policy
 
@@ -28,6 +29,10 @@ Not stored by the app: Google passwords (sign-in happens on Google's own page), 
   - content is only available through an RPC that writes an `admin.messages_viewed` audit entry per view;
   - the change itself is audited (`admin.settings_updated` with before/after values).
 - Anyone with owner access to the Supabase project (dashboard/SQL) can technically read all data. Limit who has that access and enable 2FA on the Supabase and Vercel accounts.
+
+### Passwords set by the administrator
+
+A temporary password lets the administrator, technically, sign in as that member until the member replaces it. The app therefore: forces the member to choose their own password at first sign-in; records every set/reset in the audit log (`admin.password_account_created`, `admin.password_reset`); signs the member out everywhere on a reset; and never lets an administrator set a password for another administrator. A member who notices they were signed out unexpectedly should ask the administrator why.
 
 ## Retention
 

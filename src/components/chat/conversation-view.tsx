@@ -219,7 +219,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
   return (
     <>
       <header className="flex items-center gap-3 border-b px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6">
-        <Button asChild variant="ghost" size="icon-sm" className="md:hidden" aria-label="Back to conversations">
+        <Button asChild variant="ghost" size="icon-sm" className="split:hidden" aria-label="Back to conversations">
           <Link href="/chat">
             <ArrowLeft />
           </Link>
@@ -278,100 +278,103 @@ export function ConversationView({ conversationId }: { conversationId: string })
         aria-relevant="additions"
         aria-label={`Messages in ${title}`}
       >
-        {loading ? (
-          <div className="space-y-3 px-6">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className={i % 2 ? "flex justify-end" : "flex"}>
-                <Skeleton className="h-10 w-2/5 rounded-2xl" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <>
-            {hasMore ? (
-              <div className="flex justify-center py-2">
-                <Button variant="ghost" size="sm" onClick={() => void loadOlder()} disabled={loadingOlder}>
-                  {loadingOlder ? <Spinner label="Loading earlier messages" /> : "Load earlier messages"}
-                </Button>
-              </div>
-            ) : (
-              messages.length > 0 && (
-                <p className="py-3 text-center text-xs text-muted-foreground">Beginning of your conversation</p>
-              )
-            )}
-            {messages.length === 0 && (
-              <div className="grid h-full place-items-center px-6 text-center">
-                <div>
-                  <p className="font-medium">No messages yet</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Say hello{isGroup ? " to the group" : ` to ${title}`}.</p>
+        {/* Readable line lengths on wide screens. */}
+        <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col">
+          {loading ? (
+            <div className="space-y-3 px-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className={i % 2 ? "flex justify-end" : "flex"}>
+                  <Skeleton className="h-10 w-2/5 rounded-2xl" />
                 </div>
-              </div>
-            )}
-            {messages.map((m, i) => {
-              const prev = messages[i - 1];
-              const newDay =
-                !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString();
-              const divider = newDay && (
-                <div className="my-4 flex justify-center">
-                  <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-                    {formatDayDivider(m.created_at)}
-                  </span>
+              ))}
+            </div>
+          ) : (
+            <>
+              {hasMore ? (
+                <div className="flex justify-center py-2">
+                  <Button variant="ghost" size="sm" onClick={() => void loadOlder()} disabled={loadingOlder}>
+                    {loadingOlder ? <Spinner label="Loading earlier messages" /> : "Load earlier messages"}
+                  </Button>
                 </div>
-              );
-              if (m.system_event) {
+              ) : (
+                messages.length > 0 && (
+                  <p className="py-3 text-center text-xs text-muted-foreground">Beginning of your conversation</p>
+                )
+              )}
+              {messages.length === 0 && (
+                <div className="grid flex-1 place-items-center px-6 text-center">
+                  <div>
+                    <p className="font-medium">No messages yet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Say hello{isGroup ? " to the group" : ` to ${title}`}.</p>
+                  </div>
+                </div>
+              )}
+              {messages.map((m, i) => {
+                const prev = messages[i - 1];
+                const newDay =
+                  !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString();
+                const divider = newDay && (
+                  <div className="my-4 flex justify-center">
+                    <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                      {formatDayDivider(m.created_at)}
+                    </span>
+                  </div>
+                );
+                if (m.system_event) {
+                  return (
+                    <Fragment key={m.id}>
+                      {divider}
+                      <SystemMessage event={m.system_event} actorId={m.sender_id} nameOf={nameOf} />
+                    </Fragment>
+                  );
+                }
+                const mine = m.sender_id === access.user_id;
+                const grouped =
+                  !newDay &&
+                  !prev?.system_event &&
+                  prev?.sender_id === m.sender_id &&
+                  new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < GROUP_WINDOW_MS;
+                const canEdit = editWindowMs > 0 && now - new Date(m.created_at).getTime() < editWindowMs;
                 return (
                   <Fragment key={m.id}>
                     {divider}
-                    <SystemMessage event={m.system_event} actorId={m.sender_id} nameOf={nameOf} />
+                    <MessageBubble
+                      message={m}
+                      mine={mine}
+                      myId={access.user_id}
+                      grouped={grouped}
+                      senderName={isGroup ? nameOf(m.sender_id) : undefined}
+                      nameOf={nameOf}
+                      receipt={
+                        mine
+                          ? receiptFor(m, summary?.other_last_read_at ?? null, summary?.other_last_delivered_at ?? null)
+                          : undefined
+                      }
+                      canEdit={canEdit}
+                      onEdit={() => {
+                        setReplyingTo(null);
+                        setEditing({ id: m.id, body: m.body });
+                      }}
+                      onDelete={() => setConfirmDelete(m.id)}
+                      onRetry={() => retry(m.client_id)}
+                      onDiscard={() => discard(m.client_id)}
+                      onReply={() => {
+                        setEditing(null);
+                        setReplyingTo(m);
+                      }}
+                      onReact={(emoji) => void react(m.id, emoji)}
+                      onOpenImage={(attachmentId) => {
+                        const idx = photos.findIndex((p) => p.attachment.id === attachmentId);
+                        if (idx >= 0) setLightboxIndex(idx);
+                      }}
+                      onJumpTo={setJumpTarget}
+                    />
                   </Fragment>
                 );
-              }
-              const mine = m.sender_id === access.user_id;
-              const grouped =
-                !newDay &&
-                !prev?.system_event &&
-                prev?.sender_id === m.sender_id &&
-                new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < GROUP_WINDOW_MS;
-              const canEdit = editWindowMs > 0 && now - new Date(m.created_at).getTime() < editWindowMs;
-              return (
-                <Fragment key={m.id}>
-                  {divider}
-                  <MessageBubble
-                    message={m}
-                    mine={mine}
-                    myId={access.user_id}
-                    grouped={grouped}
-                    senderName={isGroup ? nameOf(m.sender_id) : undefined}
-                    nameOf={nameOf}
-                    receipt={
-                      mine
-                        ? receiptFor(m, summary?.other_last_read_at ?? null, summary?.other_last_delivered_at ?? null)
-                        : undefined
-                    }
-                    canEdit={canEdit}
-                    onEdit={() => {
-                      setReplyingTo(null);
-                      setEditing({ id: m.id, body: m.body });
-                    }}
-                    onDelete={() => setConfirmDelete(m.id)}
-                    onRetry={() => retry(m.client_id)}
-                    onDiscard={() => discard(m.client_id)}
-                    onReply={() => {
-                      setEditing(null);
-                      setReplyingTo(m);
-                    }}
-                    onReact={(emoji) => void react(m.id, emoji)}
-                    onOpenImage={(attachmentId) => {
-                      const idx = photos.findIndex((p) => p.attachment.id === attachmentId);
-                      if (idx >= 0) setLightboxIndex(idx);
-                    }}
-                    onJumpTo={setJumpTarget}
-                  />
-                </Fragment>
-              );
-            })}
-          </>
-        )}
+              })}
+            </>
+          )}
+        </div>
       </div>
 
       <Composer

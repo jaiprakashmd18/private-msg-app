@@ -161,7 +161,7 @@ export function Composer({
 
   if (disabled && disabledReason) {
     return (
-      <div className="border-t px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-center text-sm text-muted-foreground">
+      <div className="pb-safe border-t px-4 pt-4 text-center text-sm text-muted-foreground">
         {disabledReason}
       </div>
     );
@@ -170,7 +170,7 @@ export function Composer({
   if (recorder.state === "recording") {
     const nearLimit = recorder.elapsed > MAX_VOICE_NOTE_MS - 15_000;
     return (
-      <div className="flex items-center gap-3 border-t bg-background/80 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:px-6">
+      <div className="pb-safe flex items-center gap-3 border-t bg-background/80 px-3 pt-3 backdrop-blur sm:px-6">
         <Button variant="ghost" size="icon" aria-label="Cancel recording" onClick={recorder.cancel}>
           <Trash2 className="text-destructive" />
         </Button>
@@ -187,173 +187,175 @@ export function Composer({
   }
 
   return (
-    <div className="border-t bg-background/80 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:px-6">
-      {editing && (
-        <div className="mb-2 flex items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-xs">
-          <span className="flex-1">Editing message — Enter to save, Esc to cancel</span>
-          <button type="button" onClick={onCancelEdit} aria-label="Cancel editing" className="rounded p-0.5 hover:bg-background/40">
-            <X className="size-3.5" />
-          </button>
-        </div>
-      )}
-      {replyingTo && !editing && (
-        <div className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-primary bg-accent px-3 py-1.5 text-xs">
-          <Reply className="size-3.5 shrink-0 text-primary" aria-hidden />
-          <span className="min-w-0 flex-1">
-            <span className="block font-semibold">Replying to {replyingTo.author}</span>
-            <span className="block truncate text-muted-foreground">{replyingTo.text}</span>
-          </span>
-          <button type="button" onClick={onCancelReply} aria-label="Cancel reply" className="rounded p-0.5 hover:bg-background/40">
-            <X className="size-3.5" />
-          </button>
-        </div>
-      )}
-      {(files.length > 0 || preparing > 0) && (
-        <ul className="mb-2 flex flex-wrap gap-2" aria-label="Files to send">
-          {files.map((f, i) => (
-            <li key={`${f.file.name}-${i}`} className="relative">
-              {f.previewUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- local preview (blob URL)
-                <img src={f.previewUrl} alt={f.file.name} className="size-16 rounded-lg object-cover" />
-              ) : (
-                <span className="flex h-16 max-w-44 items-center gap-2 rounded-lg bg-muted px-2.5 text-xs">
-                  <span className="truncate">{f.file.name}</span>
-                  <span className="shrink-0 text-muted-foreground">{formatBytes(f.file.size)}</span>
-                </span>
-              )}
-              <button
-                type="button"
-                aria-label={`Remove ${f.file.name}`}
-                onClick={() => removeFile(i)}
-                className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-foreground text-background"
-              >
-                <X className="size-3" />
-              </button>
-            </li>
-          ))}
-          {preparing > 0 && (
-            <li className="grid size-16 place-items-center rounded-lg bg-muted">
-              <Spinner label="Preparing photo" />
-            </li>
-          )}
-        </ul>
-      )}
-      <form
-        className="flex items-end gap-1.5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void submit();
-        }}
-      >
-        {attachmentsEnabled && !editing && (
-          <>
-            <input
-              ref={fileRef}
-              type="file"
-              multiple
-              hidden
-              accept={ALLOWED_ATTACHMENT_TYPES.join(",")}
-              onChange={(e) => void addFiles(e.target.files)}
-            />
-            <input
-              ref={cameraRef}
-              type="file"
-              hidden
-              accept="image/*"
-              capture="environment"
-              onChange={(e) => void addFiles(e.target.files)}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label="Attach photos or files"
-              title="Photos & files (max 10 MB each)"
-              disabled={disabled}
-              onClick={() => fileRef.current?.click()}
-            >
-              <Paperclip />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label="Take a photo"
-              title="Camera"
-              disabled={disabled}
-              className="md:hidden"
-              onClick={() => cameraRef.current?.click()}
-            >
-              <Camera />
-            </Button>
-          </>
+    <div className="pb-safe border-t bg-background/80 px-3 pt-3 backdrop-blur sm:px-6">
+      <div className="mx-auto w-full max-w-4xl">
+        {editing && (
+          <div className="mb-2 flex items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-xs">
+            <span className="flex-1">Editing message — Enter to save, Esc to cancel</span>
+            <button type="button" onClick={onCancelEdit} aria-label="Cancel editing" className="rounded p-0.5 hover:bg-background/40">
+              <X className="size-3.5" />
+            </button>
+          </div>
         )}
-        <div className="relative flex-1">
-          <label htmlFor="composer" className="sr-only">
-            {editing ? "Edit message" : "Message"}
-          </label>
-          <textarea
-            id="composer"
-            ref={textRef}
-            rows={1}
-            value={body}
-            disabled={disabled}
-            placeholder="Message"
-            onChange={(e) => {
-              setBody(e.target.value);
-              if (e.target.value) onTyping();
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                void submit();
-              } else if (e.key === "Escape") {
-                if (editing) {
-                  e.preventDefault();
-                  setBody("");
-                  onCancelEdit();
-                } else if (replyingTo) {
-                  e.preventDefault();
-                  onCancelReply();
-                }
-              }
-            }}
-            aria-describedby="composer-hint"
-            className={cn(
-              "block max-h-[200px] min-h-10 w-full resize-none rounded-2xl border border-input bg-muted/60 px-4 py-2.5 text-[15px] leading-snug placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30",
-              tooLong && "border-destructive",
-            )}
-          />
-          <span id="composer-hint" className="sr-only">
-            Press Enter to send, Shift+Enter for a new line.
-          </span>
-          {body.length > MAX_MESSAGE_LENGTH - 500 && (
-            <span
-              className={cn("absolute -top-5 right-2 text-[11px]", tooLong ? "text-destructive" : "text-muted-foreground")}
-              aria-live="polite"
-            >
-              {body.length}/{MAX_MESSAGE_LENGTH}
+        {replyingTo && !editing && (
+          <div className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-primary bg-accent px-3 py-1.5 text-xs">
+            <Reply className="size-3.5 shrink-0 text-primary" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">Replying to {replyingTo.author}</span>
+              <span className="block truncate text-muted-foreground">{replyingTo.text}</span>
             </span>
-          )}
-        </div>
-        {showMic ? (
-          <Button
-            type="button"
-            size="icon"
-            className="rounded-full"
-            aria-label="Record voice message"
-            title="Voice message"
-            disabled={disabled}
-            onClick={() => void startRecording()}
-          >
-            <Mic />
-          </Button>
-        ) : (
-          <Button type="submit" size="icon" className="rounded-full" disabled={!canSubmit} aria-label={editing ? "Save edit" : "Send message"}>
-            <SendHorizontal />
-          </Button>
+            <button type="button" onClick={onCancelReply} aria-label="Cancel reply" className="rounded p-0.5 hover:bg-background/40">
+              <X className="size-3.5" />
+            </button>
+          </div>
         )}
-      </form>
+        {(files.length > 0 || preparing > 0) && (
+          <ul className="mb-2 flex flex-wrap gap-2" aria-label="Files to send">
+            {files.map((f, i) => (
+              <li key={`${f.file.name}-${i}`} className="relative">
+                {f.previewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- local preview (blob URL)
+                  <img src={f.previewUrl} alt={f.file.name} className="size-16 rounded-lg object-cover" />
+                ) : (
+                  <span className="flex h-16 max-w-44 items-center gap-2 rounded-lg bg-muted px-2.5 text-xs">
+                    <span className="truncate">{f.file.name}</span>
+                    <span className="shrink-0 text-muted-foreground">{formatBytes(f.file.size)}</span>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  aria-label={`Remove ${f.file.name}`}
+                  onClick={() => removeFile(i)}
+                  className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-foreground text-background"
+                >
+                  <X className="size-3" />
+                </button>
+              </li>
+            ))}
+            {preparing > 0 && (
+              <li className="grid size-16 place-items-center rounded-lg bg-muted">
+                <Spinner label="Preparing photo" />
+              </li>
+            )}
+          </ul>
+        )}
+        <form
+          className="flex items-end gap-1.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+        >
+          {attachmentsEnabled && !editing && (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                hidden
+                accept={ALLOWED_ATTACHMENT_TYPES.join(",")}
+                onChange={(e) => void addFiles(e.target.files)}
+              />
+              <input
+                ref={cameraRef}
+                type="file"
+                hidden
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => void addFiles(e.target.files)}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Attach photos or files"
+                title="Photos & files (max 10 MB each)"
+                disabled={disabled}
+                onClick={() => fileRef.current?.click()}
+              >
+                <Paperclip />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Take a photo"
+                title="Camera"
+                disabled={disabled}
+                className="pointer-fine:hidden"
+                onClick={() => cameraRef.current?.click()}
+              >
+                <Camera />
+              </Button>
+            </>
+          )}
+          <div className="relative flex-1">
+            <label htmlFor="composer" className="sr-only">
+              {editing ? "Edit message" : "Message"}
+            </label>
+            <textarea
+              id="composer"
+              ref={textRef}
+              rows={1}
+              value={body}
+              disabled={disabled}
+              placeholder="Message"
+              onChange={(e) => {
+                setBody(e.target.value);
+                if (e.target.value) onTyping();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void submit();
+                } else if (e.key === "Escape") {
+                  if (editing) {
+                    e.preventDefault();
+                    setBody("");
+                    onCancelEdit();
+                  } else if (replyingTo) {
+                    e.preventDefault();
+                    onCancelReply();
+                  }
+                }
+              }}
+              aria-describedby="composer-hint"
+              className={cn(
+                "block max-h-[200px] min-h-10 w-full resize-none rounded-2xl border border-input bg-muted/60 px-4 py-2.5 text-base leading-snug pointer-fine:text-[15px] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30",
+                tooLong && "border-destructive",
+              )}
+            />
+            <span id="composer-hint" className="sr-only">
+              Press Enter to send, Shift+Enter for a new line.
+            </span>
+            {body.length > MAX_MESSAGE_LENGTH - 500 && (
+              <span
+                className={cn("absolute -top-5 right-2 text-[11px]", tooLong ? "text-destructive" : "text-muted-foreground")}
+                aria-live="polite"
+              >
+                {body.length}/{MAX_MESSAGE_LENGTH}
+              </span>
+            )}
+          </div>
+          {showMic ? (
+            <Button
+              type="button"
+              size="icon"
+              className="rounded-full"
+              aria-label="Record voice message"
+              title="Voice message"
+              disabled={disabled}
+              onClick={() => void startRecording()}
+            >
+              <Mic />
+            </Button>
+          ) : (
+            <Button type="submit" size="icon" className="rounded-full" disabled={!canSubmit} aria-label={editing ? "Save edit" : "Send message"}>
+              <SendHorizontal />
+            </Button>
+          )}
+        </form>
+      </div>
     </div>
   );
 }

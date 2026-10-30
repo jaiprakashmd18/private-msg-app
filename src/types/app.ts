@@ -11,6 +11,9 @@ export interface Access {
   avatar_path: string | null;
   is_active: boolean;
   role: AppRole | null;
+  has_password: boolean;
+  has_google: boolean;
+  must_change_password: boolean;
 }
 
 export interface AppSettings {
@@ -169,6 +172,8 @@ export interface AllowlistEntry {
   display_name: string | null;
   registered_at: string | null;
   last_seen_at: string | null;
+  has_password: boolean;
+  password_pending: boolean;
 }
 
 export interface AdminConversation {
