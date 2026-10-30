@@ -16,7 +16,7 @@ export function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+      <DialogPrimitive.Overlay className="fixed inset-screen z-50 bg-black/70 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
       <DialogPrimitive.Content
         className={cn(
           "fixed left-1/2 top-[calc(var(--vv-top,0px)+max(1rem,env(safe-area-inset-top)))] z-50 grid max-h-[calc(var(--vv-height,100dvh)-max(1rem,env(safe-area-inset-top))-max(1rem,env(safe-area-inset-bottom)))] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 gap-4 overflow-y-auto overscroll-contain rounded-2xl border bg-popover p-5 text-popover-foreground shadow-2xl sm:top-[calc(var(--vv-top,0px)+min(10vh,6rem))] sm:max-h-[calc(var(--vv-height,100dvh)-min(10vh,6rem)-2rem)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",

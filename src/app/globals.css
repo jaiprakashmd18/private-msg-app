@@ -172,6 +172,16 @@
 }
 
 /*
+ * Full-screen layers (overlays, viewers, lock screen). Like `inset-0`, plus
+ * the strip some iOS versions leave below the page in the installed app
+ * (--viewport-gap, measured by ViewportSync).
+ */
+@utility inset-screen {
+  inset: 0;
+  bottom: calc(0px - var(--viewport-gap, 0px));
+}
+
+/*
  * Full-screen chat. `inset: 0` reaches the very bottom of the screen in the
  * installed iPhone app, where 100dvh / the visual viewport can come up short
  * by the status bar's height. Only while the keyboard is open does it follow
@@ -180,6 +190,7 @@
 .app-shell {
   position: fixed;
   inset: 0;
+  bottom: calc(0px - var(--viewport-gap, 0px));
 }
 html[data-keyboard="open"] .app-shell {
   bottom: auto;

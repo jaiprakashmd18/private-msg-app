@@ -102,9 +102,9 @@ function ViewOnceViewer({ attachmentId, onClose }: { attachmentId: string; onClo
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black" />
+        <DialogPrimitive.Overlay className="fixed inset-screen z-50 bg-black" />
         <DialogPrimitive.Content
-          className="fixed inset-0 z-50 flex flex-col pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] text-white outline-none"
+          className="fixed inset-screen z-50 flex flex-col pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] text-white outline-none"
           onContextMenu={(e) => e.preventDefault()}
         >
           <div className="flex items-center gap-2 px-3 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">

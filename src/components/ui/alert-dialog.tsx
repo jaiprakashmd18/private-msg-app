@@ -14,7 +14,7 @@ export function AlertDialogContent({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
   return (
     <AlertDialogPrimitive.Portal>
-      <AlertDialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+      <AlertDialogPrimitive.Overlay className="fixed inset-screen z-50 bg-black/70 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0" />
       <AlertDialogPrimitive.Content
         className={cn(
           "fixed left-1/2 top-[calc(var(--vv-top,0px)+var(--vv-height,100dvh)/2)] z-50 grid max-h-[calc(var(--vv-height,100dvh)-2rem)] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto overscroll-contain rounded-2xl border bg-popover p-5 shadow-2xl data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",

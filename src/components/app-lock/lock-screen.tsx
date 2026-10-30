@@ -102,7 +102,7 @@ export function LockScreen({ config, onUnlock }: { config: LockConfig | null; on
   return (
     <main
       id="main"
-      className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-8 bg-background px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]"
+      className="fixed inset-screen z-[60] flex flex-col items-center justify-center gap-8 bg-background px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]"
     >
       <div className="text-center">
         <div className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-primary/15 text-primary">

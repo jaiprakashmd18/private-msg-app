@@ -69,9 +69,9 @@ export function Lightbox({
   return (
     <DialogPrimitive.Root open={index !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/95" />
+        <DialogPrimitive.Overlay className="fixed inset-screen z-50 bg-black/95" />
         <DialogPrimitive.Content
-          className="fixed inset-0 z-50 flex flex-col pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] text-white outline-none"
+          className="fixed inset-screen z-50 flex flex-col pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] text-white outline-none"
           onKeyDown={(e) => {
             if (e.key === "ArrowLeft") go(-1);
             if (e.key === "ArrowRight") go(1);
