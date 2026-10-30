@@ -164,3 +164,15 @@
 - Safe areas (`viewport-fit=cover`): headers pad for the notch/status bar, bottoms for the home indicator (`pb-safe` utility, dropped while the keyboard is open), sides for landscape notches.
 - Inputs are 16 px on touch screens (iOS zooms into smaller fields); hover-only controls are always visible on touch screens (`pointer-fine:` variants).
 - Single-column grids use `minmax(0, 1fr)` globally, and long words/links wrap (`overflow-wrap: anywhere`), so nothing pushes the page sideways. Messages and the composer are capped at a readable width on large monitors.
+
+## 10. Features for two
+
+- **View-once:** `attachments.view_once/viewed_at/viewed_by`. `send_message` accepts one view-once photo alone in a direct chat (no thumbnail). The storage read policy hides the file from everyone except the recipient for one minute after `open_view_once()`; the viewer loads it into a blob URL, and closing calls `/api/view-once/[id]`, which deletes the file with the service role.
+- **Chat look:** `conversation_members.wallpaper_path` / `bubble_color`, via `get_chat_appearance` / `set_chat_appearance`. Colours are CSS classes (`.bubble-rose` …) that override `--bubble-mine` on the message list.
+- **Thinking of you:** `send_nudge()` inserts a system message `{type: "nudge"}`; the open chat shows floating hearts and vibrates (Android); elsewhere in the app a toast appears; the push notification carries a vibration pattern.
+- **Special dates:** `special_dates` (one `together` per chat). Countdowns are computed in the browser (`src/lib/dates.ts`). Reminders are system messages `{type: "date_reminder"}` posted from 08:00 in the time zone the date was saved in.
+- **Love notes:** `scheduled_messages`, visible only to the author. `private.deliver_due_scheduled()` turns due notes into ordinary messages (`was_scheduled = true`) from their author.
+- **Timed work:** `private.run_scheduled_jobs()` runs every minute via pg_cron (`ghostline-timed-messages`) and calls `/api/push/hook` through pg_net with a secret from `private.app_hook` (the app registers its https origin on the first `/api/push/notify`). Open apps also call `deliver_due_items()` every minute, so delivery never depends on pg_cron alone.
+- **Our list:** `shared_list_items` with soft deletes, live through Postgres Changes (`useLiveRows`).
+- **Memories:** `/chat/[id]/memories` lists image attachments (excluding view-once) with keyset paging and reuses the lightbox.
+- **App lock:** `src/lib/app-lock.ts` + `AppLockGate` in `(app)/layout.tsx`. Config per user in `localStorage`; an `app_lock` cookie lets the server render the lock screen instead of the app on first load.

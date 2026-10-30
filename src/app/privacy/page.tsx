@@ -35,6 +35,11 @@ export default function PrivacyPage() {
             </li>
             <li>Your conversations, messages, attachments, and when messages were delivered and read.</li>
             <li>
+              If you use them: special dates, your shared list, love notes waiting to be sent (only you can see those
+              until they&apos;re delivered) and your chat wallpaper and colour. View-once photos are deleted after
+              they&apos;re opened. The app lock PIN never leaves your device.
+            </li>
+            <li>
               Security logs: sign-ins, sign-outs, access changes and administrator actions. Email addresses in logs are
               partially masked. Message content and verification codes are never logged.
             </li>

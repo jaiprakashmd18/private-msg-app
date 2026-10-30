@@ -31,3 +31,23 @@ describe("push payload for groups and media", () => {
     expect(buildPayload({ ...base, body: "", has_attachments: true, attachment_kind: "audio" }).body).toBe("🎤 Voice message");
   });
 });
+
+describe("push payload for taps, reminders and view-once photos", () => {
+  it("buzzes for 'thinking of you'", () => {
+    const p = buildPayload({ ...base, body: "", event: { type: "nudge" } });
+    expect(p).toMatchObject({ title: "Alex", body: "is thinking of you ❤️", url: "/chat/c1" });
+    expect(p.vibrate?.length).toBeGreaterThan(0);
+  });
+
+  it("announces special days, without details when previews are off", () => {
+    const event = { type: "date_reminder", kind: "together", title: "Us", years: 2 };
+    expect(buildPayload({ ...base, sender_name: "", body: "", event }).body).toBe("🎉 2 years together today! ❤️");
+    expect(buildPayload({ ...base, show_preview: false, body: "", event }).body).toBe("You have a special day today");
+  });
+
+  it("never reveals a view-once photo", () => {
+    expect(buildPayload({ ...base, body: "", has_attachments: true, attachment_kind: "view_once" }).body).toBe(
+      "📷 View-once photo",
+    );
+  });
+});

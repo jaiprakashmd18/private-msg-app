@@ -2,9 +2,12 @@
 
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { heartbeat, listConversations, markAllDelivered } from "@/lib/data/chat";
-import { setAppBadge } from "@/lib/pwa-client";
+import { deliverDueItems } from "@/lib/data/couple";
+import { displayNameOf } from "@/lib/format";
+import { requestPushForMessage, setAppBadge } from "@/lib/pwa-client";
 import type { ConversationSummary, Message, Reaction } from "@/types/app";
 
 export type ConnectionState = "connecting" | "online" | "reconnecting";
@@ -71,6 +74,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }, 1500);
   }, [supabase]);
 
+  const conversationsRef = useRef(conversations);
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
   const emit = useCallback((event: MessageEvent) => {
     for (const listener of listeners.current) listener(event);
   }, []);
@@ -95,6 +103,17 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         emit({ type: "insert", message });
         scheduleRefresh();
         if (message.sender_id !== access.user_id) scheduleDelivered();
+        // A heart while you're elsewhere in the app (the open chat animates it).
+        if (
+          message.system_event?.type === "nudge" &&
+          message.sender_id !== access.user_id &&
+          !window.location.pathname.startsWith(`/chat/${message.conversation_id}`)
+        ) {
+          const c = conversationsRef.current.find((x) => x.id === message.conversation_id);
+          const who = c?.kind === "direct" ? displayNameOf(c.other_display_name, c.other_email) : "Someone";
+          toast(`❤️ ${who} is thinking of you`);
+          navigator.vibrate?.([120, 60, 120, 60, 240]);
+        }
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (payload) => {
         emit({ type: "update", message: payload.new as Message });
@@ -173,6 +192,25 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       void supabase.removeChannel(channel);
     };
   }, [supabase, access.user_id]);
+
+  // Love notes and date reminders that are due get delivered by the
+  // database every minute; while the app is open it also checks, so they
+  // arrive even where the scheduler isn't available.
+  useEffect(() => {
+    const run = () => {
+      if (document.visibilityState !== "visible") return;
+      deliverDueItems(supabase)
+        .then((ids) => ids.forEach(requestPushForMessage))
+        .catch(() => undefined);
+    };
+    run();
+    const interval = setInterval(run, 60_000);
+    document.addEventListener("visibilitychange", run);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", run);
+    };
+  }, [supabase]);
 
   useEffect(
     () => () => {

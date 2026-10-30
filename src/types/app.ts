@@ -43,7 +43,9 @@ export type SystemEvent =
   | { type: "member_left"; user_id: string }
   | { type: "renamed"; title: string }
   | { type: "photo_changed" }
-  | { type: "photo_removed" };
+  | { type: "photo_removed" }
+  | { type: "nudge" }
+  | { type: "date_reminder"; date_id: string; kind: SpecialDateKind; title: string; years: number };
 
 export interface ConversationSummary {
   id: string;
@@ -104,6 +106,10 @@ export interface Attachment {
   width: number | null;
   height: number | null;
   duration_ms: number | null;
+  /** View-once photo: opened at most once, by the recipient. */
+  view_once?: boolean;
+  viewed_at?: string | null;
+  viewed_by?: string | null;
   created_at: string;
 }
 
@@ -117,7 +123,7 @@ export interface ReplyPreview {
   body: string;
   sender_id: string | null;
   deleted_at: string | null;
-  attachments?: Pick<Attachment, "mime_type">[];
+  attachments?: Pick<Attachment, "mime_type" | "view_once">[];
 }
 
 export interface Message {
@@ -131,6 +137,8 @@ export interface Message {
   deleted_at: string | null;
   reply_to_id: string | null;
   system_event: SystemEvent | null;
+  /** Delivered by the scheduler (a love note sent for later, or a reminder). */
+  was_scheduled?: boolean;
   attachments?: Attachment[];
   message_reactions?: Reaction[];
   reply_to?: ReplyPreview | null;
@@ -144,6 +152,8 @@ export interface PendingFile {
   height?: number;
   durationMs?: number;
   previewUrl?: string;
+  /** Send as a view-once photo (no thumbnail is made). */
+  viewOnce?: boolean;
 }
 
 /** A message as held in the UI, including optimistic local state. */
@@ -222,4 +232,49 @@ export interface AccessRequest {
   first_requested_at: string;
   last_requested_at: string;
   decided_at: string | null;
+}
+
+export type SpecialDateKind = "together" | "birthday" | "anniversary" | "other";
+
+export interface SpecialDate {
+  id: string;
+  conversation_id: string;
+  created_by: string | null;
+  kind: SpecialDateKind;
+  title: string;
+  /** YYYY-MM-DD */
+  on_date: string;
+  yearly: boolean;
+  remind: boolean;
+  tz: string;
+  deleted_at: string | null;
+}
+
+export interface ScheduledMessage {
+  id: string;
+  conversation_id: string;
+  body: string;
+  send_at: string;
+  delivered_at: string | null;
+  canceled_at: string | null;
+  created_at: string;
+}
+
+export interface ListItem {
+  id: string;
+  conversation_id: string;
+  created_by: string | null;
+  text: string;
+  done: boolean;
+  done_by: string | null;
+  deleted_at: string | null;
+  created_at: string;
+}
+
+export const BUBBLE_COLORS = ["blue", "rose", "purple", "green", "orange", "teal", "graphite"] as const;
+export type BubbleColor = (typeof BUBBLE_COLORS)[number];
+
+export interface ChatAppearance {
+  wallpaper_path: string | null;
+  bubble_color: BubbleColor | null;
 }

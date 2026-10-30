@@ -144,6 +144,33 @@
   }
 }
 
+/* Bubble colours a member can pick per chat (Chat look). White text on each
+   meets WCAG AA. */
+.bubble-blue { --bubble-mine: oklch(0.47 0.15 265); --bubble-mine-foreground: oklch(0.99 0 0); }
+.bubble-rose { --bubble-mine: oklch(0.52 0.18 5); --bubble-mine-foreground: oklch(0.99 0 0); }
+.bubble-purple { --bubble-mine: oklch(0.48 0.18 300); --bubble-mine-foreground: oklch(0.99 0 0); }
+.bubble-green { --bubble-mine: oklch(0.48 0.12 155); --bubble-mine-foreground: oklch(0.99 0 0); }
+.bubble-orange { --bubble-mine: oklch(0.52 0.15 45); --bubble-mine-foreground: oklch(0.99 0 0); }
+.bubble-teal { --bubble-mine: oklch(0.48 0.09 200); --bubble-mine-foreground: oklch(0.99 0 0); }
+.bubble-graphite { --bubble-mine: oklch(0.36 0.01 265); --bubble-mine-foreground: oklch(0.99 0 0); }
+
+/* "Thinking of you": hearts floating up. */
+@keyframes heart-float {
+  0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(var(--heart-dx, 0px), -70vh) scale(1.3); opacity: 0; }
+}
+.heart-float {
+  animation: heart-float 2.4s ease-out forwards;
+}
+
+/* Wrong PIN on the lock screen. */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  75% { transform: translateX(10px); }
+}
+
 /*
  * Bottom padding that clears the iPhone home indicator, except while the
  * on-screen keyboard is open (the keyboard covers that area anyway).

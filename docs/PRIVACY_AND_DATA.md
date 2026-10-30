@@ -16,6 +16,13 @@ The in-app privacy notice lives at `/privacy` (`src/app/privacy/page.tsx`). This
 | Profile photos and group photos (cropped to 320 px squares) | Storage bucket `avatars`; `profiles.avatar_path`, `conversations.avatar_path` | Active members |
 | Access requests from people not on the list: Google email, Google name, Google profile-picture link, number of attempts, dates, decision | `access_requests` | Admin only |
 | Passwords (only for people who use email + password) — stored by Supabase Auth as a bcrypt hash, never in plain text; the app also remembers the hash of an administrator-set temporary password, only to know whether it has been replaced | `auth.users`, `private.admin_set_passwords` | Nobody can read a password; the administrator sees only whether one is set |
+| View-once photos | Storage bucket `attachments`, plus who opened it and when | Only the recipient, only once (for one minute after opening); the file is then deleted |
+| Chat wallpaper and bubble colour | `conversation_members.wallpaper_path`, `bubble_color`; photo in bucket `avatars` | Active members (the wallpaper file); the setting itself only you |
+| Special dates (title, date, time zone for reminders) | `special_dates` | Members of that conversation |
+| Love notes waiting to be sent | `scheduled_messages` | Only the author until delivered; then an ordinary message |
+| Shared list items, who added / ticked them | `shared_list_items` | Members of that conversation |
+| App lock: salted PIN hash, timeout, Face ID / fingerprint credential id | This device's browser storage only (never sent to the server) | Nobody else |
+| The app's own address and a random secret (for timed notifications) | `private.app_hook` (not reachable through the API) | Server only |
 | Delivery/read watermarks | `conversation_members` | Members of that conversation |
 | Security events (masked email addresses, actor ids, admin actions) | `audit_logs` | Admin |
 
@@ -37,6 +44,8 @@ A temporary password lets the administrator, technically, sign in as that member
 ## Retention
 
 - Messages: kept until deleted, unless *Delete messages older than N days* is set; then a daily job (and *Run retention now*) hard-deletes older messages and their files.
+- View-once photos: deleted right after they're closed; any file missed is removed by the daily job (10 minutes after opening at the latest by that job's next run). The message row remains, showing "Opened".
+- Deleted list items and special dates: removed for good after 7 days; sent or cancelled love notes after 30 days (the delivered message itself stays like any message).
 - Access requests: pending requests stay until accepted or declined; decided requests are deleted 90 days after the decision by the daily job. At most 500 pending requests are kept, so the list can't be flooded.
 - Audit log: 365 days by default (30–3650 configurable).
 - Orphaned uploads (files never attached, or whose message was deleted): removed after 24 hours by the same job.

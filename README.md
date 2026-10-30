@@ -18,6 +18,15 @@ A minimal, dark-mode messaging app for a closed group of people. People sign in 
 - **Push notifications** — per device, with an option to hide message text on the lock screen; sent only to active members, once per message.
 - **Profile and group photos** — members pick their own photo (cropped to a square in the browser); group admins set the group photo. Stored in a private bucket, visible only to active members.
 - **Access requests** — when someone not on the list tries to sign in with Google, a request appears in *Admin → Access requests* (with a badge on the shield icon). Accept lets them in on their next sign-in; Decline keeps them out. No account is created until you accept.
+- **Made for two** — features for a couple's chat:
+  - **App lock** — PIN, plus Face ID / fingerprint where the device supports it; locks on start and after a chosen time away; slows down guessing.
+  - **View-once photos** — opened one time by the other person, then deleted; no thumbnail is ever stored.
+  - **Chat look** — your own wallpaper photo and bubble colour per chat.
+  - **"Thinking of you"** — one tap sends a heart: floating hearts on their screen and a buzzing notification.
+  - **Memories** — every photo you've shared, in one gallery by month.
+  - **Special dates** — "Day 412 together", birthday/anniversary countdowns, and a celebration in the chat on the day.
+  - **Love notes for later** — write now, delivered at the time you pick (e.g. "Good morning" at 7 am), with a notification.
+  - **Our list** — a shared to-do / shopping list that updates live for both.
 - **Admin dashboard** — allowlist management, account deletion, conversation metadata, storage usage, retention settings, and an append-only audit log.
 - **Explicit privacy policy for admins** — administrators *cannot* read messages unless an audited, member-visible policy is switched on.
 

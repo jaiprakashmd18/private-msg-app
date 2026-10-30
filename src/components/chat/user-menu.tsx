@@ -1,7 +1,8 @@
 "use client";
 
-import { LogOut, MoreVertical, ShieldCheck, UserRound } from "lucide-react";
+import { Lock, LogOut, MoreVertical, ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
+import { useAppLock } from "@/components/app-lock/app-lock-gate";
 import { useApp } from "@/components/app-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +18,7 @@ import { displayNameOf } from "@/lib/format";
 
 export function UserMenu() {
   const { access } = useApp();
+  const { config: lock, lockNow } = useAppLock();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -40,6 +42,11 @@ export function UserMenu() {
             <ShieldCheck /> Privacy notice
           </Link>
         </DropdownMenuItem>
+        {lock && (
+          <DropdownMenuItem onSelect={lockNow}>
+            <Lock /> Lock now
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem destructive onSelect={() => void signOut(false)}>
           <LogOut /> Sign out

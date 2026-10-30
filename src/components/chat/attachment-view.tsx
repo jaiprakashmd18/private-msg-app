@@ -1,6 +1,7 @@
 "use client";
 
 import { FileText, ImageOff } from "lucide-react";
+import { ViewOnceChip } from "@/components/chat/view-once";
 import { VoicePlayer } from "@/components/chat/voice-player";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSignedUrl as useSignedUrlFor } from "@/hooks/use-signed-url";
@@ -102,13 +103,17 @@ export function MessageAttachments({
   mine: boolean;
   onOpenImage: (attachmentId: string) => void;
 }) {
-  const images = attachments.filter((a) => isImage(a.mime_type) && a.mime_type !== "image/heic");
+  const viewOnce = attachments.filter((a) => a.view_once);
+  const images = attachments.filter((a) => !a.view_once && isImage(a.mime_type) && a.mime_type !== "image/heic");
   const audio = attachments.filter((a) => isAudio(a.mime_type));
-  const files = attachments.filter((a) => !images.includes(a) && !audio.includes(a));
+  const files = attachments.filter((a) => !viewOnce.includes(a) && !images.includes(a) && !audio.includes(a));
   const shown = images.slice(0, 4);
 
   return (
     <div className="grid gap-1.5">
+      {viewOnce.map((a) => (
+        <ViewOnceChip key={a.id} attachment={a} mine={mine} />
+      ))}
       {images.length === 1 && <SingleImage attachment={images[0]!} onOpen={() => onOpenImage(images[0]!.id)} />}
       {images.length > 1 && (
         <div className="grid w-64 max-w-full grid-cols-2 gap-1 sm:w-72">

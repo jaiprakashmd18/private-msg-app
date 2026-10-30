@@ -55,3 +55,9 @@ Mark each item ✅/❌. Any ❌ is a release blocker.
 - [ ] Messages remain after sign-out/sign-in and on another device.
 - [ ] Turn Wi-Fi off on B, send from A, turn Wi-Fi on → B catches up without a reload ("Reconnecting…" banner shows while offline).
 - [ ] Retrying a failed send (airplane mode → send → reconnect → retry) produces exactly **one** message.
+
+## Features for two
+- [ ] Turn on App lock, close and reopen the app: the lock screen shows and no messages are visible behind it; a wrong PIN is refused; after 5 wrong PINs the keypad waits.
+- [ ] Send a view-once photo: the receiver opens it once; afterwards neither person can open it again, and Storage no longer contains the file (Supabase → Storage → attachments).
+- [ ] Schedule a love note 2 minutes ahead and close the app on both phones: the note arrives on time with a notification.
+- [ ] A third member who isn't in the chat can't see its list, dates or love notes (try the REST URLs in the browser console with their session).

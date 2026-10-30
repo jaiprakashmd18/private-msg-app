@@ -53,6 +53,7 @@ export function describeMessage(m: Pick<ReplyPreview, "body" | "deleted_at" | "a
   if (m.deleted_at) return "Message deleted";
   if (m.body.trim()) return m.body;
   const first = m.attachments?.[0]?.mime_type ?? "";
+  if (m.attachments?.[0]?.view_once) return "📷 View-once photo";
   if (isImage(first)) return "📷 Photo";
   if (isAudio(first)) return "🎤 Voice message";
   if (first) return "📎 File";
@@ -255,6 +256,7 @@ export function MessageBubble({
               </>
             )}
             <div className={cn("mt-0.5 flex items-center justify-end gap-1 text-[11px]", mine ? "opacity-80" : "opacity-60")}>
+              {message.was_scheduled && !deleted && <span title="Love note sent on schedule">scheduled ·</span>}
               {message.edited_at && !deleted && <span>edited ·</span>}
               <time dateTime={message.created_at}>{formatMessageTime(message.created_at)}</time>
               {mine && receipt && <ReceiptIcon receipt={receipt} />}

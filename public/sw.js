@@ -48,6 +48,7 @@ self.addEventListener("push", (event) => {
         renotify: true,
         icon: "/icons/icon-192.png",
         badge: "/icons/badge-96.png",
+        vibrate: Array.isArray(data.vibrate) ? data.vibrate.slice(0, 10) : undefined,
         data: { url },
       });
     }),

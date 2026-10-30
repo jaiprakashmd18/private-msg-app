@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Eye } from "lucide-react";
+import { ArrowLeft, CalendarHeart, Clock, Eye, Heart, Images, Info, ListChecks, MoreVertical, Palette } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -8,6 +8,12 @@ import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
 import { Composer, type EditingState, type ReplyingState } from "@/components/chat/composer";
 import { ConversationInfoDialog } from "@/components/chat/conversation-info-dialog";
+import { AppearanceDialog } from "@/components/chat/couple/appearance-dialog";
+import { HeartBurst } from "@/components/chat/couple/heart-burst";
+import { LoveNotesDialog } from "@/components/chat/couple/love-notes-dialog";
+import { SharedListDialog } from "@/components/chat/couple/shared-list-dialog";
+import { SpecialDatesDialog } from "@/components/chat/couple/special-dates-dialog";
+import { TogetherChip } from "@/components/chat/couple/together-chip";
 import { Lightbox, type LightboxItem } from "@/components/chat/lightbox";
 import { describeMessage, MessageBubble, type Receipt } from "@/components/chat/message-bubble";
 import { SystemMessage } from "@/components/chat/system-message";
@@ -23,14 +29,27 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, GroupAvatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useConversationMessages } from "@/hooks/use-conversation-messages";
+import { useLiveRows } from "@/hooks/use-live-rows";
+import { useSignedUrl } from "@/hooks/use-signed-url";
 import { useTyping } from "@/hooks/use-typing";
+import { AVATARS_BUCKET } from "@/lib/constants";
 import { listConversationMembers } from "@/lib/data/chat";
+import { getChatAppearance, listSpecialDates, sendNudge } from "@/lib/data/couple";
+import { requestPushForMessage } from "@/lib/pwa-client";
 import { displayNameOf, formatDayDivider, formatLastSeen, formatTyping } from "@/lib/format";
 import { isImage } from "@/lib/media";
-import type { ConversationMember, PendingFile, UiMessage } from "@/types/app";
+import { cn } from "@/lib/utils";
+import type { ChatAppearance, ConversationMember, PendingFile, SpecialDate, UiMessage } from "@/types/app";
 
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
@@ -42,7 +61,7 @@ function receiptFor(m: UiMessage, othersRead: string | null, othersDelivered: st
 }
 
 export function ConversationView({ conversationId }: { conversationId: string }) {
-  const { access, settings, supabase } = useApp();
+  const { access, settings, supabase, reportError } = useApp();
   const { getConversation, loading: inboxLoading, onlineIds, refreshSoon } = useChat();
   const summary = getConversation(conversationId);
   const searchParams = useSearchParams();
@@ -58,6 +77,13 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const [replyingTo, setReplyingTo] = useState<UiMessage | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [panel, setPanel] = useState<"list" | "dates" | "notes" | "look" | null>(null);
+  const [appearance, setAppearance] = useState<ChatAppearance>({ wallpaper_path: null, bubble_color: null });
+  const [burst, setBurst] = useState(0);
+  const { url: wallpaperUrl } = useSignedUrl(AVATARS_BUCKET, appearance.wallpaper_path);
+  const { rows: specialDates, reload: reloadDates } = useLiveRows<SpecialDate>("special_dates", conversationId, () =>
+    listSpecialDates(supabase, conversationId),
+  );
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [jumpTarget, setJumpTarget] = useState<string | null>(() => searchParams.get("m"));
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -99,6 +125,43 @@ export function ConversationView({ conversationId }: { conversationId: string })
     [memberById, access.user_id, summary],
   );
 
+  useEffect(() => {
+    getChatAppearance(supabase, conversationId)
+      .then(setAppearance)
+      .catch(() => undefined);
+  }, [supabase, conversationId]);
+
+  // A heart from the other person that arrives while the chat is open.
+  const celebrated = useRef(new Set<string>());
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (
+      !last ||
+      last.system_event?.type !== "nudge" ||
+      last.sender_id === access.user_id ||
+      celebrated.current.has(last.id) ||
+      Date.now() - new Date(last.created_at).getTime() > 60_000
+    ) {
+      return;
+    }
+    celebrated.current.add(last.id);
+    setBurst(Date.now());
+    navigator.vibrate?.([120, 60, 120, 60, 240]);
+  }, [messages, access.user_id]);
+
+  const nudge = useCallback(async () => {
+    try {
+      const id = await sendNudge(supabase, conversationId);
+      celebrated.current.add(id);
+      setBurst(Date.now());
+      navigator.vibrate?.(30);
+      requestPushForMessage(id);
+      refreshSoon();
+    } catch (err) {
+      reportError(err, "Could not send your heart.");
+    }
+  }, [supabase, conversationId, refreshSoon, reportError]);
+
   // Someone who just sent a message has stopped typing.
   const lastMessage = messages[messages.length - 1];
   useEffect(() => {
@@ -131,7 +194,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
         m.deleted_at
           ? []
           : (m.attachments ?? [])
-              .filter((a) => isImage(a.mime_type) && a.mime_type !== "image/heic")
+              .filter((a) => !a.view_once && isImage(a.mime_type) && a.mime_type !== "image/heic")
               .map((a) => ({ attachment: a, caption: nameOf(m.sender_id), createdAt: m.created_at })),
       ),
     [messages, nameOf],
@@ -188,7 +251,13 @@ export function ConversationView({ conversationId }: { conversationId: string })
 
   const handleSend = useCallback(
     (body: string, files: PendingFile[]) => {
-      send(body, files, replyingTo);
+      if (files.some((f) => f.viewOnce)) {
+        // A view-once photo travels alone; any text follows as its own message.
+        send("", files, null);
+        if (body.trim()) send(body, [], replyingTo);
+      } else {
+        send(body, files, replyingTo);
+      }
       setReplyingTo(null);
       notifyStopped();
     },
@@ -257,7 +326,53 @@ export function ConversationView({ conversationId }: { conversationId: string })
             <Skeleton className="h-4 w-32" />
           </div>
         )}
+        {summary && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-rose-500 hover:text-rose-500"
+              aria-label="Send a heart: thinking of you"
+              title="Thinking of you"
+              disabled={otherInactive}
+              onClick={() => void nudge()}
+            >
+              <Heart className="fill-current" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="More">
+                  <MoreVertical />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-52">
+                <DropdownMenuItem onSelect={() => setPanel("list")}>
+                  <ListChecks /> Our list
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPanel("dates")}>
+                  <CalendarHeart /> Special dates
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/chat/${conversationId}/memories`}>
+                    <Images /> Memories
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPanel("notes")} disabled={otherInactive}>
+                  <Clock /> Love note for later
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPanel("look")}>
+                  <Palette /> Chat look
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setInfoOpen(true)}>
+                  <Info /> {isGroup ? "Group info" : "Contact info"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        )}
       </header>
+      {specialDates && specialDates.length > 0 && <TogetherChip dates={specialDates} onOpen={() => setPanel("dates")} />}
 
       {settings?.admin_can_read_messages && (
         <div
@@ -269,111 +384,123 @@ export function ConversationView({ conversationId }: { conversationId: string })
         </div>
       )}
 
-      <div
-        ref={scrollRef}
-        onScroll={onScroll}
-        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain py-4"
-        role="log"
-        aria-live="polite"
-        aria-relevant="additions"
-        aria-label={`Messages in ${title}`}
-      >
-        {/* Readable line lengths on wide screens. */}
-        <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col">
-          {loading ? (
-            <div className="space-y-3 px-6">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className={i % 2 ? "flex justify-end" : "flex"}>
-                  <Skeleton className="h-10 w-2/5 rounded-2xl" />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <>
-              {hasMore ? (
-                <div className="flex justify-center py-2">
-                  <Button variant="ghost" size="sm" onClick={() => void loadOlder()} disabled={loadingOlder}>
-                    {loadingOlder ? <Spinner label="Loading earlier messages" /> : "Load earlier messages"}
-                  </Button>
-                </div>
-              ) : (
-                messages.length > 0 && (
-                  <p className="py-3 text-center text-xs text-muted-foreground">Beginning of your conversation</p>
-                )
-              )}
-              {messages.length === 0 && (
-                <div className="grid flex-1 place-items-center px-6 text-center">
-                  <div>
-                    <p className="font-medium">No messages yet</p>
-                    <p className="mt-1 text-sm text-muted-foreground">Say hello{isGroup ? " to the group" : ` to ${title}`}.</p>
+      <div className={cn("relative flex min-h-0 flex-1 flex-col", appearance.bubble_color && `bubble-${appearance.bubble_color}`)}>
+        {wallpaperUrl && (
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-cover bg-center"
+            style={{
+              backgroundImage: `linear-gradient(color-mix(in oklab, var(--background) 55%, transparent), color-mix(in oklab, var(--background) 55%, transparent)), url("${wallpaperUrl}")`,
+            }}
+          />
+        )}
+        <HeartBurst burst={burst} />
+        <div
+          ref={scrollRef}
+          onScroll={onScroll}
+          className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain py-4"
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions"
+          aria-label={`Messages in ${title}`}
+        >
+          {/* Readable line lengths on wide screens. */}
+          <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col">
+            {loading ? (
+              <div className="space-y-3 px-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className={i % 2 ? "flex justify-end" : "flex"}>
+                    <Skeleton className="h-10 w-2/5 rounded-2xl" />
                   </div>
-                </div>
-              )}
-              {messages.map((m, i) => {
-                const prev = messages[i - 1];
-                const newDay =
-                  !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString();
-                const divider = newDay && (
-                  <div className="my-4 flex justify-center">
-                    <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-                      {formatDayDivider(m.created_at)}
-                    </span>
+                ))}
+              </div>
+            ) : (
+              <>
+                {hasMore ? (
+                  <div className="flex justify-center py-2">
+                    <Button variant="ghost" size="sm" onClick={() => void loadOlder()} disabled={loadingOlder}>
+                      {loadingOlder ? <Spinner label="Loading earlier messages" /> : "Load earlier messages"}
+                    </Button>
                   </div>
-                );
-                if (m.system_event) {
+                ) : (
+                  messages.length > 0 && (
+                    <p className="py-3 text-center text-xs text-muted-foreground">Beginning of your conversation</p>
+                  )
+                )}
+                {messages.length === 0 && (
+                  <div className="grid flex-1 place-items-center px-6 text-center">
+                    <div>
+                      <p className="font-medium">No messages yet</p>
+                      <p className="mt-1 text-sm text-muted-foreground">Say hello{isGroup ? " to the group" : ` to ${title}`}.</p>
+                    </div>
+                  </div>
+                )}
+                {messages.map((m, i) => {
+                  const prev = messages[i - 1];
+                  const newDay =
+                    !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString();
+                  const divider = newDay && (
+                    <div className="my-4 flex justify-center">
+                      <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                        {formatDayDivider(m.created_at)}
+                      </span>
+                    </div>
+                  );
+                  if (m.system_event) {
+                    return (
+                      <Fragment key={m.id}>
+                        {divider}
+                        <SystemMessage event={m.system_event} actorId={m.sender_id} nameOf={nameOf} />
+                      </Fragment>
+                    );
+                  }
+                  const mine = m.sender_id === access.user_id;
+                  const grouped =
+                    !newDay &&
+                    !prev?.system_event &&
+                    prev?.sender_id === m.sender_id &&
+                    new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < GROUP_WINDOW_MS;
+                  const canEdit = editWindowMs > 0 && now - new Date(m.created_at).getTime() < editWindowMs;
                   return (
                     <Fragment key={m.id}>
                       {divider}
-                      <SystemMessage event={m.system_event} actorId={m.sender_id} nameOf={nameOf} />
+                      <MessageBubble
+                        message={m}
+                        mine={mine}
+                        myId={access.user_id}
+                        grouped={grouped}
+                        senderName={isGroup ? nameOf(m.sender_id) : undefined}
+                        nameOf={nameOf}
+                        receipt={
+                          mine
+                            ? receiptFor(m, summary?.other_last_read_at ?? null, summary?.other_last_delivered_at ?? null)
+                            : undefined
+                        }
+                        canEdit={canEdit}
+                        onEdit={() => {
+                          setReplyingTo(null);
+                          setEditing({ id: m.id, body: m.body });
+                        }}
+                        onDelete={() => setConfirmDelete(m.id)}
+                        onRetry={() => retry(m.client_id)}
+                        onDiscard={() => discard(m.client_id)}
+                        onReply={() => {
+                          setEditing(null);
+                          setReplyingTo(m);
+                        }}
+                        onReact={(emoji) => void react(m.id, emoji)}
+                        onOpenImage={(attachmentId) => {
+                          const idx = photos.findIndex((p) => p.attachment.id === attachmentId);
+                          if (idx >= 0) setLightboxIndex(idx);
+                        }}
+                        onJumpTo={setJumpTarget}
+                      />
                     </Fragment>
                   );
-                }
-                const mine = m.sender_id === access.user_id;
-                const grouped =
-                  !newDay &&
-                  !prev?.system_event &&
-                  prev?.sender_id === m.sender_id &&
-                  new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < GROUP_WINDOW_MS;
-                const canEdit = editWindowMs > 0 && now - new Date(m.created_at).getTime() < editWindowMs;
-                return (
-                  <Fragment key={m.id}>
-                    {divider}
-                    <MessageBubble
-                      message={m}
-                      mine={mine}
-                      myId={access.user_id}
-                      grouped={grouped}
-                      senderName={isGroup ? nameOf(m.sender_id) : undefined}
-                      nameOf={nameOf}
-                      receipt={
-                        mine
-                          ? receiptFor(m, summary?.other_last_read_at ?? null, summary?.other_last_delivered_at ?? null)
-                          : undefined
-                      }
-                      canEdit={canEdit}
-                      onEdit={() => {
-                        setReplyingTo(null);
-                        setEditing({ id: m.id, body: m.body });
-                      }}
-                      onDelete={() => setConfirmDelete(m.id)}
-                      onRetry={() => retry(m.client_id)}
-                      onDiscard={() => discard(m.client_id)}
-                      onReply={() => {
-                        setEditing(null);
-                        setReplyingTo(m);
-                      }}
-                      onReact={(emoji) => void react(m.id, emoji)}
-                      onOpenImage={(attachmentId) => {
-                        const idx = photos.findIndex((p) => p.attachment.id === attachmentId);
-                        if (idx >= 0) setLightboxIndex(idx);
-                      }}
-                      onJumpTo={setJumpTarget}
-                    />
-                  </Fragment>
-                );
-              })}
-            </>
-          )}
+                })}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -381,6 +508,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
         disabled={loading || otherInactive}
         disabledReason={otherInactive ? `${title} no longer has access, so you can't send new messages.` : undefined}
         attachmentsEnabled={settings?.attachments_enabled ?? false}
+        allowViewOnce={!isGroup}
         editing={editing}
         replyingTo={replyState}
         onSend={handleSend}
@@ -402,6 +530,28 @@ export function ConversationView({ conversationId }: { conversationId: string })
           }}
         />
       )}
+
+      <SharedListDialog conversationId={conversationId} open={panel === "list"} onOpenChange={(o) => setPanel(o ? "list" : null)} nameOf={nameOf} />
+      <SpecialDatesDialog
+        conversationId={conversationId}
+        dates={specialDates}
+        open={panel === "dates"}
+        onOpenChange={(o) => setPanel(o ? "dates" : null)}
+        onChanged={reloadDates}
+      />
+      <LoveNotesDialog
+        conversationId={conversationId}
+        recipientName={isGroup ? "the group" : title}
+        open={panel === "notes"}
+        onOpenChange={(o) => setPanel(o ? "notes" : null)}
+      />
+      <AppearanceDialog
+        conversationId={conversationId}
+        appearance={appearance}
+        open={panel === "look"}
+        onOpenChange={(o) => setPanel(o ? "look" : null)}
+        onChanged={setAppearance}
+      />
 
       <Lightbox items={photos} index={lightboxIndex} onIndexChange={setLightboxIndex} onClose={() => setLightboxIndex(null)} />
 

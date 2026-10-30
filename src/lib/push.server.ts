@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import webpush from "web-push";
+import { describeDateReminder } from "@/lib/dates";
 import { logServerError } from "@/lib/errors";
 
 interface VapidKeys {
@@ -37,7 +38,9 @@ interface PushTarget {
   sender_name: string;
   body: string;
   has_attachments: boolean;
-  attachment_kind?: "image" | "audio" | "file" | null;
+  attachment_kind?: "image" | "audio" | "file" | "view_once" | null;
+  /** System event for taps ("nudge") and date reminders. */
+  event?: { type: string; title?: string; kind?: string; years?: number } | null;
 }
 
 export interface PushPayload {
@@ -45,18 +48,40 @@ export interface PushPayload {
   body: string;
   url: string;
   tag: string;
+  /** Vibration pattern (Android), for "thinking of you". */
+  vibrate?: number[];
 }
 
 export function buildPayload(t: Omit<PushTarget, "endpoint" | "p256dh" | "auth">): PushPayload {
-  const media =
-    t.attachment_kind === "image" ? "📷 Photo" : t.attachment_kind === "audio" ? "🎤 Voice message" : "📎 Attachment";
-  const preview = t.body.trim() ? t.body.trim().slice(0, 140) : t.has_attachments ? media : "New message";
+  const url = `/chat/${t.conversation_id}`;
   const sender = t.sender_name || "Someone";
+  if (t.event?.type === "nudge") {
+    return { title: sender, body: "is thinking of you ❤️", url, tag: `nudge-${t.conversation_id}`, vibrate: [120, 60, 120, 60, 240] };
+  }
+  if (t.event?.type === "date_reminder") {
+    return {
+      title: "A special day 🎉",
+      body: t.show_preview
+        ? describeDateReminder({ kind: t.event.kind ?? "other", title: t.event.title ?? "A special day", years: t.event.years ?? 0 })
+        : "You have a special day today",
+      url,
+      tag: `reminder-${t.conversation_id}`,
+    };
+  }
+  const media =
+    t.attachment_kind === "view_once"
+      ? "📷 View-once photo"
+      : t.attachment_kind === "image"
+        ? "📷 Photo"
+        : t.attachment_kind === "audio"
+          ? "🎤 Voice message"
+          : "📎 Attachment";
+  const preview = t.body.trim() ? t.body.trim().slice(0, 140) : t.has_attachments ? media : "New message";
   const group = t.conversation_kind === "group";
   return {
     title: group ? (t.conversation_title ?? "Group") : sender,
     body: group ? (t.show_preview ? `${sender}: ${preview}` : `New message from ${sender}`) : t.show_preview ? preview : "New message",
-    url: `/chat/${t.conversation_id}`,
+    url,
     tag: t.conversation_id,
   };
 }
@@ -66,19 +91,34 @@ function vapidSubject(origin: string): string {
   return origin.startsWith("https://") ? origin : "mailto:notifications@example.com";
 }
 
+let registeredOrigin: string | undefined;
+
+/**
+ * Tells the database where this app lives, so its every-minute job can ask
+ * /api/push/hook to notify people about love notes and date reminders.
+ * Only real deployments (https) are registered.
+ */
+export async function registerAppOrigin(service: SupabaseClient, origin: string): Promise<void> {
+  if (registeredOrigin === origin || !origin.startsWith("https://")) return;
+  const { error } = await service.rpc("server_register_app", { p_url: origin });
+  if (error) logServerError("push.register", error);
+  else registeredOrigin = origin;
+}
+
 /**
  * Sends a notification about `messageId` to the other members' devices.
  * The database decides who (if anyone) is notified; see server_push_targets.
+ * `callerId` is the signed-in user asking, or null for the database's hook.
  */
 export async function notifyNewMessage(
   service: SupabaseClient,
   messageId: string,
-  senderId: string,
+  callerId: string | null,
   origin: string,
 ): Promise<number> {
   const { data, error } = await service.rpc("server_push_targets", {
     p_message_id: messageId,
-    p_sender: senderId,
+    p_caller: callerId,
   });
   if (error) throw error;
   const targets = (data ?? []) as PushTarget[];

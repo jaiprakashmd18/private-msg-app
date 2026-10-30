@@ -124,8 +124,22 @@ When a new version adds database changes, the repository includes an `update_*.s
 2. `supabase/update_chat_features.sql` — group chats, replies, reactions, photo thumbnails, voice notes, typing and online status
 3. `supabase/update_photos_and_requests.sql` — profile and group photos, access requests in the admin page
 4. `supabase/update_password_sign_in.sql` — email + password sign-in (also turn the **Email** provider **on**, step 4b)
+5. `supabase/update_couple_features.sql` — app lock, view-once photos, chat look, "thinking of you", memories, special dates, love notes, shared list
 
 Vercel deploys the new app code automatically when the code on GitHub changes. New projects only need `setup_all.sql`, which always contains everything.
+
+## 7d. Features for two
+
+Nothing to configure — after running the update (7c, step 5) everything works. Where to find things:
+
+| Feature | Where |
+| --- | --- |
+| App lock | **Settings → App lock** → *Turn on app lock* (PIN), then optionally *Unlock with Face ID / fingerprint*. Per device. Forgot the PIN? *Forgot PIN? Sign out* on the lock screen, then sign in again. |
+| "Thinking of you" | The **❤️** button at the top of a chat |
+| View-once photo | Pick **one** photo, tap the round **1** on its preview, send |
+| Memories, Our list, Special dates, Love note for later, Chat look | The **⋮** menu at the top of a chat |
+
+**Timed messages** (love notes and date reminders) are delivered every minute by the database's scheduler (*pg_cron*, switched on by the update file). Their phone notifications are sent through *pg_net* to your app, whose address the app registers itself the first time anyone sends a message from the live site — so send one message after updating. If the scheduler isn't available on your plan, notes are still delivered as soon as either of you opens the app.
 
 ## 8. Test that access control works
 
@@ -193,6 +207,10 @@ Requires Node.js 20.9+ (https://nodejs.org) and Docker Desktop.
 | "Password sign-in isn't switched on for this app yet" | Supabase → Authentication → Sign In / Providers → **Email** → enable (step 4b). |
 | "Set password" says something went wrong | Run `update_password_sign_in.sql` (step 7c), and check `SUPABASE_SERVICE_ROLE_KEY` is set in Vercel. |
 | Someone forgot their password | Admin → Members & access → **Reset password** on their entry, and send them the new temporary password. |
+| Love notes / date reminders only arrive when the app is opened | Run `supabase/snippets/enable_timed_messages.sql` in the SQL Editor (safe to run again). **Integrations → Cron** (or *Database → Cron Jobs*) should then list `ghostline-timed-messages`. |
+| No notification for a love note | Send one normal message from the live site first (the app registers its address then). Vercel *Deployment Protection* must be off for production (it blocks the database's call to `/api/push/hook`). |
+| Forgot the app lock PIN | Lock screen → **Forgot PIN? Sign out**, sign in again. The lock is removed from that device. |
+| Face ID / fingerprint option missing | The browser or device doesn't offer it (needs a device with Face ID, Touch ID, a fingerprint reader or Windows Hello). The PIN still works. |
 | No access requests ever appear | Check step 4b: **Authentication → Hooks → Before User Created** must point to `before_user_created_hook` and be enabled. Also run `update_photos_and_requests.sql` (step 7c). |
 | "Change photo" fails | Run `update_photos_and_requests.sql` (step 7c) — it creates the `avatars` storage bucket. |
 | Messages only appear after refresh | Make sure migration `…0500` ran (it enables Realtime for messages). |

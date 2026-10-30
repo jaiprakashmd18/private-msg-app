@@ -28,6 +28,7 @@ export function Composer({
   disabled,
   disabledReason,
   attachmentsEnabled,
+  allowViewOnce = false,
   editing,
   replyingTo,
   onSend,
@@ -39,6 +40,8 @@ export function Composer({
   disabled: boolean;
   disabledReason?: string;
   attachmentsEnabled: boolean;
+  /** One-to-one chats: a single photo can be sent as view-once. */
+  allowViewOnce?: boolean;
   editing: EditingState | null;
   replyingTo: ReplyingState | null;
   onSend: (body: string, files: PendingFile[]) => void;
@@ -222,6 +225,23 @@ export function Composer({
                     <span className="shrink-0 text-muted-foreground">{formatBytes(f.file.size)}</span>
                   </span>
                 )}
+                {allowViewOnce && files.length === 1 && f.previewUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setFiles((prev) => prev.map((p, j) => (j === i ? { ...p, viewOnce: !p.viewOnce } : p)))}
+                    aria-pressed={Boolean(f.viewOnce)}
+                    aria-label="View once"
+                    title={f.viewOnce ? "View once: on" : "Send as view once"}
+                    className={cn(
+                      "absolute bottom-1 left-1 grid size-6 place-items-center rounded-full border-2 text-[11px] font-bold shadow",
+                      f.viewOnce
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-white bg-black/50 text-white",
+                    )}
+                  >
+                    1
+                  </button>
+                )}
                 <button
                   type="button"
                   aria-label={`Remove ${f.file.name}`}
@@ -238,6 +258,11 @@ export function Composer({
               </li>
             )}
           </ul>
+        )}
+        {files.length === 1 && files[0]!.viewOnce && (
+          <p className="mb-2 text-xs text-muted-foreground">
+            View once: they can open this photo one time, then it&apos;s deleted. Any text is sent as a separate message.
+          </p>
         )}
         <form
           className="flex items-end gap-1.5"

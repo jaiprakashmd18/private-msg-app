@@ -17,7 +17,7 @@ import type {
 
 const MESSAGE_SELECT =
   "*, attachments(*), message_reactions(user_id, emoji), " +
-  "reply_to:reply_to_id(id, body, sender_id, deleted_at, attachments(mime_type))";
+  "reply_to:reply_to_id(id, body, sender_id, deleted_at, attachments(mime_type, view_once))";
 
 export async function listConversations(supabase: SupabaseClient): Promise<ConversationSummary[]> {
   const { data, error } = await supabase.rpc("list_conversations");
@@ -88,6 +88,7 @@ export interface UploadedAttachment {
   width?: number;
   height?: number;
   duration_ms?: number;
+  view_once?: boolean;
 }
 
 async function putObject(supabase: SupabaseClient, path: string, body: Blob, contentType: string) {
@@ -114,7 +115,8 @@ export async function uploadAttachment(
   const path = `${folder}/${crypto.randomUUID()}-${name}`;
   await putObject(supabase, path, file, contentType);
   const uploaded: UploadedAttachment = { path, name: file.name.slice(0, 200) };
-  if (pending.thumb) {
+  if (pending.viewOnce) uploaded.view_once = true;
+  if (pending.thumb && !pending.viewOnce) {
     const thumbPath = `${folder}/${crypto.randomUUID()}-thumb.jpg`;
     await putObject(supabase, thumbPath, pending.thumb, "image/jpeg");
     uploaded.thumb_path = thumbPath;

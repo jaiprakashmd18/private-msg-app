@@ -1,6 +1,7 @@
+import { describeDateReminder } from "@/lib/dates";
 import type { SystemEvent } from "@/types/app";
 
-/** Human text for a group event, e.g. "Alex added Sam". */
+/** Human text for a chat event, e.g. "Alex added Sam". */
 export function describeSystemEvent(
   event: SystemEvent,
   actorId: string | null,
@@ -22,6 +23,10 @@ export function describeSystemEvent(
       return `${actor} changed the group photo`;
     case "photo_removed":
       return `${actor} removed the group photo`;
+    case "nudge":
+      return actor === "You" ? "You sent a ❤️" : `${actor} is thinking of you ❤️`;
+    case "date_reminder":
+      return describeDateReminder(event);
     default:
       return "Group updated";
   }
