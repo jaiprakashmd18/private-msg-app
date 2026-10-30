@@ -12,10 +12,12 @@ import { useEffect } from "react";
  * resizes the page itself (viewport interactive-widget=resizes-content), where
  * the variables simply match the page.
  *
- * It also measures --viewport-gap: in the installed iPhone app some iOS
- * versions make the page shorter than the screen by the status bar's height
- * while still drawing it from the very top, which leaves an empty strip at
- * the bottom. Full-screen layers extend by that amount.
+ * Some iOS versions size the installed app's view as if the status bar took
+ * space, yet draw it from the very top, so the view ends above the home
+ * indicator while still reporting a bottom safe area. Then
+ * html[data-short-view] drops that (now pointless) bottom padding. The app
+ * uses a black, non-translucent status bar so newly installed copies avoid
+ * this entirely.
  */
 export function ViewportSync() {
   useEffect(() => {
@@ -26,6 +28,9 @@ export function ViewportSync() {
 
     // iOS only (navigator.standalone exists only there), installed app only.
     const iosApp = (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:fixed;top:0;left:0;width:0;visibility:hidden;height:env(safe-area-inset-top)";
+    if (iosApp) document.body.appendChild(probe);
 
     const update = () => {
       frame = 0;
@@ -34,8 +39,11 @@ export function ViewportSync() {
         const full = portrait
           ? Math.max(window.screen.width, window.screen.height)
           : Math.min(window.screen.width, window.screen.height);
-        const gap = Math.round(full - window.innerHeight);
-        root.style.setProperty("--viewport-gap", `${gap > 0 && gap <= 120 ? gap : 0}px`);
+        const gap = full - window.innerHeight;
+        const statusBar = probe.getBoundingClientRect().height;
+        // Drawn under the status bar (statusBar > 0) but shorter by its height.
+        if (statusBar > 0 && Math.abs(gap - statusBar) <= 3) root.dataset.shortView = "";
+        else delete root.dataset.shortView;
       }
       // Ignore pinch-zoom: the layout should stay put while zoomed.
       if (Math.abs(vv.scale - 1) > 0.01) return;
@@ -71,7 +79,8 @@ export function ViewportSync() {
       document.removeEventListener("focusout", schedule);
       root.style.removeProperty("--vv-height");
       root.style.removeProperty("--vv-top");
-      root.style.removeProperty("--viewport-gap");
+      delete root.dataset.shortView;
+      probe.remove();
       delete root.dataset.keyboard;
     };
   }, []);

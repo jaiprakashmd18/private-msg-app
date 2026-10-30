@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
   referrer: "no-referrer",
   applicationName: APP_NAME,
-  appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "black" },
   icons: { icon: "/icon.svg", apple: "/icons/apple-touch-icon.png" },
   formatDetection: { telephone: false },
 };

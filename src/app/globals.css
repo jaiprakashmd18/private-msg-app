@@ -171,14 +171,9 @@
   75% { transform: translateX(10px); }
 }
 
-/*
- * Full-screen layers (overlays, viewers, lock screen). Like `inset-0`, plus
- * the strip some iOS versions leave below the page in the installed app
- * (--viewport-gap, measured by ViewportSync).
- */
+/* Full-screen layers (overlays, viewers, lock screen). */
 @utility inset-screen {
   inset: 0;
-  bottom: calc(0px - var(--viewport-gap, 0px));
 }
 
 /*
@@ -190,7 +185,6 @@
 .app-shell {
   position: fixed;
   inset: 0;
-  bottom: calc(0px - var(--viewport-gap, 0px));
 }
 html[data-keyboard="open"] .app-shell {
   bottom: auto;
@@ -200,12 +194,14 @@ html[data-keyboard="open"] .app-shell {
 
 /*
  * Bottom padding that clears the iPhone home indicator, except while the
- * on-screen keyboard is open (the keyboard covers that area anyway).
- * html[data-keyboard] is set by <ViewportSync />.
+ * on-screen keyboard is open (the keyboard covers that area anyway) and when
+ * iOS ends the app's view above the home indicator (html[data-short-view]).
+ * Both attributes are set by <ViewportSync />.
  */
 @utility pb-safe {
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  html[data-keyboard="open"] & {
+  html[data-keyboard="open"] &,
+  html[data-short-view] & {
     padding-bottom: 0.75rem;
   }
 }
