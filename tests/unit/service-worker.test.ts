@@ -8,7 +8,10 @@ import { describe, expect, it, vi } from "vitest";
 
 type Handler = (event: Record<string, unknown>) => void;
 
-function loadServiceWorker(windows: { url: string; focused: boolean; visibilityState: string }[] = []) {
+function loadServiceWorker(
+  windows: { url: string; focused: boolean; visibilityState: string }[] = [],
+  fetchImpl: (...args: unknown[]) => Promise<unknown> = async () => new Response("{}"),
+) {
   const handlers: Record<string, Handler> = {};
   const showNotification = vi.fn(async () => undefined);
   const openWindow = vi.fn(async () => undefined);
@@ -21,7 +24,7 @@ function loadServiceWorker(windows: { url: string; focused: boolean; visibilityS
     clients: { matchAll: vi.fn(async () => clientWindows), openWindow, claim: vi.fn() },
     skipWaiting: vi.fn(),
   };
-  runInNewContext(readFileSync("public/sw.js", "utf8"), { self, caches: {}, fetch, URL, Response, Promise });
+  runInNewContext(readFileSync("public/sw.js", "utf8"), { self, caches: {}, fetch: fetchImpl, URL, Response, Promise });
 
   async function dispatch(type: string, extra: Record<string, unknown>) {
     let pending: Promise<unknown> = Promise.resolve();
@@ -67,5 +70,25 @@ describe("service worker notifications", () => {
     expect(open.clientWindows[0]!.focus).toHaveBeenCalled();
     expect(open.navigate).toHaveBeenCalledWith("https://app.example/chat/c1");
     expect(open.openWindow).not.toHaveBeenCalled();
+  });
+});
+
+describe("delivery receipts from notifications", () => {
+  it("tells the server the message reached this phone (✓✓ for the sender)", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}"));
+    const sw = loadServiceWorker([], fetchMock);
+    const id = "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
+    await sw.dispatch("push", pushEvent({ title: "Alex", body: "Hi", url: `/chat/${id}`, tag: id }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/push/delivered",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ conversationId: id }) }),
+    );
+    expect(sw.showNotification).toHaveBeenCalled();
+  });
+
+  it("still shows the notification when that request fails", async () => {
+    const sw = loadServiceWorker([], async () => Promise.reject(new Error("offline")));
+    await sw.dispatch("push", pushEvent({ title: "Alex", body: "Hi", url: "/chat/3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d" }));
+    expect(sw.showNotification).toHaveBeenCalled();
   });
 });

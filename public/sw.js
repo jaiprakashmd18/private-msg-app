@@ -34,8 +34,18 @@ self.addEventListener("push", (event) => {
     data = { body: event.data ? event.data.text() : "" };
   }
   const url = data.url || "/chat";
+  // Tell the server the message reached this phone (✓✓ for the sender).
+  const conversationId = (url.match(/^\/chat\/([0-9a-f-]{36})/) || [])[1];
+  const delivered = conversationId
+    ? fetch("/api/push/delivered", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ conversationId }),
+      }).catch(() => undefined)
+    : Promise.resolve();
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+    Promise.all([delivered, self.clients.matchAll({ type: "window", includeUncontrolled: true })]).then(([, windows]) => {
       // Skip the notification if that conversation is already open and focused.
       const target = new URL(url, self.location.origin).pathname;
       const focusedOnIt = windows.some(

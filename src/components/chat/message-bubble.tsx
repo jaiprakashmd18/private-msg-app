@@ -33,18 +33,28 @@ export type Receipt = "sending" | "failed" | "sent" | "delivered" | "read";
 
 export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
-function ReceiptIcon({ receipt }: { receipt: Receipt }) {
+/**
+ * ✓ sent (saved on the server) · ✓✓ delivered (reached their phone) ·
+ * ✓✓ in bright cyan, bolder: seen. Cyan stays distinct on every bubble colour.
+ */
+export function ReceiptIcon({ receipt, className }: { receipt: Receipt; className?: string }) {
   switch (receipt) {
     case "sending":
-      return <Clock className="size-3.5" aria-label="Sending" />;
+      return <Clock className={cn("size-3.5", className)} aria-label="Sending" />;
     case "failed":
-      return <AlertCircle className="size-3.5 text-destructive" aria-label="Not sent" />;
+      return <AlertCircle className={cn("size-3.5 text-destructive", className)} aria-label="Not sent" />;
     case "sent":
-      return <Check className="size-3.5" aria-label="Sent" />;
+      return <Check className={cn("size-4", className)} aria-label="Sent" />;
     case "delivered":
-      return <CheckCheck className="size-3.5" aria-label="Delivered" />;
+      return <CheckCheck className={cn("size-4", className)} aria-label="Delivered" />;
     case "read":
-      return <CheckCheck className="size-3.5 text-sky-300" aria-label="Read" />;
+      return (
+        <CheckCheck
+          className={cn("size-4 text-[oklch(0.86_0.15_200)] [filter:drop-shadow(0_0_1px_rgb(0_0_0/0.35))]", className)}
+          strokeWidth={2.75}
+          aria-label="Seen"
+        />
+      );
   }
 }
 

@@ -15,7 +15,7 @@ import { SharedListDialog } from "@/components/chat/couple/shared-list-dialog";
 import { SpecialDatesDialog } from "@/components/chat/couple/special-dates-dialog";
 import { TogetherChip } from "@/components/chat/couple/together-chip";
 import { Lightbox, type LightboxItem } from "@/components/chat/lightbox";
-import { describeMessage, MessageBubble, type Receipt } from "@/components/chat/message-bubble";
+import { describeMessage, MessageBubble, ReceiptIcon, type Receipt } from "@/components/chat/message-bubble";
 import { SystemMessage } from "@/components/chat/system-message";
 import {
   AlertDialog,
@@ -186,6 +186,12 @@ export function ConversationView({ conversationId }: { conversationId: string })
     const seen = memberById.get(summary.other_user_id ?? "")?.last_seen_at ?? summary.other_last_seen_at;
     return formatLastSeen(seen) || summary.other_email || "";
   })();
+
+  // "Sent / Delivered / Seen" under my latest message.
+  const lastMineId = useMemo(
+    () => [...messages].reverse().find((m) => m.sender_id === access.user_id && !m.system_event && !m.deleted_at)?.id ?? null,
+    [messages, access.user_id],
+  );
 
   // Every photo in the conversation, for the full-screen viewer.
   const photos: LightboxItem[] = useMemo(
@@ -472,6 +478,9 @@ export function ConversationView({ conversationId }: { conversationId: string })
                     prev?.sender_id === m.sender_id &&
                     new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < GROUP_WINDOW_MS;
                   const canEdit = editWindowMs > 0 && now - new Date(m.created_at).getTime() < editWindowMs;
+                  const receipt = mine
+                    ? receiptFor(m, summary?.other_last_read_at ?? null, summary?.other_last_delivered_at ?? null)
+                    : undefined;
                   return (
                     <Fragment key={m.id}>
                       {divider}
@@ -482,11 +491,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
                         grouped={grouped}
                         senderName={isGroup ? nameOf(m.sender_id) : undefined}
                         nameOf={nameOf}
-                        receipt={
-                          mine
-                            ? receiptFor(m, summary?.other_last_read_at ?? null, summary?.other_last_delivered_at ?? null)
-                            : undefined
-                        }
+                        receipt={receipt}
                         canEdit={canEdit}
                         onEdit={() => {
                           setReplyingTo(null);
@@ -506,6 +511,15 @@ export function ConversationView({ conversationId }: { conversationId: string })
                         }}
                         onJumpTo={setJumpTarget}
                       />
+                      {m.id === lastMineId && receipt && receipt !== "sending" && receipt !== "failed" && (
+                        <p
+                          className="mt-1 flex items-center justify-end gap-1 px-4 text-[11px] text-muted-foreground sm:px-7"
+                          aria-live="polite"
+                        >
+                          <ReceiptIcon receipt={receipt} className="size-3.5" />
+                          {receipt === "read" ? (isGroup ? "Seen by everyone" : "Seen") : receipt === "delivered" ? "Delivered" : "Sent"}
+                        </p>
+                      )}
                     </Fragment>
                   );
                 })}

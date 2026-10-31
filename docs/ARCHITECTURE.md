@@ -176,3 +176,8 @@
 - **Our list:** `shared_list_items` with soft deletes, live through Postgres Changes (`useLiveRows`).
 - **Memories:** `/chat/[id]/memories` lists image attachments (excluding view-once) with keyset paging and reuses the lightbox.
 - **App lock:** `src/lib/app-lock.ts` + `AppLockGate` in `(app)/layout.tsx`. Config per user in `localStorage`; an `app_lock` cookie lets the server render the lock screen instead of the app on first load.
+
+## 11. Ticks (sent / delivered / seen)
+
+- ✓ **Sent**: saved on the server. ✓✓ **Delivered**: the other person's `last_delivered_at` is past the message — set when their app is open (`mark_all_delivered`) **or** when a push notification reaches their phone: the service worker calls `/api/push/delivered`, which moves only the caller's own delivery mark for that conversation (it doesn't touch "seen" or "last seen"). Bright blue ✓✓ **Seen**: their `last_read_at` is past it (they opened the chat). In groups, the oldest mark among the other members counts, so blue means everyone.
+- The latest message you sent also shows the state in words underneath.
