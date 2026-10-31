@@ -18,6 +18,7 @@ import type { SpecialDate, SpecialDateKind } from "@/types/app";
 
 const KINDS: { value: SpecialDateKind; label: string; emoji: string }[] = [
   { value: "together", label: "Together since", emoji: "❤️" },
+  { value: "meet", label: "Next meet", emoji: "💞" },
   { value: "anniversary", label: "Anniversary", emoji: "💍" },
   { value: "birthday", label: "Birthday", emoji: "🎂" },
   { value: "other", label: "Other", emoji: "⭐" },
@@ -134,13 +135,23 @@ export function SpecialDatesDialog({
                   id="date-title"
                   value={draft.title}
                   maxLength={60}
-                  placeholder={draft.kind === "birthday" ? "e.g. Priya's birthday" : draft.kind === "anniversary" ? "e.g. Wedding anniversary" : "e.g. Trip to Goa"}
+                  placeholder={
+                    draft.kind === "birthday"
+                      ? "e.g. Priya's birthday"
+                      : draft.kind === "anniversary"
+                        ? "e.g. Wedding anniversary"
+                        : draft.kind === "meet"
+                          ? "Optional, e.g. Chennai trip"
+                          : "e.g. Trip to Goa"
+                  }
                   onChange={(e) => setDraft({ ...draft, title: e.target.value })}
                 />
               </div>
             )}
             <div className="grid gap-2">
-              <Label htmlFor="date-on">{draft.kind === "together" ? "The day you got together" : "Date"}</Label>
+              <Label htmlFor="date-on">
+                {draft.kind === "together" ? "The day you got together" : draft.kind === "meet" ? "The day you meet" : "Date"}
+              </Label>
               <Input
                 id="date-on"
                 type="date"
@@ -190,7 +201,7 @@ export function SpecialDatesDialog({
                         {d.kind === "together"
                           ? ` · Day ${daysTogether(d.on_date).toLocaleString()}`
                           : next
-                            ? ` · ${describeCountdown(next.daysUntil)}${d.kind !== "other" && next.years > 0 ? ` · ${next.years} year${next.years === 1 ? "" : "s"}` : ""}`
+                            ? ` · ${describeCountdown(next.daysUntil)}${d.kind !== "other" && d.kind !== "meet" && next.years > 0 ? ` · ${next.years} year${next.years === 1 ? "" : "s"}` : ""}`
                             : " · passed"}
                       </span>
                     </span>

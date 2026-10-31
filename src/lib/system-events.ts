@@ -1,5 +1,5 @@
 import { describeDateReminder } from "@/lib/dates";
-import { describeMood, describeTap } from "@/lib/love";
+import { describeJournal, describeMood, describePlanAdded, describeTap } from "@/lib/love";
 import type { SystemEvent } from "@/types/app";
 
 /** Human text for a chat event, e.g. "Alex added Sam". */
@@ -31,6 +31,12 @@ export function describeSystemEvent(
       return actor === "You" ? "You answered today's question 💬" : `${actor} answered today's question 💬`;
     case "mood":
       return describeMood(event.mood, event.note, actor);
+    case "plan_added":
+      return describePlanAdded(actor, event.title, event.starts_at, event.place);
+    case "plan_reminder":
+      return `⏰ Coming up: “${event.title}”${event.place ? ` at ${event.place}` : ""}`;
+    case "journal":
+      return describeJournal(actor);
     case "date_reminder":
       return describeDateReminder(event);
     default:

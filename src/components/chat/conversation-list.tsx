@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageIcon, Mic, Paperclip } from "lucide-react";
+import { Film, ImageIcon, Mic, Paperclip } from "lucide-react";
 import Link from "next/link";
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
@@ -47,6 +47,10 @@ function preview(c: ConversationSummary, myId: string) {
         ) : kind === "audio" ? (
           <>
             <Mic className="size-3.5" aria-hidden /> Voice message
+          </>
+        ) : kind === "video" ? (
+          <>
+            <Film className="size-3.5" aria-hidden /> Video
           </>
         ) : (
           <>

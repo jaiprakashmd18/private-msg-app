@@ -33,7 +33,7 @@ export interface DirectoryEntry {
 }
 
 export type ConversationKind = "direct" | "group";
-export type AttachmentKind = "image" | "audio" | "file";
+export type AttachmentKind = "image" | "audio" | "video" | "file";
 
 /** Group events shown as centered notes ("Alex added Sam"). */
 export type SystemEvent =
@@ -47,6 +47,9 @@ export type SystemEvent =
   | { type: "nudge"; kind?: "heart" | "miss_you" | "hug" | "kiss" }
   | { type: "daily_answered"; day: string; both: boolean }
   | { type: "mood"; mood: string; note: string | null }
+  | { type: "plan_added"; plan_id: string; title: string; starts_at: string; place: string | null }
+  | { type: "plan_reminder"; plan_id: string; title: string; starts_at: string; place: string | null }
+  | { type: "journal"; day: string }
   | { type: "date_reminder"; date_id: string; kind: SpecialDateKind; title: string; years: number };
 
 export interface ConversationSummary {
@@ -240,7 +243,7 @@ export interface AccessRequest {
   decided_at: string | null;
 }
 
-export type SpecialDateKind = "together" | "birthday" | "anniversary" | "other";
+export type SpecialDateKind = "together" | "birthday" | "anniversary" | "other" | "meet";
 
 export interface SpecialDate {
   id: string;
@@ -275,6 +278,10 @@ export interface ListItem {
   done_by: string | null;
   deleted_at: string | null;
   created_at: string;
+  /** "todo" (default) or "bucket". */
+  list_kind?: "todo" | "bucket";
+  /** Bucket list: a photo of doing it. */
+  photo_path?: string | null;
 }
 
 export const BUBBLE_COLORS = ["blue", "rose", "purple", "green", "orange", "teal", "graphite"] as const;
@@ -300,4 +307,27 @@ export interface MemberMood {
   mood: string;
   mood_note: string | null;
   mood_at: string;
+}
+
+export interface DatePlan {
+  id: string;
+  conversation_id: string;
+  created_by: string | null;
+  title: string;
+  starts_at: string;
+  place: string | null;
+  notes: string | null;
+  remind_minutes: number;
+  deleted_at: string | null;
+}
+
+export interface JournalEntry {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  day: string;
+  body: string | null;
+  photo_path: string | null;
+  created_at: string;
+  updated_at: string;
 }

@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 import { describeDateReminder } from "@/lib/dates";
 import { logServerError } from "@/lib/errors";
-import { describeMood, tapFor } from "@/lib/love";
+import { describeMood, describePlanReminder, formatPlanTime, tapFor } from "@/lib/love";
 
 interface VapidKeys {
   publicKey: string;
@@ -39,9 +39,19 @@ interface PushTarget {
   sender_name: string;
   body: string;
   has_attachments: boolean;
-  attachment_kind?: "image" | "audio" | "file" | "view_once" | null;
+  attachment_kind?: "image" | "audio" | "video" | "file" | "view_once" | null;
   /** System event for taps ("nudge") and date reminders. */
-  event?: { type: string; title?: string; kind?: string; years?: number; both?: boolean; mood?: string; note?: string | null } | null;
+  event?: {
+    type: string;
+    title?: string;
+    kind?: string;
+    years?: number;
+    both?: boolean;
+    mood?: string;
+    note?: string | null;
+    starts_at?: string;
+    place?: string | null;
+  } | null;
 }
 
 export interface PushPayload {
@@ -68,6 +78,25 @@ export function buildPayload(t: Omit<PushTarget, "endpoint" | "p256dh" | "auth">
       tag: `daily-${t.conversation_id}`,
     };
   }
+  if (t.event?.type === "plan_added" && t.event.starts_at) {
+    return {
+      title: sender,
+      body: t.show_preview ? `planned “${t.event.title ?? "a date"}” · ${formatPlanTime(t.event.starts_at)}` : "planned a date 📅",
+      url,
+      tag: `plan-${t.conversation_id}`,
+    };
+  }
+  if (t.event?.type === "plan_reminder" && t.event.starts_at) {
+    return {
+      title: "Date reminder ⏰",
+      body: t.show_preview ? describePlanReminder(t.event.title ?? "Your date", t.event.starts_at) : "You have a date coming up",
+      url,
+      tag: `plan-${t.conversation_id}`,
+    };
+  }
+  if (t.event?.type === "journal") {
+    return { title: sender, body: "wrote in your journal 📔", url: `${url}/journal`, tag: `journal-${t.conversation_id}` };
+  }
   if (t.event?.type === "mood") {
     return {
       title: sender,
@@ -93,7 +122,9 @@ export function buildPayload(t: Omit<PushTarget, "endpoint" | "p256dh" | "auth">
         ? "📷 Photo"
         : t.attachment_kind === "audio"
           ? "🎤 Voice message"
-          : "📎 Attachment";
+          : t.attachment_kind === "video"
+            ? "🎬 Video"
+            : "📎 Attachment";
   const preview = t.body.trim() ? t.body.trim().slice(0, 140) : t.has_attachments ? media : "New message";
   const group = t.conversation_kind === "group";
   return {

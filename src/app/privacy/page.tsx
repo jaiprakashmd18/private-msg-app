@@ -39,7 +39,9 @@ export default function PrivacyPage() {
               until they&apos;re delivered) and your chat wallpaper and colour. View-once photos are deleted after
               they&apos;re opened. The app lock PIN never leaves your device. Your answer to the question of the day is
               shown to the other person only after they&apos;ve answered too; your mood is shown for 24 hours. GIFs come
-              from GIPHY, which sees GIF searches (made by our server) and loads the pictures.
+              from GIPHY, which sees GIF searches (made by our server) and loads the pictures. Date plans, journal
+              entries and bucket-list photos are visible to the members of that chat. To show link previews, our server
+              opens the links you send.
             </li>
             <li>
               Security logs: sign-ins, sign-outs, access changes and administrator actions. Email addresses in logs are

@@ -1,13 +1,14 @@
 "use client";
 
-import { FileText, ImageOff } from "lucide-react";
+import { FileText, ImageOff, Play } from "lucide-react";
+import { useState } from "react";
 import { ViewOnceChip } from "@/components/chat/view-once";
 import { VoicePlayer } from "@/components/chat/voice-player";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSignedUrl as useSignedUrlFor } from "@/hooks/use-signed-url";
 import { ATTACHMENTS_BUCKET } from "@/lib/constants";
 import { formatBytes } from "@/lib/format";
-import { isAudio, isImage } from "@/lib/media";
+import { formatDuration, isAudio, isImage, isVideo } from "@/lib/media";
 import { cn } from "@/lib/utils";
 import type { Attachment } from "@/types/app";
 
@@ -93,7 +94,70 @@ function Voice({ attachment, mine }: { attachment: Attachment; mine: boolean }) 
   return <VoicePlayer src={url} durationMs={attachment.duration_ms} mine={mine} />;
 }
 
-/** All attachments of one message: photo grid, voice notes, then files. */
+/**
+ * A video: shows its thumbnail first and only loads the video when tapped
+ * (saves data). Videos the device can't play offer a download instead.
+ */
+function VideoAttachment({ attachment }: { attachment: Attachment }) {
+  const [playing, setPlaying] = useState(false);
+  const [unplayable, setUnplayable] = useState(false);
+  const { url: poster } = useSignedUrl(attachment.thumb_path);
+  const { url: src } = useSignedUrl(playing ? attachment.storage_path : null);
+  const { url: download } = useSignedUrl(unplayable ? attachment.storage_path : null, attachment.file_name);
+  const ratio = attachment.width && attachment.height ? attachment.width / attachment.height : 16 / 9;
+  const style = { aspectRatio: String(Math.min(Math.max(ratio, 0.5), 2)) };
+
+  if (unplayable) {
+    return (
+      <a href={download ?? undefined} className="flex items-center gap-2 rounded-lg bg-black/15 px-3 py-2 text-sm">
+        <FileText className="size-4" aria-hidden /> Can&apos;t play here — download video
+      </a>
+    );
+  }
+  return (
+    <div style={style} className="relative w-64 max-w-full overflow-hidden rounded-lg bg-black sm:w-72">
+      {playing && src ? (
+        <video
+          src={src}
+          poster={poster ?? undefined}
+          controls
+          autoPlay
+          playsInline
+          preload="metadata"
+          onError={() => setUnplayable(true)}
+          className="size-full object-contain"
+          aria-label={`Video ${attachment.file_name}`}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setPlaying(true)}
+          className="group relative block size-full"
+          aria-label={`Play video${attachment.duration_ms ? `, ${formatDuration(attachment.duration_ms)}` : ""}`}
+        >
+          {poster ? (
+            // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL of a private file
+            <img src={poster} alt="" className="size-full object-cover" />
+          ) : (
+            <Skeleton className="size-full rounded-none" />
+          )}
+          <span className="absolute inset-0 grid place-items-center">
+            <span className="grid size-12 place-items-center rounded-full bg-black/60 text-white transition-transform group-hover:scale-110">
+              {playing ? <span className="size-5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Play className="ml-0.5 size-6 fill-current" />}
+            </span>
+          </span>
+          {attachment.duration_ms ? (
+            <span className="absolute bottom-1.5 right-1.5 rounded bg-black/60 px-1.5 text-[11px] text-white tabular-nums">
+              {formatDuration(attachment.duration_ms)}
+            </span>
+          ) : null}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** All attachments of one message: photo grid, videos, voice notes, then files. */
 export function MessageAttachments({
   attachments,
   mine,
@@ -106,7 +170,10 @@ export function MessageAttachments({
   const viewOnce = attachments.filter((a) => a.view_once);
   const images = attachments.filter((a) => !a.view_once && isImage(a.mime_type) && a.mime_type !== "image/heic");
   const audio = attachments.filter((a) => isAudio(a.mime_type));
-  const files = attachments.filter((a) => !viewOnce.includes(a) && !images.includes(a) && !audio.includes(a));
+  const videos = attachments.filter((a) => isVideo(a.mime_type));
+  const files = attachments.filter(
+    (a) => !viewOnce.includes(a) && !images.includes(a) && !audio.includes(a) && !videos.includes(a),
+  );
   const shown = images.slice(0, 4);
 
   return (
@@ -128,6 +195,9 @@ export function MessageAttachments({
           ))}
         </div>
       )}
+      {videos.map((a) => (
+        <VideoAttachment key={a.id} attachment={a} />
+      ))}
       {audio.map((a) => (
         <Voice key={a.id} attachment={a} mine={mine} />
       ))}

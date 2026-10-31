@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   ALLOWED_ATTACHMENT_TYPES,
   MAX_ATTACHMENT_BYTES,
+  MAX_VIDEO_BYTES,
   MAX_MESSAGE_LENGTH,
 } from "./constants";
 
@@ -39,7 +40,11 @@ export const uuidSchema = z.uuid();
 
 export function validateAttachment(file: { size: number; type: string }): string | null {
   if (file.size <= 0) return "File is empty";
-  if (file.size > MAX_ATTACHMENT_BYTES) return "Files can be at most 10 MB";
+  if (file.type.startsWith("video/")) {
+    if (file.size > MAX_VIDEO_BYTES) return "Videos can be at most 50 MB";
+  } else if (file.size > MAX_ATTACHMENT_BYTES) {
+    return "Files can be at most 10 MB";
+  }
   if (!(ALLOWED_ATTACHMENT_TYPES as readonly string[]).includes(file.type.split(";")[0]!.trim())) {
     return "This file type is not supported";
   }

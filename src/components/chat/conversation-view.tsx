@@ -2,6 +2,8 @@
 
 import {
   ArrowLeft,
+  BookHeart,
+  CalendarClock,
   CalendarHeart,
   Clock,
   Eye,
@@ -11,7 +13,9 @@ import {
   ListChecks,
   MessageCircleHeart,
   MoreVertical,
+  Mountain,
   Palette,
+  Search,
   Smile,
 } from "lucide-react";
 import Link from "next/link";
@@ -20,13 +24,15 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
 import { Composer, type EditingState, type ReplyingState } from "@/components/chat/composer";
+import { ChatSearch } from "@/components/chat/chat-search";
 import { ConversationInfoDialog } from "@/components/chat/conversation-info-dialog";
 import { AppearanceDialog } from "@/components/chat/couple/appearance-dialog";
 import { DailyQuestionBar, DailyQuestionDialog } from "@/components/chat/couple/daily-question";
+import { DatePlansDialog } from "@/components/chat/couple/date-plans-dialog";
 import { MoodDialog } from "@/components/chat/couple/mood-dialog";
 import { HeartBurst } from "@/components/chat/couple/heart-burst";
 import { LoveNotesDialog } from "@/components/chat/couple/love-notes-dialog";
-import { SharedListDialog } from "@/components/chat/couple/shared-list-dialog";
+import { type ListTab, SharedListDialog } from "@/components/chat/couple/shared-list-dialog";
 import { SpecialDatesDialog } from "@/components/chat/couple/special-dates-dialog";
 import { TogetherChip } from "@/components/chat/couple/together-chip";
 import { Lightbox, type LightboxItem } from "@/components/chat/lightbox";
@@ -59,7 +65,15 @@ import { useSignedUrl } from "@/hooks/use-signed-url";
 import { useTyping } from "@/hooks/use-typing";
 import { AVATARS_BUCKET } from "@/lib/constants";
 import { listConversationMembers } from "@/lib/data/chat";
-import { getChatAppearance, getMoods, listDailyAnswers, listSpecialDates, sendNudge } from "@/lib/data/couple";
+import {
+  getChatAppearance,
+  getMoods,
+  getStreak,
+  listDailyAnswers,
+  listPlans,
+  listSpecialDates,
+  sendNudge,
+} from "@/lib/data/couple";
 import { localDateString } from "@/lib/dates";
 import { moodLabel, TAPS, tapFor, type TapKind } from "@/lib/love";
 import { requestPushForMessage } from "@/lib/pwa-client";
@@ -70,6 +84,7 @@ import type {
   ChatAppearance,
   ConversationMember,
   DailyAnswer,
+  DatePlan,
   MemberMood,
   PendingFile,
   SpecialDate,
@@ -102,8 +117,14 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const [replyingTo, setReplyingTo] = useState<UiMessage | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
-  const [panel, setPanel] = useState<"list" | "dates" | "notes" | "look" | "daily" | "mood" | null>(null);
+  const [panel, setPanel] = useState<"list" | "dates" | "notes" | "look" | "daily" | "mood" | "plans" | null>(null);
+  const { rows: plans, reload: reloadPlans } = useLiveRows<DatePlan>("date_plans", conversationId, () =>
+    listPlans(supabase, conversationId),
+  );
   const [moods, setMoods] = useState<MemberMood[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [listTab, setListTab] = useState<ListTab>("todo");
+  const [streak, setStreak] = useState<{ days: number; today_done: boolean } | null>(null);
   const [burstEmojis, setBurstEmojis] = useState<string[]>(["❤️", "💖"]);
   const today = localDateString();
   const { rows: dailyAnswers, reload: reloadDaily } = useLiveRows<DailyAnswer>("daily_answers", conversationId, () =>
@@ -205,6 +226,17 @@ export function ConversationView({ conversationId }: { conversationId: string })
       reportError(err, "Couldn't send that.");
     }
   }, [supabase, conversationId, refreshSoon, reportError]);
+
+  // Streak: refreshed when a message arrives (debounced).
+  const lastMessageId = messages[messages.length - 1]?.id;
+  useEffect(() => {
+    const t = setTimeout(() => {
+      getStreak(supabase, conversationId)
+        .then(setStreak)
+        .catch(() => undefined);
+    }, 800);
+    return () => clearTimeout(t);
+  }, [supabase, conversationId, lastMessageId]);
 
   // Someone who just sent a message has stopped typing.
   const lastMessage = messages[messages.length - 1];
@@ -419,17 +451,41 @@ export function ConversationView({ conversationId }: { conversationId: string })
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-52">
+                <DropdownMenuItem onSelect={() => setSearching(true)}>
+                  <Search /> Search in chat
+                </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => setPanel("mood")}>
                   <Smile /> My mood
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => setPanel("daily")}>
                   <MessageCircleHeart /> Question of the day
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setPanel("list")}>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setListTab("todo");
+                    setPanel("list");
+                  }}
+                >
                   <ListChecks /> Our list
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setListTab("bucket");
+                    setPanel("list");
+                  }}
+                >
+                  <Mountain /> Bucket list
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPanel("plans")}>
+                  <CalendarClock /> Date plans
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => setPanel("dates")}>
                   <CalendarHeart /> Special dates
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/chat/${conversationId}/journal`}>
+                    <BookHeart /> Our journal
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href={`/chat/${conversationId}/memories`}>
@@ -451,7 +507,21 @@ export function ConversationView({ conversationId }: { conversationId: string })
           </>
         )}
       </header>
-      {specialDates && specialDates.length > 0 && <TogetherChip dates={specialDates} onOpen={() => setPanel("dates")} />}
+      {searching && (
+        <ChatSearch
+          conversationId={conversationId}
+          nameOf={nameOf}
+          onJump={(id) => setJumpTarget(id)}
+          onClose={() => setSearching(false)}
+        />
+      )}
+      <TogetherChip
+        dates={specialDates ?? []}
+        streak={streak}
+        plans={plans ?? []}
+        onOpen={() => setPanel("dates")}
+        onOpenPlans={() => setPanel("plans")}
+      />
       {summary && !otherInactive && (
         <DailyQuestionBar answers={dailyAnswers} otherName={isGroup ? "the others" : title} onOpen={() => setPanel("daily")} />
       )}
@@ -633,7 +703,14 @@ export function ConversationView({ conversationId }: { conversationId: string })
         />
       )}
 
-      <SharedListDialog conversationId={conversationId} open={panel === "list"} onOpenChange={(o) => setPanel(o ? "list" : null)} nameOf={nameOf} />
+      <SharedListDialog
+        conversationId={conversationId}
+        open={panel === "list"}
+        onOpenChange={(o) => setPanel(o ? "list" : null)}
+        nameOf={nameOf}
+        tab={listTab}
+        onTabChange={setListTab}
+      />
       <SpecialDatesDialog
         conversationId={conversationId}
         dates={specialDates}
@@ -646,6 +723,13 @@ export function ConversationView({ conversationId }: { conversationId: string })
         recipientName={isGroup ? "the group" : title}
         open={panel === "notes"}
         onOpenChange={(o) => setPanel(o ? "notes" : null)}
+      />
+      <DatePlansDialog
+        conversationId={conversationId}
+        plans={plans}
+        open={panel === "plans"}
+        onOpenChange={(o) => setPanel(o ? "plans" : null)}
+        onChanged={reloadPlans}
       />
       <DailyQuestionDialog
         conversationId={conversationId}

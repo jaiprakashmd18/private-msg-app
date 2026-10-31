@@ -115,3 +115,41 @@ export function questionIndexFor(day: string): number {
 }
 
 export const questionText = (index: number) => DAILY_QUESTIONS[index % DAILY_QUESTIONS.length]!;
+
+/** "Sat 2 Nov, 7:00 pm" in the viewer's own time zone. */
+export function formatPlanTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/** Short form for small spaces: "today 7 pm", "tmrw 7:30 pm", "Sat 7 pm". */
+export function formatPlanTimeShort(iso: string, now = new Date()): string {
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: d.getMinutes() ? "2-digit" : undefined });
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  if (d.toDateString() === now.toDateString()) return `today ${time}`;
+  if (d.toDateString() === tomorrow.toDateString()) return `tmrw ${time}`;
+  return `${d.toLocaleDateString(undefined, { weekday: "short" })} ${time}`;
+}
+
+/** Chat notes for plans and the journal. */
+export function describePlanAdded(actor: string, title: string, startsAt: string, place?: string | null): string {
+  return `📅 ${actor} planned “${title}” · ${formatPlanTime(startsAt)}${place ? ` · ${place}` : ""}`;
+}
+
+export function describePlanReminder(title: string, startsAt: string, now = Date.now()): string {
+  const minutes = Math.round((new Date(startsAt).getTime() - now) / 60_000);
+  const when =
+    minutes <= 1 ? "now" : minutes < 60 ? `in ${minutes} minutes` : minutes < 24 * 60 ? `in ${Math.round(minutes / 60)} h` : `on ${formatPlanTime(startsAt)}`;
+  return `⏰ “${title}” ${when}`;
+}
+
+export function describeJournal(actor: string): string {
+  return actor === "You" ? "You wrote in your journal 📔" : `${actor} wrote in your journal 📔`;
+}

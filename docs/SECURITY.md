@@ -4,7 +4,7 @@ This document explains every security control, how it works, how it is tested, a
 
 ## 1. Controls and how each one is tested
 
-Automated test files: `tests/db/security.test.ts` (database, 85 tests: `security.test.ts`, `couple.test.ts`, `moods-questions.test.ts`), `tests/integration/supabase.test.ts` (live Supabase stack), `tests/integration/api.test.ts` (live app), `tests/unit/*`.
+Automated test files: `tests/db/security.test.ts` (database, 91 tests: `security.test.ts`, `couple.test.ts`, `moods-questions.test.ts`, `plans-journal.test.ts`), `tests/integration/supabase.test.ts` (live Supabase stack), `tests/integration/api.test.ts` (live app), `tests/unit/*`.
 
 | # | Requirement | Mechanism | Automated test |
 | --- | --- | --- | --- |
@@ -46,6 +46,8 @@ Automated test files: `tests/db/security.test.ts` (database, 85 tests: `security
 | 36 | Stickers & GIFs | `send_sticker` takes a sticker id matching `^[a-z0-9-]{1,40}$` or a GIF whose URL must be an https GIPHY CDN URL (rebuilt server-side from known fields only); CSP `img-src` allows only GIPHY besides our own hosts; GIF search goes through `/api/gifs` (signed-in users, key server-side) | db: *stickers and GIFs* (2); unit: `stickers.test.ts` |
 | 37 | Daily question | Each answer is readable by the other member **only after they have answered the same day** (RLS, so Realtime obeys it too); answers only for today ±1 day; writes only via `answer_daily_question` | db: *daily question* |
 | 38 | Love taps & moods | Fixed list of tap kinds; shared rate limit with hearts; moods 1–16 characters, note ≤ 80, visible to conversation members for 24 h, max 20 changes/hour | db: *love taps*, *mood check-in* |
+| 39 | Link previews can't be used to probe private networks | `/api/link-preview` (and its image proxy) only for signed-in users; http(s) only, no credentials, common ports only; every connection — including after each redirect — uses a DNS lookup that refuses private, loopback, link-local (cloud metadata), CGNAT, multicast and IPv6 ULA addresses, and IP-address links are checked directly; 512 KB / 2 MB and 6 s limits; images re-served by us (no SVG, `nosniff`, `default-src 'none'`) so the CSP stays strict and other sites never see who is reading | unit: `link-preview.test.ts` (connects to nothing on this machine); e2e: private address refused |
+| 40 | Videos, plans, journal, bucket list | Videos up to 50 MB (other files 10 MB) enforced by the bucket, the table and `send_message` from Storage's own metadata; plans, journal entries and list items readable only by members, written only via RPCs; photos must be the caller's own file in `avatars/users/<uid>/` | db: *videos*, *bucket list*, *date planner*, *our journal* |
 
 ### How the RLS tests work
 

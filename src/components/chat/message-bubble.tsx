@@ -17,6 +17,7 @@ import {
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { MessageAttachments } from "@/components/chat/attachment-view";
+import { LinkifiedText, LinkPreviewCard } from "@/components/chat/link-preview";
 import { Sticker } from "@/components/chat/sticker";
 import {
   DropdownMenu,
@@ -80,6 +81,7 @@ export function describeMessage(m: Pick<ReplyPreview, "body" | "deleted_at" | "a
   if (m.attachments?.[0]?.view_once) return "📷 View-once photo";
   if (isImage(first)) return "📷 Photo";
   if (isAudio(first)) return "🎤 Voice message";
+  if (first.startsWith("video/")) return "🎬 Video";
   if (first) return "📎 File";
   return "Message";
 }
@@ -298,7 +300,12 @@ export function MessageBubble({
                   </p>
                 ) : (
                   message.body && (
-                    <p className="whitespace-pre-wrap text-[15px] leading-relaxed [overflow-wrap:anywhere]">{message.body}</p>
+                    <>
+                      <p className="whitespace-pre-wrap text-[15px] leading-relaxed [overflow-wrap:anywhere]">
+                        <LinkifiedText text={message.body} mine={mine} />
+                      </p>
+                      {!local && <LinkPreviewCard text={message.body} mine={mine} />}
+                    </>
                   )
                 )}
               </>

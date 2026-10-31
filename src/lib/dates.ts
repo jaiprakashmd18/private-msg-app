@@ -59,6 +59,13 @@ export function nextOccurrence(d: Pick<SpecialDate, "on_date" | "yearly">, now =
   return null;
 }
 
+/** "💞 12 days until we meet" / "💞 We meet tomorrow!" */
+export function describeMeet(daysUntil: number): string {
+  if (daysUntil === 0) return "💞 We meet today!";
+  if (daysUntil === 1) return "💞 We meet tomorrow!";
+  return `💞 ${daysUntil} days until we meet`;
+}
+
 export function describeCountdown(daysUntil: number): string {
   if (daysUntil === 0) return "today";
   if (daysUntil === 1) return "tomorrow";
@@ -71,6 +78,7 @@ export function describeDateReminder(e: { kind: string; title: string; years: nu
   if (e.kind === "together") return `🎉 ${span} together today! ❤️`;
   if (e.kind === "anniversary" && e.years > 0) return `🎉 ${e.title} — ${span} today`;
   if (e.kind === "birthday") return `🎂 Today: ${e.title}`;
+  if (e.kind === "meet") return `💞 Today we meet!${e.title && e.title !== "We meet" ? ` (${e.title})` : ""}`;
   return `🎉 Today: ${e.title}`;
 }
 

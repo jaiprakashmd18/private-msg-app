@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ATTACHMENTS_BUCKET } from "@/lib/constants";
 import type { Gif } from "@/lib/giphy";
 import type { TapKind } from "@/lib/love";
-import type { Attachment, BubbleColor, DailyAnswer, MemberMood, Message, ChatAppearance, ListItem, ScheduledMessage, SpecialDate, SpecialDateKind } from "@/types/app";
+import type { Attachment, BubbleColor, DailyAnswer, DatePlan, JournalEntry, MemberMood, Message, ChatAppearance, ListItem, ScheduledMessage, SpecialDate, SpecialDateKind } from "@/types/app";
 
 /**
  * Client-side data access for the features for two: view-once photos, chat
@@ -139,7 +139,7 @@ export async function deliverDueItems(supabase: SupabaseClient): Promise<string[
 export async function listItems(supabase: SupabaseClient, conversationId: string): Promise<ListItem[]> {
   const { data, error } = await supabase
     .from("shared_list_items")
-    .select("id, conversation_id, created_by, text, done, done_by, deleted_at, created_at")
+    .select("*")
     .eq("conversation_id", conversationId)
     .is("deleted_at", null)
     .order("created_at");
@@ -147,14 +147,26 @@ export async function listItems(supabase: SupabaseClient, conversationId: string
   return (data ?? []) as ListItem[];
 }
 
-export async function addListItem(supabase: SupabaseClient, conversationId: string, text: string): Promise<ListItem> {
-  const { data, error } = await supabase.rpc("add_list_item", { p_conversation_id: conversationId, p_text: text }).single();
+export async function addListItem(
+  supabase: SupabaseClient,
+  conversationId: string,
+  text: string,
+  kind: "todo" | "bucket" = "todo",
+): Promise<ListItem> {
+  const { data, error } = await supabase
+    .rpc("add_list_item", { p_conversation_id: conversationId, p_text: text, p_kind: kind })
+    .single();
   if (error) throw error;
   return data as ListItem;
 }
 
 export async function setListItemDone(supabase: SupabaseClient, id: string, done: boolean): Promise<void> {
   const { error } = await supabase.rpc("set_list_item_done", { p_id: id, p_done: done });
+  if (error) throw error;
+}
+
+export async function setListItemPhoto(supabase: SupabaseClient, id: string, path: string | null): Promise<void> {
+  const { error } = await supabase.rpc("set_list_item_photo", { p_id: id, p_path: path });
   if (error) throw error;
 }
 
@@ -283,5 +295,113 @@ export async function getMoods(supabase: SupabaseClient, conversationId: string)
 
 export async function setMood(supabase: SupabaseClient, conversationId: string, mood: string | null, note?: string) {
   const { error } = await supabase.rpc("set_mood", { p_conversation_id: conversationId, p_mood: mood, p_note: note ?? null });
+  if (error) throw error;
+}
+
+// --- Search in one chat -------------------------------------------------------
+
+export interface ChatSearchHit {
+  id: string;
+  body: string;
+  sender_id: string | null;
+  created_at: string;
+}
+
+/** Newest messages in this chat whose text contains `query` (case-insensitive). */
+export async function searchInConversation(supabase: SupabaseClient, conversationId: string, query: string): Promise<ChatSearchHit[]> {
+  const q = query.trim().slice(0, 100);
+  if (!q) return [];
+  // LIKE wildcards in the query are matched literally.
+  const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  const { data, error } = await supabase
+    .from("messages")
+    .select("id, body, sender_id, created_at")
+    .eq("conversation_id", conversationId)
+    .is("deleted_at", null)
+    .is("system_event", null)
+    .ilike("body", pattern)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw error;
+  return (data ?? []) as ChatSearchHit[];
+}
+
+// --- Streak -------------------------------------------------------------------
+
+export async function getStreak(supabase: SupabaseClient, conversationId: string): Promise<{ days: number; today_done: boolean }> {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const { data, error } = await supabase.rpc("get_streak", { p_conversation_id: conversationId, p_tz: tz }).single();
+  if (error) throw error;
+  return data as { days: number; today_done: boolean };
+}
+
+// --- Date planner -------------------------------------------------------------
+
+/** Plans from yesterday on (and a few recent ones), soonest first. */
+export async function listPlans(supabase: SupabaseClient, conversationId: string): Promise<DatePlan[]> {
+  const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const { data, error } = await supabase
+    .from("date_plans")
+    .select("id, conversation_id, created_by, title, starts_at, place, notes, remind_minutes, deleted_at")
+    .eq("conversation_id", conversationId)
+    .is("deleted_at", null)
+    .gte("starts_at", since)
+    .order("starts_at");
+  if (error) throw error;
+  return (data ?? []) as DatePlan[];
+}
+
+export async function savePlan(
+  supabase: SupabaseClient,
+  input: { id?: string | null; conversationId: string; title: string; startsAt: Date; place: string; notes: string; remindMinutes: number },
+): Promise<void> {
+  const { error } = await supabase.rpc("save_plan", {
+    p_id: input.id ?? null,
+    p_conversation_id: input.conversationId,
+    p_title: input.title,
+    p_starts_at: input.startsAt.toISOString(),
+    p_place: input.place,
+    p_notes: input.notes,
+    p_remind_minutes: input.remindMinutes,
+  });
+  if (error) throw error;
+}
+
+export async function deletePlan(supabase: SupabaseClient, id: string): Promise<void> {
+  const { error } = await supabase.rpc("delete_plan", { p_id: id });
+  if (error) throw error;
+}
+
+// --- Journal ------------------------------------------------------------------
+
+export const JOURNAL_PAGE_DAYS = 30;
+
+/** Entries for the newest `JOURNAL_PAGE_DAYS` days before `before` (exclusive), newest first. */
+export async function listJournal(supabase: SupabaseClient, conversationId: string, before?: string): Promise<JournalEntry[]> {
+  let query = supabase
+    .from("journal_entries")
+    .select("*")
+    .eq("conversation_id", conversationId)
+    .order("day", { ascending: false })
+    .limit(JOURNAL_PAGE_DAYS * 2);
+  if (before) query = query.lt("day", before);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as JournalEntry[];
+}
+
+export async function saveJournalEntry(
+  supabase: SupabaseClient,
+  conversationId: string,
+  day: string,
+  body: string,
+  photoPath: string | null,
+): Promise<void> {
+  const { error } = await supabase.rpc("save_journal_entry", {
+    p_conversation_id: conversationId,
+    p_day: day,
+    p_body: body,
+    p_photo_path: photoPath,
+  });
   if (error) throw error;
 }

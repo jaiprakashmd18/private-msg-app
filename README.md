@@ -31,6 +31,9 @@ A minimal, dark-mode messaging app for a closed group of people. People sign in 
   - **Love taps** — "Thinking of you", "I miss you", a hug or a kiss in one tap, arriving as a lock-screen notification with floating emoji.
   - **Question of the day** — the same question for both; each answer is revealed only after you've both answered.
   - **Mood check-in** — share how you feel (with an optional note); it shows on your photo for 24 hours.
+  - **Search in a chat**, **clickable links with preview cards**, and **videos** (up to 50 MB, with a thumbnail).
+  - **🔥 Streaks** (days in a row you both wrote) and a **💞 countdown** to your next meet.
+  - **Bucket list** (ticked off with a photo), **date planner** with reminders, and **our journal** — one entry each per day, with a photo.
 - **Admin dashboard** — allowlist management, account deletion, conversation metadata, storage usage, retention settings, and an append-only audit log.
 - **Explicit privacy policy for admins** — administrators *cannot* read messages unless an audited, member-visible policy is switched on.
 

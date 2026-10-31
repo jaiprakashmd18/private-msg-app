@@ -20,3 +20,31 @@ describe("love taps, moods and daily questions", () => {
     expect(questionIndexFor("1999-01-01")).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe("plans and the journal", () => {
+  it("describes plans, reminders and journal entries", async () => {
+    const { describePlanAdded, describePlanReminder, describeJournal } = await import("@/lib/love");
+    const at = new Date(2026, 10, 7, 19, 0).toISOString();
+    expect(describePlanAdded("Jai", "Dinner", at, "Marina")).toMatch(/^📅 Jai planned “Dinner” · .+ · Marina$/);
+    const now = new Date(2026, 10, 7, 18, 0).getTime();
+    expect(describePlanReminder("Dinner", at, now)).toBe("⏰ “Dinner” in 1 h");
+    expect(describePlanReminder("Dinner", at, new Date(2026, 10, 7, 18, 45).getTime())).toBe("⏰ “Dinner” in 15 minutes");
+    expect(describeJournal("Meenu")).toBe("Meenu wrote in your journal 📔");
+  });
+
+  it("counts down to the next meet", async () => {
+    const { describeMeet, describeDateReminder } = await import("@/lib/dates");
+    expect([0, 1, 12].map(describeMeet)).toEqual(["💞 We meet today!", "💞 We meet tomorrow!", "💞 12 days until we meet"]);
+    expect(describeDateReminder({ kind: "meet", title: "We meet", years: 0 })).toBe("💞 Today we meet!");
+  });
+});
+
+describe("short plan times", () => {
+  it("says today / tmrw / weekday", async () => {
+    const { formatPlanTimeShort } = await import("@/lib/love");
+    const now = new Date(2026, 10, 7, 10, 0);
+    expect(formatPlanTimeShort(new Date(2026, 10, 7, 19, 0).toISOString(), now)).toMatch(/^today 7/);
+    expect(formatPlanTimeShort(new Date(2026, 10, 8, 19, 30).toISOString(), now)).toMatch(/^tmrw 7:30/);
+    expect(formatPlanTimeShort(new Date(2026, 10, 10, 19, 0).toISOString(), now)).toMatch(/^Tue 7/);
+  });
+});

@@ -11,6 +11,57 @@ export function isImage(mime: string) {
   return mime.startsWith("image/");
 }
 
+export function isVideo(mime: string) {
+  return mime.startsWith("video/");
+}
+
+/**
+ * A video to send: a JPEG thumbnail of an early frame, its size and length.
+ * If the browser can't decode it (e.g. some iPhone HEVC videos in Chrome),
+ * it is sent without a thumbnail.
+ */
+export async function prepareVideo(file: File): Promise<PendingFile> {
+  const url = URL.createObjectURL(file);
+  try {
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+    video.src = url;
+    await new Promise<void>((resolve, reject) => {
+      video.onloadeddata = () => resolve();
+      video.onerror = () => reject(new Error("Can't read this video"));
+      setTimeout(() => reject(new Error("Timed out")), 8000);
+    });
+    video.currentTime = Math.min(0.5, (video.duration || 1) / 2);
+    await new Promise<void>((resolve) => {
+      video.onseeked = () => resolve();
+      setTimeout(resolve, 1500);
+    });
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (!w || !h) return { file };
+    const scale = Math.min(1, 480 / Math.max(w, h));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round(h * scale);
+    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const thumb = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.75));
+    return {
+      file,
+      thumb: thumb ?? undefined,
+      width: w,
+      height: h,
+      durationMs: Number.isFinite(video.duration) ? Math.round(video.duration * 1000) : undefined,
+      previewUrl: thumb ? URL.createObjectURL(thumb) : undefined,
+    };
+  } catch {
+    return { file };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export function isAudio(mime: string) {
   return mime.startsWith("audio/");
 }

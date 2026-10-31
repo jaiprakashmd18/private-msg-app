@@ -9,7 +9,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import { ALLOWED_ATTACHMENT_TYPES, MAX_ATTACHMENTS_PER_MESSAGE, MAX_MESSAGE_LENGTH, MAX_VOICE_NOTE_MS } from "@/lib/constants";
 import { formatBytes } from "@/lib/format";
-import { formatDuration, isImage, prepareImage } from "@/lib/media";
+import { formatDuration, isImage, isVideo, prepareImage, prepareVideo } from "@/lib/media";
 import type { StickerPayload } from "@/lib/data/couple";
 import { validateAttachment } from "@/lib/validation";
 import { cn } from "@/lib/utils";
@@ -132,7 +132,11 @@ export function Composer({
     if (cameraRef.current) cameraRef.current.value = "";
     setPreparing((n) => n + accepted.length);
     for (const file of accepted) {
-      const pending = isImage(file.type) ? await prepareImage(file).catch(() => ({ file })) : { file };
+      const pending = isImage(file.type)
+        ? await prepareImage(file).catch(() => ({ file }))
+        : isVideo(file.type)
+          ? await prepareVideo(file)
+          : { file };
       setFiles((prev) => [...prev, pending]);
       setPreparing((n) => n - 1);
     }
@@ -238,7 +242,12 @@ export function Composer({
                     <span className="shrink-0 text-muted-foreground">{formatBytes(f.file.size)}</span>
                   </span>
                 )}
-                {allowViewOnce && files.length === 1 && f.previewUrl && (
+                {isVideo(f.file.type) && f.previewUrl && (
+                  <span className="pointer-events-none absolute inset-0 grid place-items-center text-white drop-shadow" aria-hidden>
+                    ▶
+                  </span>
+                )}
+                {allowViewOnce && files.length === 1 && f.previewUrl && isImage(f.file.type) && (
                   <button
                     type="button"
                     onClick={() => setFiles((prev) => prev.map((p, j) => (j === i ? { ...p, viewOnce: !p.viewOnce } : p)))}
@@ -298,7 +307,7 @@ export function Composer({
                 ref={cameraRef}
                 type="file"
                 hidden
-                accept="image/*"
+                accept="image/*,video/*"
                 capture="environment"
                 onChange={(e) => void addFiles(e.target.files)}
               />

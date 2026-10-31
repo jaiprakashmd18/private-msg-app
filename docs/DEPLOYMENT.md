@@ -126,6 +126,7 @@ When a new version adds database changes, the repository includes an `update_*.s
 4. `supabase/update_password_sign_in.sql` — email + password sign-in (also turn the **Email** provider **on**, step 4b)
 5. `supabase/update_couple_features.sql` — app lock, view-once photos, chat look, "thinking of you", memories, special dates, love notes, shared list
 6. `supabase/update_stickers_moods_questions.sql` — stickers & GIFs, "I miss you" / hug / kiss taps, question of the day, mood check-in
+7. `supabase/update_plans_journal_videos.sql` — videos, countdown to the next meet, streaks, bucket list, date planner, our journal
 
 Vercel deploys the new app code automatically when the code on GitHub changes. New projects only need `setup_all.sql`, which always contains everything.
 
@@ -160,6 +161,21 @@ After running update 6 (step 7c):
 3. Vercel → your project → **Settings → Environment Variables** → add `GIPHY_API_KEY` with that key → **Save** → **Deployments → ⋯ → Redeploy**.
 
 Searches go through your server, so the key stays secret. GIF pictures load from GIPHY, which sees the viewer's IP address like any website image.
+
+## 7f. Search, links, videos, streaks, countdown, bucket list, date plans, journal
+
+After running update 7 (step 7c):
+
+| Feature | Where |
+| --- | --- |
+| Search in a chat | **⋮ → Search in chat**; tap a result to jump to that message |
+| Links | Links in messages are clickable and show a preview card (title, picture). Our server fetches the page; it refuses private and local addresses. |
+| Videos | 📎 or 📷 in the message box → pick a video (up to 50 MB). In Supabase, **Storage → Settings → Upload file size limit** must be at least 50 MB (that's the default). |
+| 🔥 Streak | Under the chat header: days in a row you've both written |
+| 💞 Countdown | **⋮ → Special dates → Add a date → Next meet** |
+| Bucket list | **⋮ → Bucket list**; tick something off, then 📷 to add a photo of it |
+| Date plans | **⋮ → Date plans**; you both get a reminder before (and the next plan shows under the header) |
+| Our journal | **⋮ → Our journal**; one entry each per day, with an optional photo |
 
 ## 8. Test that access control works
 

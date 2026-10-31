@@ -26,6 +26,10 @@ The in-app privacy notice lives at `/privacy` (`src/app/privacy/page.tsx`). This
 | Daily-question answers | `daily_answers` | You; the other member only after they've answered that day's question too |
 | Mood (emoji, optional note) | `conversation_members.mood*` and a chat note | Members of that conversation, shown for 24 hours |
 | GIF searches | Sent to GIPHY by our server (not stored); GIF images load from GIPHY's CDN | GIPHY sees the server's searches and the viewer's IP when images load |
+| Date plans (title, time, place, notes) | `date_plans` | Members of that conversation |
+| Journal entries (text and optional photo) | `journal_entries`; photos in bucket `avatars` | Members of that conversation |
+| Bucket-list photos | bucket `avatars` | Active members |
+| Links you send | Our server fetches the page and its picture to build a preview (not stored; cached in the browser for a day) | The linked site sees our server, not you |
 | Delivery/read watermarks | `conversation_members` | Members of that conversation |
 | Security events (masked email addresses, actor ids, admin actions) | `audit_logs` | Admin |
 

@@ -188,3 +188,14 @@
 - **Love taps**: `send_nudge(conversation, kind)` with kind `heart | miss_you | hug | kiss` → system message `{type: "nudge", kind}`; wording and floating emoji in `src/lib/love.ts`.
 - **Question of the day**: questions in `src/lib/love.ts`, chosen by local date so both see the same one; answers in `daily_answers` with an RLS rule that reveals the other person's answer only after you answered; each first answer posts `{type: "daily_answered", both}`.
 - **Mood**: `set_mood()` stores `mood/mood_note/mood_at` on `conversation_members` and posts `{type: "mood"}`; `get_moods()` returns moods from the last 24 hours.
+
+## 13. Search, links, videos, streaks, countdown, bucket list, plans, journal
+
+- **Search in a chat**: `ILIKE` on `messages.body` for that conversation (RLS applies), newest 50; picking a result reuses the jump-to-message logic (loads older pages until found).
+- **Links**: `findLinks()` makes http(s) links clickable (`rel="noopener noreferrer nofollow"`). `/api/link-preview` uses `safeFetch()` (`src/lib/safe-fetch.server.ts`), which pins every connection to a DNS answer checked by `isBlockedAddress()`; images go through `/api/link-preview/image`.
+- **Videos**: `prepareVideo()` grabs a frame as the thumbnail plus size and length; the chat shows the thumbnail and only downloads the video when tapped.
+- **Streak**: `get_streak(conversation, tz)` counts consecutive days on which every current member sent a message.
+- **Countdown**: special dates of kind `meet` (one-off, reminder on the day).
+- **Bucket list**: `shared_list_items.list_kind = 'bucket'` with `photo_path`.
+- **Date planner**: `date_plans`; `save_plan()` posts `{type: "plan_added"}`, and `private.deliver_due_plans()` (run by the every-minute job and open apps) posts `{type: "plan_reminder"}` `remind_minutes` before.
+- **Journal**: `journal_entries` (one per person per day); the first entry of a day posts `{type: "journal"}`; page `/chat/[id]/journal`.
