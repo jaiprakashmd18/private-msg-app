@@ -23,6 +23,9 @@ The in-app privacy notice lives at `/privacy` (`src/app/privacy/page.tsx`). This
 | Shared list items, who added / ticked them | `shared_list_items` | Members of that conversation |
 | App lock: salted PIN hash, timeout, Face ID / fingerprint credential id | This device's browser storage only (never sent to the server) | Nobody else |
 | The app's own address and a random secret (for timed notifications) | `private.app_hook` (not reachable through the API) | Server only |
+| Daily-question answers | `daily_answers` | You; the other member only after they've answered that day's question too |
+| Mood (emoji, optional note) | `conversation_members.mood*` and a chat note | Members of that conversation, shown for 24 hours |
+| GIF searches | Sent to GIPHY by our server (not stored); GIF images load from GIPHY's CDN | GIPHY sees the server's searches and the viewer's IP when images load |
 | Delivery/read watermarks | `conversation_members` | Members of that conversation |
 | Security events (masked email addresses, actor ids, admin actions) | `audit_logs` | Admin |
 

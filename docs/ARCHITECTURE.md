@@ -181,3 +181,10 @@
 
 - ✓ **Sent**: saved on the server. ✓✓ **Delivered**: the other person's `last_delivered_at` is past the message — set when their app is open (`mark_all_delivered`) **or** when a push notification reaches their phone: the service worker calls `/api/push/delivered`, which moves only the caller's own delivery mark for that conversation (it doesn't touch "seen" or "last seen"). Bright blue ✓✓ **Seen**: their `last_read_at` is past it (they opened the chat). In groups, the oldest mark among the other members counts, so blue means everyone.
 - The latest message you sent also shows the state in words underneath.
+
+## 12. Stickers, GIFs, love taps, daily question, mood
+
+- **Stickers** (`src/lib/stickers.ts`) are drawn from emoji + gradients; a sticker message stores `messages.sticker` (id) and a text version in `body` ("💖 Love you") so previews, search and notifications need no special cases. **GIFs** store `messages.gif` (`{url,width,height,title}`, GIPHY CDN only) and `body = "GIF: …"`. Both are sent with `send_sticker()`. `/api/gifs` proxies GIPHY search with `GIPHY_API_KEY`. Messages of 1–3 emoji render large without a bubble.
+- **Love taps**: `send_nudge(conversation, kind)` with kind `heart | miss_you | hug | kiss` → system message `{type: "nudge", kind}`; wording and floating emoji in `src/lib/love.ts`.
+- **Question of the day**: questions in `src/lib/love.ts`, chosen by local date so both see the same one; answers in `daily_answers` with an RLS rule that reveals the other person's answer only after you answered; each first answer posts `{type: "daily_answered", both}`.
+- **Mood**: `set_mood()` stores `mood/mood_note/mood_at` on `conversation_members` and posts `{type: "mood"}`; `get_moods()` returns moods from the last 24 hours.

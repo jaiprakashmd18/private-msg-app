@@ -17,6 +17,7 @@ import {
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { MessageAttachments } from "@/components/chat/attachment-view";
+import { Sticker } from "@/components/chat/sticker";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatBytes, formatMessageTime } from "@/lib/format";
 import { formatDuration, isAudio, isImage } from "@/lib/media";
+import { isEmojiOnly } from "@/lib/stickers";
 import { cn } from "@/lib/utils";
 import type { Reaction, ReplyPreview, UiMessage } from "@/types/app";
 
@@ -56,6 +58,18 @@ export function ReceiptIcon({ receipt, className }: { receipt: Receipt; classNam
         />
       );
   }
+}
+
+/** A GIF (from GIPHY), with the attribution GIPHY asks for. */
+function GifImage({ gif }: { gif: NonNullable<UiMessage["gif"]> }) {
+  const ratio = gif.width && gif.height ? gif.width / gif.height : 1;
+  return (
+    <span className="relative block w-56 max-w-full overflow-hidden rounded-xl bg-muted sm:w-64" style={{ aspectRatio: String(ratio) }}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- animated GIF from GIPHY's CDN */}
+      <img src={gif.url} alt={gif.title || "GIF"} loading="lazy" className="size-full object-cover" />
+      <span className="absolute bottom-1 left-1 rounded bg-black/55 px-1 text-[9px] font-bold tracking-wide text-white">GIPHY</span>
+    </span>
+  );
 }
 
 /** One-line description of a message, for reply quotes. */
@@ -153,6 +167,15 @@ export function MessageBubble({
   onJumpTo: (messageId: string) => void;
 }) {
   const deleted = Boolean(message.deleted_at);
+  const special = !deleted && Boolean(message.sticker || message.gif);
+  // One to three emoji on their own are shown big, without a bubble.
+  const bigEmoji =
+    !deleted &&
+    !special &&
+    !message.reply_to &&
+    !(message.attachments?.length || message.local_files?.length) &&
+    isEmojiOnly(message.body);
+  const bare = special || bigEmoji;
   const local = Boolean(message.local_status);
   const interactive = !deleted && !local;
   const [dragX, setDragX] = useState(0);
@@ -212,9 +235,14 @@ export function MessageBubble({
         <div className={cn("flex items-end gap-1", mine && "flex-row-reverse")}>
           <div
             className={cn(
-              "min-w-0 rounded-2xl px-3.5 py-2 shadow-sm",
-              mine ? "bg-bubble-mine text-bubble-mine-foreground" : "bg-bubble-theirs text-bubble-theirs-foreground",
-              mine ? (grouped ? "rounded-tr-md" : "rounded-br-md") : grouped ? "rounded-tl-md" : "rounded-bl-md",
+              "min-w-0 rounded-2xl",
+              bare
+                ? "px-0.5 py-0.5"
+                : cn(
+                    "px-3.5 py-2 shadow-sm",
+                    mine ? "bg-bubble-mine text-bubble-mine-foreground" : "bg-bubble-theirs text-bubble-theirs-foreground",
+                    mine ? (grouped ? "rounded-tr-md" : "rounded-br-md") : grouped ? "rounded-tl-md" : "rounded-bl-md",
+                  ),
               "group-data-[highlighted=true]:ring-2 group-data-[highlighted=true]:ring-primary group-data-[highlighted=true]:ring-offset-2 group-data-[highlighted=true]:ring-offset-background",
               local && "opacity-80",
             )}
@@ -260,12 +288,27 @@ export function MessageBubble({
                     )}
                   </div>
                 )}
-                {message.body && (
-                  <p className="whitespace-pre-wrap text-[15px] leading-relaxed [overflow-wrap:anywhere]">{message.body}</p>
+                {message.sticker ? (
+                  <Sticker id={message.sticker} />
+                ) : message.gif ? (
+                  <GifImage gif={message.gif} />
+                ) : bigEmoji ? (
+                  <p className="text-5xl leading-tight" aria-label={message.body}>
+                    {message.body}
+                  </p>
+                ) : (
+                  message.body && (
+                    <p className="whitespace-pre-wrap text-[15px] leading-relaxed [overflow-wrap:anywhere]">{message.body}</p>
+                  )
                 )}
               </>
             )}
-            <div className={cn("mt-0.5 flex items-center justify-end gap-1 text-[11px]", mine ? "opacity-80" : "opacity-60")}>
+            <div
+              className={cn(
+                "mt-0.5 flex items-center justify-end gap-1 text-[11px]",
+                bare ? "text-muted-foreground" : mine ? "opacity-80" : "opacity-60",
+              )}
+            >
               {message.was_scheduled && !deleted && <span title="Love note sent on schedule">scheduled ·</span>}
               {message.edited_at && !deleted && <span>edited ·</span>}
               <time dateTime={message.created_at}>{formatMessageTime(message.created_at)}</time>
@@ -321,7 +364,7 @@ export function MessageBubble({
                 <DropdownMenuItem onSelect={onReply}>
                   <Reply /> Reply
                 </DropdownMenuItem>
-                {message.body && (
+                {message.body && !special && (
                   <DropdownMenuItem
                     onSelect={() => {
                       navigator.clipboard
@@ -333,7 +376,7 @@ export function MessageBubble({
                     <Copy /> Copy text
                   </DropdownMenuItem>
                 )}
-                {mine && canEdit && message.body && (
+                {mine && canEdit && message.body && !special && (
                   <DropdownMenuItem onSelect={onEdit}>
                     <Pencil /> Edit
                   </DropdownMenuItem>

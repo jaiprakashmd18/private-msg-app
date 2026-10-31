@@ -1,4 +1,5 @@
 import { describeDateReminder } from "@/lib/dates";
+import { describeMood, describeTap } from "@/lib/love";
 import type { SystemEvent } from "@/types/app";
 
 /** Human text for a chat event, e.g. "Alex added Sam". */
@@ -24,7 +25,12 @@ export function describeSystemEvent(
     case "photo_removed":
       return `${actor} removed the group photo`;
     case "nudge":
-      return actor === "You" ? "You sent a ❤️" : `${actor} is thinking of you ❤️`;
+      return describeTap(event.kind, actor);
+    case "daily_answered":
+      if (event.both) return "You both answered today's question ✨";
+      return actor === "You" ? "You answered today's question 💬" : `${actor} answered today's question 💬`;
+    case "mood":
+      return describeMood(event.mood, event.note, actor);
     case "date_reminder":
       return describeDateReminder(event);
     default:

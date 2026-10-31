@@ -27,6 +27,10 @@ A minimal, dark-mode messaging app for a closed group of people. People sign in 
   - **Special dates** — "Day 412 together", birthday/anniversary countdowns, and a celebration in the chat on the day.
   - **Love notes for later** — write now, delivered at the time you pick (e.g. "Good morning" at 7 am), with a notification.
   - **Our list** — a shared to-do / shopping list that updates live for both.
+  - **Stickers & GIFs** — a built-in sticker pack, GIF search (GIPHY, optional free key), and big emoji when you send just an emoji.
+  - **Love taps** — "Thinking of you", "I miss you", a hug or a kiss in one tap, arriving as a lock-screen notification with floating emoji.
+  - **Question of the day** — the same question for both; each answer is revealed only after you've both answered.
+  - **Mood check-in** — share how you feel (with an optional note); it shows on your photo for 24 hours.
 - **Admin dashboard** — allowlist management, account deletion, conversation metadata, storage usage, retention settings, and an append-only audit log.
 - **Explicit privacy policy for admins** — administrators *cannot* read messages unless an audited, member-visible policy is switched on.
 

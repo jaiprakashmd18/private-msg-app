@@ -4,6 +4,8 @@ import { z } from "zod";
 const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20, "SUPABASE_SERVICE_ROLE_KEY is missing"),
   CRON_SECRET: z.string().min(16).optional(),
+  /** Optional: turns on GIF search (free key from developers.giphy.com). */
+  GIPHY_API_KEY: z.string().min(10).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverSchema>;
@@ -16,6 +18,7 @@ export function getServerEnv(): ServerEnv {
   const parsed = serverSchema.safeParse({
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     CRON_SECRET: process.env.CRON_SECRET || undefined,
+    GIPHY_API_KEY: process.env.GIPHY_API_KEY || undefined,
   });
   if (!parsed.success) {
     throw new Error(

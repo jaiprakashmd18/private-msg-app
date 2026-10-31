@@ -1,14 +1,16 @@
 "use client";
 
-import { Camera, Mic, Paperclip, Reply, SendHorizontal, Trash2, X } from "lucide-react";
+import { Camera, Mic, Paperclip, Reply, SendHorizontal, Smile, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { StickerPanel } from "@/components/chat/sticker-panel";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import { ALLOWED_ATTACHMENT_TYPES, MAX_ATTACHMENTS_PER_MESSAGE, MAX_MESSAGE_LENGTH, MAX_VOICE_NOTE_MS } from "@/lib/constants";
 import { formatBytes } from "@/lib/format";
 import { formatDuration, isImage, prepareImage } from "@/lib/media";
+import type { StickerPayload } from "@/lib/data/couple";
 import { validateAttachment } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 import type { PendingFile } from "@/types/app";
@@ -32,6 +34,7 @@ export function Composer({
   editing,
   replyingTo,
   onSend,
+  onSendSticker,
   onSaveEdit,
   onCancelEdit,
   onCancelReply,
@@ -45,6 +48,7 @@ export function Composer({
   editing: EditingState | null;
   replyingTo: ReplyingState | null;
   onSend: (body: string, files: PendingFile[]) => void;
+  onSendSticker?: (payload: StickerPayload) => void;
   onSaveEdit: (id: string, body: string) => Promise<boolean>;
   onCancelEdit: () => void;
   onCancelReply: () => void;
@@ -54,6 +58,7 @@ export function Composer({
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [saving, setSaving] = useState(false);
   const [preparing, setPreparing] = useState(0);
+  const [stickersOpen, setStickersOpen] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -212,6 +217,14 @@ export function Composer({
             </button>
           </div>
         )}
+        {stickersOpen && onSendSticker && !editing && (
+          <StickerPanel
+            onPick={(payload) => {
+              onSendSticker(payload);
+              setStickersOpen(false);
+            }}
+          />
+        )}
         {(files.length > 0 || preparing > 0) && (
           <ul className="mb-2 flex flex-wrap gap-2" aria-label="Files to send">
             {files.map((f, i) => (
@@ -346,10 +359,26 @@ export function Composer({
               }}
               aria-describedby="composer-hint"
               className={cn(
-                "block max-h-[200px] min-h-10 w-full resize-none rounded-2xl border border-input bg-muted/60 px-4 py-2.5 text-base leading-snug pointer-fine:text-[15px] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30",
+                "block max-h-[200px] min-h-10 w-full resize-none rounded-2xl border border-input bg-muted/60 py-2.5 pl-4 text-base leading-snug pointer-fine:text-[15px] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30",
+                onSendSticker && !editing ? "pr-11" : "pr-4",
                 tooLong && "border-destructive",
               )}
             />
+            {onSendSticker && !editing && (
+              <button
+                type="button"
+                onClick={() => setStickersOpen((o) => !o)}
+                disabled={disabled}
+                aria-label="Stickers and GIFs"
+                aria-expanded={stickersOpen}
+                className={cn(
+                  "absolute bottom-1 right-1 grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                  stickersOpen && "bg-accent text-primary",
+                )}
+              >
+                <Smile className="size-5" />
+              </button>
+            )}
             <span id="composer-hint" className="sr-only">
               Press Enter to send, Shift+Enter for a new line.
             </span>

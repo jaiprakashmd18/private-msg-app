@@ -44,7 +44,9 @@ export type SystemEvent =
   | { type: "renamed"; title: string }
   | { type: "photo_changed" }
   | { type: "photo_removed" }
-  | { type: "nudge" }
+  | { type: "nudge"; kind?: "heart" | "miss_you" | "hug" | "kiss" }
+  | { type: "daily_answered"; day: string; both: boolean }
+  | { type: "mood"; mood: string; note: string | null }
   | { type: "date_reminder"; date_id: string; kind: SpecialDateKind; title: string; years: number };
 
 export interface ConversationSummary {
@@ -139,6 +141,10 @@ export interface Message {
   system_event: SystemEvent | null;
   /** Delivered by the scheduler (a love note sent for later, or a reminder). */
   was_scheduled?: boolean;
+  /** Built-in sticker id (see lib/stickers). */
+  sticker?: string | null;
+  /** A GIF from GIPHY. */
+  gif?: { url: string; id?: string; title?: string; width?: number | null; height?: number | null } | null;
   attachments?: Attachment[];
   message_reactions?: Reaction[];
   reply_to?: ReplyPreview | null;
@@ -277,4 +283,21 @@ export type BubbleColor = (typeof BUBBLE_COLORS)[number];
 export interface ChatAppearance {
   wallpaper_path: string | null;
   bubble_color: BubbleColor | null;
+}
+
+export interface DailyAnswer {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  day: string;
+  question_index: number;
+  answer: string;
+  created_at: string;
+}
+
+export interface MemberMood {
+  user_id: string;
+  mood: string;
+  mood_note: string | null;
+  mood_at: string;
 }

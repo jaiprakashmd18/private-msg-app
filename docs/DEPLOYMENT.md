@@ -125,6 +125,7 @@ When a new version adds database changes, the repository includes an `update_*.s
 3. `supabase/update_photos_and_requests.sql` — profile and group photos, access requests in the admin page
 4. `supabase/update_password_sign_in.sql` — email + password sign-in (also turn the **Email** provider **on**, step 4b)
 5. `supabase/update_couple_features.sql` — app lock, view-once photos, chat look, "thinking of you", memories, special dates, love notes, shared list
+6. `supabase/update_stickers_moods_questions.sql` — stickers & GIFs, "I miss you" / hug / kiss taps, question of the day, mood check-in
 
 Vercel deploys the new app code automatically when the code on GitHub changes. New projects only need `setup_all.sql`, which always contains everything.
 
@@ -140,6 +141,25 @@ Nothing to configure — after running the update (7c, step 5) everything works.
 | Memories, Our list, Special dates, Love note for later, Chat look | The **⋮** menu at the top of a chat |
 
 **Timed messages** (love notes and date reminders) are delivered every minute by the database's scheduler (*pg_cron*, switched on by the update file). Their phone notifications are sent through *pg_net* to your app, whose address the app registers itself the first time anyone sends a message from the live site — so send one message after updating. If the scheduler isn't available on your plan, notes are still delivered as soon as either of you opens the app.
+
+## 7e. Stickers, GIFs, love taps, daily question, mood
+
+After running update 6 (step 7c):
+
+| Feature | Where |
+| --- | --- |
+| Stickers | The **🙂** button inside the message box → *Stickers* |
+| GIFs | **🙂** → *GIFs* (needs the free GIPHY key below) |
+| "I miss you", hug, kiss, thinking of you | The **❤️** button at the top of the chat. The other person gets a notification on their lock screen (if they turned notifications on). |
+| Question of the day | The bar under the chat header, or **⋮ → Question of the day**. You see each other's answer once you've both answered. |
+| Mood | **⋮ → My mood**. Shows on your photo and under your name in the other person's chat for 24 hours. |
+
+**Turn on GIFs (optional, free):**
+1. Go to https://developers.giphy.com/dashboard, sign up, click **Create an App**, choose **API** (not SDK), give it any name.
+2. Copy the **API Key**.
+3. Vercel → your project → **Settings → Environment Variables** → add `GIPHY_API_KEY` with that key → **Save** → **Deployments → ⋯ → Redeploy**.
+
+Searches go through your server, so the key stays secret. GIF pictures load from GIPHY, which sees the viewer's IP address like any website image.
 
 ## 8. Test that access control works
 

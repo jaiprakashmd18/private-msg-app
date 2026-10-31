@@ -7,6 +7,7 @@ import { useApp } from "@/components/app-provider";
 import { heartbeat, listConversations, markAllDelivered } from "@/lib/data/chat";
 import { deliverDueItems } from "@/lib/data/couple";
 import { displayNameOf } from "@/lib/format";
+import { tapFor } from "@/lib/love";
 import { requestPushForMessage, setAppBadge } from "@/lib/pwa-client";
 import type { ConversationSummary, Message, Reaction } from "@/types/app";
 
@@ -111,7 +112,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         ) {
           const c = conversationsRef.current.find((x) => x.id === message.conversation_id);
           const who = c?.kind === "direct" ? displayNameOf(c.other_display_name, c.other_email) : "Someone";
-          toast(`❤️ ${who} is thinking of you`);
+          toast(`${who} ${tapFor(message.system_event.kind).notification}`);
           navigator.vibrate?.([120, 60, 120, 60, 240]);
         }
       })

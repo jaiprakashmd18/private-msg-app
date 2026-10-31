@@ -164,6 +164,13 @@
   animation: heart-float 2.4s ease-out forwards;
 }
 
+/* A sticker arriving. */
+@keyframes sticker-pop {
+  0% { transform: scale(0.6) rotate(-6deg); opacity: 0; }
+  70% { transform: scale(1.06) rotate(2deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+
 /* Wrong PIN on the lock screen. */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }

@@ -4,7 +4,7 @@ This document explains every security control, how it works, how it is tested, a
 
 ## 1. Controls and how each one is tested
 
-Automated test files: `tests/db/security.test.ts` (database, 80 tests: `security.test.ts`, `couple.test.ts`), `tests/integration/supabase.test.ts` (live Supabase stack), `tests/integration/api.test.ts` (live app), `tests/unit/*`.
+Automated test files: `tests/db/security.test.ts` (database, 85 tests: `security.test.ts`, `couple.test.ts`, `moods-questions.test.ts`), `tests/integration/supabase.test.ts` (live Supabase stack), `tests/integration/api.test.ts` (live app), `tests/unit/*`.
 
 | # | Requirement | Mechanism | Automated test |
 | --- | --- | --- | --- |
@@ -43,6 +43,9 @@ Automated test files: `tests/db/security.test.ts` (database, 80 tests: `security
 | 33 | Notification hook | `/api/push/hook` requires the secret stored in the private schema (constant-time compare); it can only ask for notifications the database allows: timed messages, once each. `server_push_targets` lets only a message's sender request its notification, except timed messages (any current member or the hook) | db: *app address for timed notifications*, push-target checks in *thinking of you* / *love notes*; unit: `push.test.ts` |
 | 34 | Chat look | Wallpaper must be the caller's own file in `avatars/users/<uid>/`; colours from a fixed list | db: *chat wallpaper and colours* |
 | 35 | App lock | Device-only privacy screen: PIN stored as a salted PBKDF2-SHA-256 hash (210 000 iterations), constant-time compare, growing waits after 5 wrong PINs; the app isn't rendered at all while locked (a cookie makes the server render the lock screen from the first byte); Face ID / fingerprint via WebAuthn platform authenticators with user verification | unit: `app-lock.test.ts`; e2e (incl. a virtual authenticator) |
+| 36 | Stickers & GIFs | `send_sticker` takes a sticker id matching `^[a-z0-9-]{1,40}$` or a GIF whose URL must be an https GIPHY CDN URL (rebuilt server-side from known fields only); CSP `img-src` allows only GIPHY besides our own hosts; GIF search goes through `/api/gifs` (signed-in users, key server-side) | db: *stickers and GIFs* (2); unit: `stickers.test.ts` |
+| 37 | Daily question | Each answer is readable by the other member **only after they have answered the same day** (RLS, so Realtime obeys it too); answers only for today ±1 day; writes only via `answer_daily_question` | db: *daily question* |
+| 38 | Love taps & moods | Fixed list of tap kinds; shared rate limit with hearts; moods 1–16 characters, note ≤ 80, visible to conversation members for 24 h, max 20 changes/hour | db: *love taps*, *mood check-in* |
 
 ### How the RLS tests work
 

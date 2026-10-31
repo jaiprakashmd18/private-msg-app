@@ -170,13 +170,13 @@ describe("thinking of you", () => {
       "select sender_id, system_event from public.messages where id = $1",
       [n.id],
     );
-    expect(msg).toEqual({ sender_id: a.id, system_event: { type: "nudge" } });
+    expect(msg).toEqual({ sender_id: a.id, system_event: { type: "nudge", kind: "heart" } });
 
     // Only the sender may trigger its notification; it goes to the other person only.
     expect(await pushTargets(n.id, b.id)).toHaveLength(0);
     const targets = await pushTargets(n.id, a.id);
     expect(targets).toHaveLength(1);
-    expect(targets[0]!.event).toEqual({ type: "nudge" });
+    expect(targets[0]!.event).toEqual({ type: "nudge", kind: "heart" });
     expect(await pushTargets(n.id, a.id)).toHaveLength(0); // once
 
     await asUser(a.id, "select public.send_nudge($1)", [conv]);

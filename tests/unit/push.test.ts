@@ -51,3 +51,23 @@ describe("push payload for taps, reminders and view-once photos", () => {
     );
   });
 });
+
+describe("push payload for love taps, daily questions and moods", () => {
+  it("says 'misses you' for the I-miss-you tap", () => {
+    const p = buildPayload({ ...base, body: "", event: { type: "nudge", kind: "miss_you" } });
+    expect(p).toMatchObject({ title: "Alex", body: "misses you 🥺" });
+    expect(p.vibrate?.length).toBeGreaterThan(0);
+  });
+
+  it("invites you to answer, without revealing the answer", () => {
+    expect(buildPayload({ ...base, body: "", event: { type: "daily_answered", both: false } }).body).toBe(
+      "answered today's question 💬 Answer to see theirs",
+    );
+  });
+
+  it("shares a mood only when previews are on", () => {
+    const event = { type: "mood", mood: "😴", note: "Long day" };
+    expect(buildPayload({ ...base, body: "", event }).body).toBe("is feeling 😴 tired — “Long day”");
+    expect(buildPayload({ ...base, show_preview: false, body: "", event }).body).toBe("updated their mood");
+  });
+});

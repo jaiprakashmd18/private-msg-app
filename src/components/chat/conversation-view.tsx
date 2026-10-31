@@ -1,6 +1,19 @@
 "use client";
 
-import { ArrowLeft, CalendarHeart, Clock, Eye, Heart, Images, Info, ListChecks, MoreVertical, Palette } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarHeart,
+  Clock,
+  Eye,
+  Heart,
+  Images,
+  Info,
+  ListChecks,
+  MessageCircleHeart,
+  MoreVertical,
+  Palette,
+  Smile,
+} from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -9,6 +22,8 @@ import { useChat } from "@/components/chat/chat-provider";
 import { Composer, type EditingState, type ReplyingState } from "@/components/chat/composer";
 import { ConversationInfoDialog } from "@/components/chat/conversation-info-dialog";
 import { AppearanceDialog } from "@/components/chat/couple/appearance-dialog";
+import { DailyQuestionBar, DailyQuestionDialog } from "@/components/chat/couple/daily-question";
+import { MoodDialog } from "@/components/chat/couple/mood-dialog";
 import { HeartBurst } from "@/components/chat/couple/heart-burst";
 import { LoveNotesDialog } from "@/components/chat/couple/love-notes-dialog";
 import { SharedListDialog } from "@/components/chat/couple/shared-list-dialog";
@@ -44,12 +59,22 @@ import { useSignedUrl } from "@/hooks/use-signed-url";
 import { useTyping } from "@/hooks/use-typing";
 import { AVATARS_BUCKET } from "@/lib/constants";
 import { listConversationMembers } from "@/lib/data/chat";
-import { getChatAppearance, listSpecialDates, sendNudge } from "@/lib/data/couple";
+import { getChatAppearance, getMoods, listDailyAnswers, listSpecialDates, sendNudge } from "@/lib/data/couple";
+import { localDateString } from "@/lib/dates";
+import { moodLabel, TAPS, tapFor, type TapKind } from "@/lib/love";
 import { requestPushForMessage } from "@/lib/pwa-client";
 import { displayNameOf, formatDayDivider, formatLastSeen, formatTyping } from "@/lib/format";
 import { isImage } from "@/lib/media";
 import { cn } from "@/lib/utils";
-import type { ChatAppearance, ConversationMember, PendingFile, SpecialDate, UiMessage } from "@/types/app";
+import type {
+  ChatAppearance,
+  ConversationMember,
+  DailyAnswer,
+  MemberMood,
+  PendingFile,
+  SpecialDate,
+  UiMessage,
+} from "@/types/app";
 
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
@@ -67,7 +92,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const searchParams = useSearchParams();
   const isGroup = summary?.kind === "group";
 
-  const { messages, loading, loadingOlder, hasMore, error, reload, loadOlder, send, retry, discard, edit, remove, react } =
+  const { messages, loading, loadingOlder, hasMore, error, reload, loadOlder, send, sendSticker, retry, discard, edit, remove, react } =
     useConversationMessages(conversationId);
   const { typingIds, notifyTyping, notifyStopped, clearUser } = useTyping(conversationId);
 
@@ -77,7 +102,13 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const [replyingTo, setReplyingTo] = useState<UiMessage | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
-  const [panel, setPanel] = useState<"list" | "dates" | "notes" | "look" | null>(null);
+  const [panel, setPanel] = useState<"list" | "dates" | "notes" | "look" | "daily" | "mood" | null>(null);
+  const [moods, setMoods] = useState<MemberMood[]>([]);
+  const [burstEmojis, setBurstEmojis] = useState<string[]>(["❤️", "💖"]);
+  const today = localDateString();
+  const { rows: dailyAnswers, reload: reloadDaily } = useLiveRows<DailyAnswer>("daily_answers", conversationId, () =>
+    listDailyAnswers(supabase, conversationId, today),
+  );
   const [appearance, setAppearance] = useState<ChatAppearance>({ wallpaper_path: null, bubble_color: null });
   const [burst, setBurst] = useState(0);
   const { url: wallpaperUrl } = useSignedUrl(AVATARS_BUCKET, appearance.wallpaper_path);
@@ -110,6 +141,17 @@ export function ConversationView({ conversationId }: { conversationId: string })
   useEffect(() => {
     loadMembers();
   }, [loadMembers, lastSystemId]);
+
+  // Moods come and go with system messages ("Sam is feeling …").
+  const loadMoods = useCallback(() => {
+    getMoods(supabase, conversationId)
+      .then(setMoods)
+      .catch(() => undefined);
+  }, [supabase, conversationId]);
+  useEffect(() => {
+    loadMoods();
+    reloadDaily();
+  }, [loadMoods, reloadDaily, lastSystemId]);
 
   // Includes former members, so names in older messages stay right.
   const memberById = useMemo(() => new Map(allMembers.map((m) => [m.user_id, m])), [allMembers]);
@@ -145,20 +187,22 @@ export function ConversationView({ conversationId }: { conversationId: string })
       return;
     }
     celebrated.current.add(last.id);
+    setBurstEmojis(tapFor(last.system_event.kind).burst);
     setBurst(Date.now());
     navigator.vibrate?.([120, 60, 120, 60, 240]);
   }, [messages, access.user_id]);
 
-  const nudge = useCallback(async () => {
+  const nudge = useCallback(async (kind: TapKind) => {
     try {
-      const id = await sendNudge(supabase, conversationId);
+      const id = await sendNudge(supabase, conversationId, kind);
       celebrated.current.add(id);
+      setBurstEmojis(tapFor(kind).burst);
       setBurst(Date.now());
       navigator.vibrate?.(30);
       requestPushForMessage(id);
       refreshSoon();
     } catch (err) {
-      reportError(err, "Could not send your heart.");
+      reportError(err, "Couldn't send that.");
     }
   }, [supabase, conversationId, refreshSoon, reportError]);
 
@@ -182,9 +226,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
       return `${members.length} members${online ? ` · ${online} online` : ""}`;
     }
     if (otherInactive) return "No longer has access";
-    if (summary.other_user_id && onlineIds.has(summary.other_user_id)) return "online";
+    const otherMood = moods.find((m) => m.user_id === summary.other_user_id);
+    const feeling = otherMood ? ` · ${otherMood.mood} ${moodLabel(otherMood.mood).toLowerCase()}`.trimEnd() : "";
+    if (summary.other_user_id && onlineIds.has(summary.other_user_id)) return `online${feeling}`;
     const seen = memberById.get(summary.other_user_id ?? "")?.last_seen_at ?? summary.other_last_seen_at;
-    return formatLastSeen(seen) || summary.other_email || "";
+    return `${formatLastSeen(seen) || summary.other_email || ""}${feeling}`;
   })();
 
   // "Sent / Delivered / Seen" under my latest message.
@@ -312,6 +358,14 @@ export function ConversationView({ conversationId }: { conversationId: string })
               ) : (
                 <Avatar name={title} seed={summary.other_user_id} path={summary.other_avatar_path} />
               )}
+              {!isGroup && moods.find((m) => m.user_id === summary.other_user_id) && (
+                <span
+                  className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-popover text-xs shadow ring-1 ring-border"
+                  aria-hidden
+                >
+                  {moods.find((m) => m.user_id === summary.other_user_id)!.mood}
+                </span>
+              )}
               {!isGroup && summary.other_user_id && onlineIds.has(summary.other_user_id) && !otherInactive && (
                 <span className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-background bg-success" aria-hidden />
               )}
@@ -334,17 +388,30 @@ export function ConversationView({ conversationId }: { conversationId: string })
         )}
         {summary && (
           <>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-rose-500 hover:text-rose-500"
-              aria-label="Send a heart: thinking of you"
-              title="Thinking of you"
-              disabled={otherInactive}
-              onClick={() => void nudge()}
-            >
-              <Heart className="fill-current" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-rose-500 hover:text-rose-500"
+                  aria-label="Love taps: thinking of you, I miss you, hug, kiss"
+                  title="Love taps"
+                  disabled={otherInactive}
+                >
+                  <Heart className="fill-current" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-52">
+                {TAPS.map((t) => (
+                  <DropdownMenuItem key={t.kind} onSelect={() => void nudge(t.kind)}>
+                    <span className="text-lg leading-none" aria-hidden>
+                      {t.emoji}
+                    </span>
+                    {t.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" aria-label="More">
@@ -352,6 +419,12 @@ export function ConversationView({ conversationId }: { conversationId: string })
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-52">
+                <DropdownMenuItem onSelect={() => setPanel("mood")}>
+                  <Smile /> My mood
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPanel("daily")}>
+                  <MessageCircleHeart /> Question of the day
+                </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => setPanel("list")}>
                   <ListChecks /> Our list
                 </DropdownMenuItem>
@@ -379,6 +452,9 @@ export function ConversationView({ conversationId }: { conversationId: string })
         )}
       </header>
       {specialDates && specialDates.length > 0 && <TogetherChip dates={specialDates} onOpen={() => setPanel("dates")} />}
+      {summary && !otherInactive && (
+        <DailyQuestionBar answers={dailyAnswers} otherName={isGroup ? "the others" : title} onOpen={() => setPanel("daily")} />
+      )}
 
       {settings?.admin_can_read_messages && (
         <div
@@ -400,7 +476,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
             }}
           />
         )}
-        <HeartBurst burst={burst} />
+        <HeartBurst burst={burst} emojis={burstEmojis} />
         <div
           ref={scrollRef}
           onScroll={onScroll}
@@ -537,6 +613,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
         editing={editing}
         replyingTo={replyState}
         onSend={handleSend}
+        onSendSticker={(payload) => void sendSticker(payload)}
         onSaveEdit={edit}
         onCancelEdit={() => setEditing(null)}
         onCancelReply={() => setReplyingTo(null)}
@@ -569,6 +646,24 @@ export function ConversationView({ conversationId }: { conversationId: string })
         recipientName={isGroup ? "the group" : title}
         open={panel === "notes"}
         onOpenChange={(o) => setPanel(o ? "notes" : null)}
+      />
+      <DailyQuestionDialog
+        conversationId={conversationId}
+        answers={dailyAnswers}
+        otherName={isGroup ? "the others" : title}
+        nameOf={nameOf}
+        open={panel === "daily"}
+        onOpenChange={(o) => setPanel(o ? "daily" : null)}
+        onAnswered={reloadDaily}
+      />
+      <MoodDialog
+        key={panel === "mood" ? "mood-open" : "mood-closed"}
+        conversationId={conversationId}
+        current={moods.find((m) => m.user_id === access.user_id)}
+        otherName={isGroup ? "The group" : title}
+        open={panel === "mood"}
+        onOpenChange={(o) => setPanel(o ? "mood" : null)}
+        onChanged={loadMoods}
       />
       <AppearanceDialog
         conversationId={conversationId}

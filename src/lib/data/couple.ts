@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ATTACHMENTS_BUCKET } from "@/lib/constants";
-import type { Attachment, BubbleColor, ChatAppearance, ListItem, ScheduledMessage, SpecialDate, SpecialDateKind } from "@/types/app";
+import type { Gif } from "@/lib/giphy";
+import type { TapKind } from "@/lib/love";
+import type { Attachment, BubbleColor, DailyAnswer, MemberMood, Message, ChatAppearance, ListItem, ScheduledMessage, SpecialDate, SpecialDateKind } from "@/types/app";
 
 /**
  * Client-side data access for the features for two: view-once photos, chat
@@ -48,8 +50,8 @@ export async function setChatAppearance(
 
 // --- Thinking of you ----------------------------------------------------------
 
-export async function sendNudge(supabase: SupabaseClient, conversationId: string): Promise<string> {
-  const { data, error } = await supabase.rpc("send_nudge", { p_conversation_id: conversationId });
+export async function sendNudge(supabase: SupabaseClient, conversationId: string, kind: TapKind = "heart"): Promise<string> {
+  const { data, error } = await supabase.rpc("send_nudge", { p_conversation_id: conversationId, p_kind: kind });
   if (error) throw error;
   return data as string;
 }
@@ -195,4 +197,91 @@ export async function listMemories(
     hasMore: rows.length === MEMORIES_PAGE_SIZE,
     cursor: rows[rows.length - 1]?.created_at ?? null,
   };
+}
+
+// --- Stickers & GIFs ----------------------------------------------------------
+
+export type StickerPayload = { sticker: string; text: string } | { gif: Gif };
+
+export async function sendSticker(
+  supabase: SupabaseClient,
+  conversationId: string,
+  clientId: string,
+  payload: StickerPayload,
+): Promise<Message> {
+  const { data, error } = await supabase
+    .rpc("send_sticker", {
+      p_conversation_id: conversationId,
+      p_client_id: clientId,
+      p_sticker: "sticker" in payload ? payload.sticker : null,
+      p_gif: "gif" in payload ? payload.gif : null,
+      p_body: "sticker" in payload ? payload.text : `GIF${payload.gif.title ? `: ${payload.gif.title}` : ""}`.slice(0, 120),
+    })
+    .single();
+  if (error) throw error;
+  return data as Message;
+}
+
+/** GIF search through our server (null = GIFs aren't switched on). */
+export async function searchGifs(query: string, offset = 0): Promise<Gif[] | null> {
+  const res = await fetch(`/api/gifs?q=${encodeURIComponent(query)}&offset=${offset}`);
+  const json = (await res.json().catch(() => ({}))) as { ok?: boolean; gifs?: Gif[]; error?: { code?: string } };
+  if (res.status === 503 && json.error?.code === "gifs_off") return null;
+  if (!res.ok || !json.ok) throw new Error("GIF search failed");
+  return json.gifs ?? [];
+}
+
+// --- Daily question -----------------------------------------------------------
+
+/** Answers for one day you're allowed to see (the other person's only after you answered). */
+export async function listDailyAnswers(supabase: SupabaseClient, conversationId: string, day: string): Promise<DailyAnswer[]> {
+  const { data, error } = await supabase
+    .from("daily_answers")
+    .select("id, conversation_id, user_id, day, question_index, answer, created_at")
+    .eq("conversation_id", conversationId)
+    .eq("day", day);
+  if (error) throw error;
+  return (data ?? []) as DailyAnswer[];
+}
+
+/** Earlier days (newest first). */
+export async function listDailyHistory(supabase: SupabaseClient, conversationId: string, before: string): Promise<DailyAnswer[]> {
+  const { data, error } = await supabase
+    .from("daily_answers")
+    .select("id, conversation_id, user_id, day, question_index, answer, created_at")
+    .eq("conversation_id", conversationId)
+    .lt("day", before)
+    .order("day", { ascending: false })
+    .limit(60);
+  if (error) throw error;
+  return (data ?? []) as DailyAnswer[];
+}
+
+export async function answerDailyQuestion(
+  supabase: SupabaseClient,
+  conversationId: string,
+  day: string,
+  questionIndex: number,
+  answer: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("answer_daily_question", {
+    p_conversation_id: conversationId,
+    p_day: day,
+    p_question_index: questionIndex,
+    p_answer: answer,
+  });
+  if (error) throw error;
+}
+
+// --- Mood ---------------------------------------------------------------------
+
+export async function getMoods(supabase: SupabaseClient, conversationId: string): Promise<MemberMood[]> {
+  const { data, error } = await supabase.rpc("get_moods", { p_conversation_id: conversationId });
+  if (error) throw error;
+  return (data ?? []) as MemberMood[];
+}
+
+export async function setMood(supabase: SupabaseClient, conversationId: string, mood: string | null, note?: string) {
+  const { error } = await supabase.rpc("set_mood", { p_conversation_id: conversationId, p_mood: mood, p_note: note ?? null });
+  if (error) throw error;
 }

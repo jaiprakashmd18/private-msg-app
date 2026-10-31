@@ -13,7 +13,7 @@ const csp = [
   `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   // googleusercontent.com: Google profile pictures shown on access requests.
-  `img-src 'self' blob: data: ${supabaseOrigin} https://*.googleusercontent.com`,
+  `img-src 'self' blob: data: ${supabaseOrigin} https://*.googleusercontent.com https://*.giphy.com`,
   "font-src 'self'",
   `connect-src 'self' ${supabaseOrigin} ${supabaseWs}`,
   "frame-ancestors 'none'",

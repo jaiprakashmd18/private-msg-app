@@ -1,7 +1,7 @@
 "use client";
 
-/** A handful of hearts floating up over the chat. Purely decorative. */
-export function HeartBurst({ burst }: { burst: number }) {
+/** A handful of hearts (or other emoji) floating up over the chat. Purely decorative. */
+export function HeartBurst({ burst, emojis = ["❤️", "💖"] }: { burst: number; emojis?: string[] }) {
   if (!burst) return null;
   return (
     <div key={burst} className="pointer-events-none absolute inset-x-0 bottom-24 z-20 flex justify-center" aria-hidden>
@@ -17,7 +17,7 @@ export function HeartBurst({ burst }: { burst: number }) {
             } as React.CSSProperties
           }
         >
-          {i % 3 === 0 ? "💖" : "❤️"}
+          {emojis[i % emojis.length]}
         </span>
       ))}
     </div>

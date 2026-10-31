@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 import { describeDateReminder } from "@/lib/dates";
 import { logServerError } from "@/lib/errors";
+import { describeMood, tapFor } from "@/lib/love";
 
 interface VapidKeys {
   publicKey: string;
@@ -40,7 +41,7 @@ interface PushTarget {
   has_attachments: boolean;
   attachment_kind?: "image" | "audio" | "file" | "view_once" | null;
   /** System event for taps ("nudge") and date reminders. */
-  event?: { type: string; title?: string; kind?: string; years?: number } | null;
+  event?: { type: string; title?: string; kind?: string; years?: number; both?: boolean; mood?: string; note?: string | null } | null;
 }
 
 export interface PushPayload {
@@ -56,7 +57,24 @@ export function buildPayload(t: Omit<PushTarget, "endpoint" | "p256dh" | "auth">
   const url = `/chat/${t.conversation_id}`;
   const sender = t.sender_name || "Someone";
   if (t.event?.type === "nudge") {
-    return { title: sender, body: "is thinking of you ❤️", url, tag: `nudge-${t.conversation_id}`, vibrate: [120, 60, 120, 60, 240] };
+    const tap = tapFor(t.event.kind);
+    return { title: sender, body: tap.notification, url, tag: `nudge-${t.conversation_id}`, vibrate: [120, 60, 120, 60, 240] };
+  }
+  if (t.event?.type === "daily_answered") {
+    return {
+      title: sender,
+      body: t.event.both ? "answered too ✨ See each other's answers" : "answered today's question 💬 Answer to see theirs",
+      url,
+      tag: `daily-${t.conversation_id}`,
+    };
+  }
+  if (t.event?.type === "mood") {
+    return {
+      title: sender,
+      body: t.show_preview && t.event.mood ? describeMood(t.event.mood, t.event.note, "").replace(/^ is /, "is ") : "updated their mood",
+      url,
+      tag: `mood-${t.conversation_id}`,
+    };
   }
   if (t.event?.type === "date_reminder") {
     return {

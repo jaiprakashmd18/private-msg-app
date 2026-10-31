@@ -15,6 +15,7 @@ import {
   uploadAttachment,
   type UploadedAttachment,
 } from "@/lib/data/chat";
+import { sendSticker as sendStickerApi, type StickerPayload } from "@/lib/data/couple";
 import { requestPushForMessage } from "@/lib/pwa-client";
 import { MESSAGES_PAGE_SIZE } from "@/lib/constants";
 import type { Message, PendingFile, Reaction, UiMessage } from "@/types/app";
@@ -239,6 +240,42 @@ export function useConversationMessages(conversationId: string) {
     [conversationId, access.user_id, deliver],
   );
 
+  /** Stickers and GIFs: shown at once, saved in the background. */
+  const sendSticker = useCallback(
+    async (payload: StickerPayload) => {
+      const clientId = crypto.randomUUID();
+      const optimistic: UiMessage = {
+        id: `local-${clientId}`,
+        client_id: clientId,
+        conversation_id: conversationId,
+        sender_id: access.user_id,
+        body: "sticker" in payload ? payload.text : "GIF",
+        created_at: new Date().toISOString(),
+        edited_at: null,
+        deleted_at: null,
+        reply_to_id: null,
+        reply_to: null,
+        system_event: null,
+        sticker: "sticker" in payload ? payload.sticker : null,
+        gif: "gif" in payload ? payload.gif : null,
+        attachments: [],
+        message_reactions: [],
+        local_status: "sending",
+      };
+      setMessages((prev) => sortMessages([...prev, optimistic]));
+      try {
+        const saved = await sendStickerApi(supabase, conversationId, clientId, payload);
+        requestPushForMessage(saved.id);
+        setMessages((prev) => upsert(prev, saved));
+        refreshSoon();
+      } catch (err) {
+        setMessages((prev) => prev.filter((m) => m.client_id !== clientId || !m.local_status));
+        reportError(err, "Couldn't send that.");
+      }
+    },
+    [supabase, conversationId, access.user_id, reportError, refreshSoon],
+  );
+
   const retry = useCallback(
     (clientId: string) => {
       const msg = messagesRef.current.find((m) => m.client_id === clientId && m.local_status === "failed");
@@ -313,6 +350,7 @@ export function useConversationMessages(conversationId: string) {
     reload,
     loadOlder,
     send,
+    sendSticker,
     retry,
     discard,
     edit,
