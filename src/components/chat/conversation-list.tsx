@@ -8,6 +8,7 @@ import { Avatar, GroupAvatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { displayNameOf, formatListTime } from "@/lib/format";
+import { parseLocation } from "@/lib/location";
 import { describeSystemEvent } from "@/lib/system-events";
 import { cn } from "@/lib/utils";
 import type { ConversationSummary } from "@/types/app";
@@ -63,7 +64,7 @@ function preview(c: ConversationSummary, myId: string) {
   return (
     <>
       {sender}
-      {c.last_message_body}
+      {parseLocation(c.last_message_body) ? "📍 Location" : c.last_message_body}
     </>
   );
 }

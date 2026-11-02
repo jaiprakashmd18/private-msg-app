@@ -76,6 +76,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- "Thinking of you" buzz -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- "Send my location" in a chat (only while you're using the app) -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Face / fingerprint app lock -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
@@ -85,6 +88,8 @@
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-feature android:name="android.hardware.fingerprint" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
     <!-- Opening the Google sign-in window (Custom Tabs) and links in the browser (Android 11+). -->
     <queries>

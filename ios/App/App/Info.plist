@@ -72,6 +72,8 @@
 	<string>Ghostline lets you choose photos and videos from your library to send in your chats.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Ghostline saves photos you choose to download from your chats to your library.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Ghostline uses your location only when you choose to send it in a chat.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Ghostline uses Face ID to unlock the app when App Lock is on.</string>
 	<!-- New message notifications -->

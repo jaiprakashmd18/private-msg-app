@@ -126,7 +126,8 @@ export function buildPayload(t: Omit<PushTarget, "endpoint" | "p256dh" | "auth">
           : t.attachment_kind === "video"
             ? "🎬 Video"
             : "📎 Attachment";
-  const preview = t.body.trim() ? t.body.trim().slice(0, 140) : t.has_attachments ? media : "New message";
+  const text = /^📍 Location\nhttps:\/\/www\.google\.com\/maps\/search\//.test(t.body) ? "📍 Location" : t.body.trim();
+  const preview = text ? text.slice(0, 140) : t.has_attachments ? media : "New message";
   const group = t.conversation_kind === "group";
   return {
     title: group ? (t.conversation_title ?? "Group") : sender,

@@ -83,7 +83,13 @@ export async function createUser(opts: { role?: "member" | "admin"; label?: stri
   return { id, email, entryId: entry.id };
 }
 
+/** Makes two people contacts (as an invite would). */
+export async function connect(a: string, b: string) {
+  await asOwner("select private.link_contacts($1, $2)", [a, b]);
+}
+
 export async function directConversation(a: string, b: string): Promise<string> {
+  await connect(a, b);
   const [row] = await asUser<{ id: string }>(
     a,
     "select public.get_or_create_direct_conversation($1) as id",

@@ -166,7 +166,8 @@ Android phone.
      app is invitation-only.
    * **Ads**: No. **Content rating** questionnaire. **Target audience**: 18+
      is simplest. **Data safety**: collected — email, name, user IDs,
-     messages, photos/videos, audio, device ID (for notifications); all for
+     messages, photos/videos, audio, device ID (for notifications), precise
+     location (only when someone chooses to send it in a chat); all for
      app functionality; encrypted in transit; not shared; users can ask for
      deletion. **Account deletion**: see "Store rules to know" below.
 6. When the closed test has run (12 testers, 14 days for new personal

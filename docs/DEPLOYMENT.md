@@ -100,6 +100,8 @@ Without this, Google sign-in returns to the wrong place.
 
 **People without Google (or who prefer a password):** approve their email the same way, then press **Set password** on their entry. You get a temporary password (shown once) with a **Copy message** button; send it to them privately. They open the app, type their email and that password under *Sign in*, and are asked to choose their own password straight away. **Reset password** works the same way if someone forgets theirs (their old password stops working and they're signed out everywhere). Members who use Google can also add a password themselves in **Settings → Sign-in**.
 
+**Members can invite people too:** in the app, *New conversation (✏️) → Invite someone* → enter their Gmail → **Invite**. They can sign in straight away with Google — you don't need to approve them — and the two of them become contacts. Each person only sees their own contacts. You still see and manage everyone under the shield icon, and **Disable** there blocks someone even if a member invited them (members can't re-invite a disabled email). Password accounts are still created only by you (*Set password*).
+
 **Or let people ask:** if someone who isn't on the list tries to sign in, their request appears under **shield icon → Access requests** (a red number on the shield shows how many are waiting). Click **Accept** and they can sign in straight away by pressing *Continue with Google* again; **Decline** keeps them out. This needs the *Before User Created* hook from step 4b to be switched on.
 
 Any Google account works, including Google Workspace (company) addresses; it doesn't have to end in `@gmail.com`.
