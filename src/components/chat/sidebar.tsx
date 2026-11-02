@@ -25,12 +25,12 @@ export function Sidebar() {
 
   return (
     <>
-      {/* iOS-style top bar with round glass buttons, then a large title. */}
+      {/* Top bar with plain icon buttons, then a large title. */}
       <header className="px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div className="flex h-11 items-center gap-2">
           <UserMenu />
           <div className="flex-1" />
-          <div className="glass flex items-center gap-0.5 rounded-full p-0.5 shadow-none">
+          <div className="flex items-center gap-1">
             {access.role === "admin" && (
               <Button
                 asChild

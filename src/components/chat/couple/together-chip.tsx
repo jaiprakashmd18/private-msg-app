@@ -7,7 +7,7 @@ import { formatPlanTime, formatPlanTimeShort } from "@/lib/love";
 import type { DatePlan, SpecialDate } from "@/types/app";
 
 /**
- * The bar under the chat header: "🔥 5 · ❤️ Day 412 together ·
+ * The quiet line under the chat header: "🔥 5 · ❤️ Day 412 together ·
  * 💞 12 days until we meet · 🎂 Sam's birthday in 3 days". Shows only what's
  * set: the streak, the day counter, the next meet, and the next other date
  * within 30 days.
@@ -69,28 +69,30 @@ export function TogetherChip({
   }
   if (items.length === 0 && !nextPlan) return null;
 
+  // Minimal: one quiet line of small grey text, no pill.
   return (
-    <div className="mx-auto flex w-full max-w-xl items-stretch overflow-hidden rounded-full bg-gradient-to-r from-rose-500/15 via-primary/10 to-rose-500/15 text-xs font-medium ring-1 ring-border/50">
+    <div className="mx-auto flex max-w-full items-center justify-center gap-1.5 whitespace-nowrap text-[11px] text-muted-foreground">
       {items.length > 0 && (
         <button
           type="button"
           onClick={onOpen}
           aria-label="Special dates and streak"
-          className="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden whitespace-nowrap px-4 py-1.5 hover:bg-rose-500/10"
+          className="flex min-w-0 items-center gap-1.5 overflow-hidden rounded-full px-1 hover:text-foreground"
         >
           {items.flatMap((item, i) => (i === 0 ? [item] : [<span key={`sep${i}`} aria-hidden>·</span>, item]))}
         </button>
       )}
+      {items.length > 0 && nextPlan && <span aria-hidden>·</span>}
       {nextPlan && (
         <button
           type="button"
           onClick={onOpenPlans}
-          className="flex min-w-0 shrink items-center justify-center gap-1 overflow-hidden whitespace-nowrap border-l border-border/60 px-3 py-1.5 hover:bg-primary/10 first:flex-1 first:border-l-0"
+          className="flex min-w-0 shrink items-center gap-1 overflow-hidden rounded-full px-1 hover:text-foreground"
           aria-label={`Next date: ${nextPlan.title}, ${formatPlanTime(nextPlan.starts_at)}`}
         >
           <span aria-hidden>📅</span>
           <span className="truncate">{nextPlan.title}</span>
-          <span className="shrink-0 text-muted-foreground">· {formatPlanTimeShort(nextPlan.starts_at)}</span>
+          <span className="shrink-0">{formatPlanTimeShort(nextPlan.starts_at)}</span>
         </button>
       )}
     </div>

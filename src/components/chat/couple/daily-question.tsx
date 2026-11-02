@@ -13,36 +13,15 @@ import { localDateString } from "@/lib/dates";
 import { questionIndexFor, questionText } from "@/lib/love";
 import type { DailyAnswer } from "@/types/app";
 
-/** Today's question under the chat header, with where you both are. */
-export function DailyQuestionBar({
-  answers,
-  otherName,
-  onOpen,
-}: {
-  answers: DailyAnswer[] | null;
-  otherName: string;
-  onOpen: () => void;
-}) {
-  const { access } = useApp();
+/**
+ * Today's question status for the "…" menu: "Answer" (you haven't yet),
+ * "Waiting for Sam", or "See answers ✨". Null while loading.
+ */
+export function dailyQuestionStatus(answers: DailyAnswer[] | null, myId: string, otherName: string) {
   if (answers === null) return null;
-  const mine = answers.some((a) => a.user_id === access.user_id);
-  const theirs = answers.some((a) => a.user_id !== access.user_id);
-  const status = !mine ? "Answer" : theirs ? "See answers ✨" : `Waiting for ${otherName}`;
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="mx-auto flex w-full max-w-xl items-center gap-2 rounded-full bg-foreground/[0.06] py-1 pl-3 pr-1 text-left text-xs ring-1 ring-border/50 hover:bg-foreground/10"
-    >
-      <MessageCircleHeart className="size-4 shrink-0 text-primary" aria-hidden />
-      <span className="min-w-0 flex-1 truncate">
-        <span className="font-medium">Today:</span> {questionText(questionIndexFor(localDateString()))}
-      </span>
-      <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground">
-        {status}
-      </span>
-    </button>
-  );
+  const mine = answers.some((a) => a.user_id === myId);
+  const theirs = answers.some((a) => a.user_id !== myId);
+  return { needsMe: !mine, label: !mine ? "Answer" : theirs ? "See answers ✨" : `Waiting for ${otherName}` };
 }
 
 export function DailyQuestionDialog({

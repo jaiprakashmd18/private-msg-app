@@ -229,7 +229,6 @@ export function Composer({
             {attachmentsEnabled && (
               <AppTile
                 label="Camera"
-                tint="bg-zinc-500"
                 onClick={() => {
                   setAppsOpen(false);
                   cameraRef.current?.click();
@@ -241,7 +240,6 @@ export function Composer({
             {attachmentsEnabled && (
               <AppTile
                 label="Photos & files"
-                tint="bg-gradient-to-br from-sky-400 to-indigo-500"
                 onClick={() => {
                   setAppsOpen(false);
                   fileRef.current?.click();
@@ -253,7 +251,6 @@ export function Composer({
             {onSendSticker && (
               <AppTile
                 label="Stickers and GIFs"
-                tint="bg-gradient-to-br from-pink-400 to-rose-500"
                 onClick={() => {
                   setAppsOpen(false);
                   setStickersOpen(true);
@@ -454,12 +451,10 @@ export function Composer({
 /** A big round button in the "+" panel (like the apps row in iMessage). */
 function AppTile({
   label,
-  tint,
   onClick,
   children,
 }: {
   label: string;
-  tint: string;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -471,7 +466,7 @@ function AppTile({
       aria-label={label}
       className="flex flex-col items-center gap-1.5 rounded-2xl p-2 text-xs font-medium transition-transform active:scale-95"
     >
-      <span className={cn("grid size-12 place-items-center rounded-full text-white shadow-md [&_svg]:size-6", tint)}>{children}</span>
+      <span className="grid size-12 place-items-center rounded-full bg-foreground/[0.07] text-primary [&_svg]:size-6">{children}</span>
       {label}
     </button>
   );

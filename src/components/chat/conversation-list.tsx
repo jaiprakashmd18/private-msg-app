@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Film, ImageIcon, Mic, Paperclip } from "lucide-react";
+import { Film, ImageIcon, Mic, Paperclip } from "lucide-react";
 import Link from "next/link";
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
@@ -133,12 +133,12 @@ export function ConversationList({
               aria-current={active ? "page" : undefined}
               className={cn(
                 "group mx-2 flex items-center gap-2 rounded-2xl py-2 pl-1 pr-3 transition-colors active:bg-accent pointer-fine:hover:bg-accent/60",
-                active && "bg-primary text-primary-foreground pointer-fine:hover:bg-primary",
+                active && "bg-accent pointer-fine:hover:bg-accent",
               )}
             >
               {/* Unread: a blue dot, like iMessage. */}
               <span className="grid w-3 shrink-0 place-items-center" aria-hidden>
-                {unread && <span className={cn("size-2.5 rounded-full", active ? "bg-primary-foreground" : "bg-primary")} />}
+                {unread && <span className="size-2.5 rounded-full bg-primary" />}
               </span>
               <span className="relative shrink-0">
                 {c.kind === "group" ? (
@@ -159,8 +159,8 @@ export function ConversationList({
               </span>
               <div
                 className={cn(
-                  "min-w-0 flex-1 border-b py-1.5 pl-1 group-last-of-type:border-transparent",
-                  active ? "border-transparent" : "border-border/60",
+                  "min-w-0 flex-1 border-b border-border/50 py-1.5 pl-1 group-last-of-type:border-transparent",
+                  active && "border-transparent",
                 )}
               >
                 <div className="flex items-baseline gap-2">
@@ -168,20 +168,16 @@ export function ConversationList({
                   {c.last_message_created_at && (
                     <time
                       dateTime={c.last_message_created_at}
-                      className={cn("shrink-0 text-[15px]", active ? "text-primary-foreground/80" : "text-muted-foreground")}
+                      className="shrink-0 text-[15px] text-muted-foreground"
                     >
                       {formatListTime(c.last_message_created_at)}
                     </time>
                   )}
-                  <ChevronRight
-                    className={cn("size-4 shrink-0 self-center", active ? "text-primary-foreground/70" : "text-muted-foreground/60")}
-                    aria-hidden
-                  />
                 </div>
                 <p
                   className={cn(
                     "line-clamp-2 text-[15px] leading-5",
-                    active ? "text-primary-foreground/85" : unread ? "text-foreground" : "text-muted-foreground",
+                    unread ? "text-foreground" : "text-muted-foreground",
                   )}
                 >
                   {preview(c, access.user_id)}

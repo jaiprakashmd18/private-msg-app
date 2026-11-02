@@ -81,7 +81,7 @@ export function LoginForm({ errorKey }: { errorKey?: string }) {
   }
 
   return (
-    <div className="glass-panel grid gap-5 rounded-[28px] p-5 sm:p-6">
+    <div className="grid gap-5 rounded-[24px] bg-card p-5 ring-1 ring-border/50 sm:p-6">
       <Button
         size="lg"
         variant="outline"

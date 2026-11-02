@@ -4,7 +4,6 @@ import { Delete, Fingerprint, Lock } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { Button } from "@/components/ui/button";
-import { GlassBackdrop } from "@/components/ui/glass-backdrop";
 import { Spinner } from "@/components/ui/spinner";
 import {
   clearLock,
@@ -105,9 +104,8 @@ export function LockScreen({ config, onUnlock }: { config: LockConfig | null; on
       id="main"
       className="fixed inset-screen z-[60] flex flex-col items-center justify-center gap-8 overflow-hidden bg-background px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]"
     >
-      <GlassBackdrop />
       <div className="relative text-center">
-        <div className="mx-auto mb-4 grid size-14 place-items-center rounded-full glass">
+        <div className="mx-auto mb-4 grid size-14 place-items-center rounded-full bg-foreground/[0.07]">
           <Lock className="size-6" aria-hidden />
         </div>
         <h1 className="text-xl font-semibold">{APP_NAME} is locked</h1>
@@ -189,7 +187,7 @@ function KeypadButton({ label, onPress, disabled }: { label: string; onPress: ()
       type="button"
       onClick={onPress}
       disabled={disabled}
-      className="glass flex aspect-square flex-col items-center justify-center rounded-full text-[34px] font-light leading-none tabular-nums shadow-none transition-[background-color,transform] active:scale-95 active:bg-foreground/25 disabled:opacity-40"
+      className="flex aspect-square flex-col items-center justify-center rounded-full bg-foreground/[0.07] text-[34px] font-light leading-none tabular-nums transition-[background-color,transform] active:scale-95 active:bg-foreground/25 disabled:opacity-40"
     >
       {label}
       {LETTERS[label] && (

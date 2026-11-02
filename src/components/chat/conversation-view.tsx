@@ -28,7 +28,7 @@ import { Composer, type EditingState, type ReplyingState } from "@/components/ch
 import { ChatSearch } from "@/components/chat/chat-search";
 import { ConversationInfoDialog } from "@/components/chat/conversation-info-dialog";
 import { AppearanceDialog } from "@/components/chat/couple/appearance-dialog";
-import { DailyQuestionBar, DailyQuestionDialog } from "@/components/chat/couple/daily-question";
+import { DailyQuestionDialog, dailyQuestionStatus } from "@/components/chat/couple/daily-question";
 import { DatePlansDialog } from "@/components/chat/couple/date-plans-dialog";
 import { MoodDialog } from "@/components/chat/couple/mood-dialog";
 import { HeartBurst } from "@/components/chat/couple/heart-burst";
@@ -316,8 +316,10 @@ export function ConversationView({ conversationId }: { conversationId: string })
     const feeling = otherMood ? ` · ${otherMood.mood} ${moodLabel(otherMood.mood).toLowerCase()}`.trimEnd() : "";
     if (summary.other_user_id && onlineIds.has(summary.other_user_id)) return `online${feeling}`;
     const seen = memberById.get(summary.other_user_id ?? "")?.last_seen_at ?? summary.other_last_seen_at;
-    return `${formatLastSeen(seen) || summary.other_email || ""}${feeling}`;
+    return `${formatLastSeen(seen)}${feeling}`.replace(/^ · /, "");
   })();
+
+  const daily = dailyQuestionStatus(dailyAnswers, access.user_id, isGroup ? "the others" : title);
 
   // "Sent / Delivered / Seen" under my latest message.
   const lastMineId = useMemo(
@@ -575,7 +577,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
               {/* Floating glass header: back, photo + name in the middle, actions. */}
         <header
           ref={headerRef}
-          className="absolute inset-x-0 top-0 z-20 border-b border-border/40 glass-bar pt-[max(0.25rem,env(safe-area-inset-top))]"
+          className="absolute inset-x-0 top-0 z-20 glass-bar pt-[max(0.25rem,env(safe-area-inset-top))]"
         >
           <div className="mx-auto flex max-w-4xl items-start px-1.5 pb-1.5">
             <div className="flex h-12 w-[5.5rem] shrink-0 items-center">
@@ -622,7 +624,10 @@ export function ConversationView({ conversationId }: { conversationId: string })
                   <ChevronRight className="size-3 shrink-0 text-muted-foreground" aria-hidden />
                 </span>
                 <p
-                  className={cn("max-w-full truncate text-[11px] leading-tight", typingIds.length ? "text-primary" : "text-muted-foreground")}
+                  className={cn(
+                    "max-w-full truncate text-[11px] leading-tight empty:hidden",
+                    typingIds.length ? "text-primary" : "text-muted-foreground",
+                  )}
                   aria-live="polite"
                 >
                   {subtitle}
@@ -663,8 +668,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
                 </DropdownMenu>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" aria-label="More" className="text-primary hover:bg-transparent">
+                    <Button variant="ghost" size="icon" aria-label="More" className="relative text-primary hover:bg-transparent">
                       <MoreHorizontal className="!size-6" />
+                      {daily?.needsMe && !otherInactive && (
+                        <span className="absolute right-1.5 top-2 size-2 rounded-full bg-primary" aria-hidden />
+                      )}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-52">
@@ -674,8 +682,18 @@ export function ConversationView({ conversationId }: { conversationId: string })
                     <DropdownMenuItem onSelect={() => setPanel("mood")}>
                       <Smile /> My mood
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setPanel("daily")}>
+                    <DropdownMenuItem onSelect={() => setPanel("daily")} disabled={otherInactive}>
                       <MessageCircleHeart /> Question of the day
+                      {daily && (
+                        <span
+                          className={cn(
+                            "ml-auto pl-3 text-xs",
+                            daily.needsMe ? "font-semibold text-primary" : "text-muted-foreground",
+                          )}
+                        >
+                          {daily.label}
+                        </span>
+                      )}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={() => {
@@ -734,7 +752,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
             onClose={() => setSearching(false)}
           />
         )}
-          <div className="flex flex-col gap-1.5 px-3 pb-2 empty:hidden">
+          <div className="flex flex-col gap-1.5 px-3 pb-1.5 empty:hidden">
             <TogetherChip
               dates={specialDates ?? []}
               streak={streak}
@@ -742,9 +760,6 @@ export function ConversationView({ conversationId }: { conversationId: string })
               onOpen={() => setPanel("dates")}
               onOpenPlans={() => setPanel("plans")}
             />
-            {summary && !otherInactive && (
-              <DailyQuestionBar answers={dailyAnswers} otherName={isGroup ? "the others" : title} onOpen={() => setPanel("daily")} />
-            )}
             {settings?.admin_can_read_messages && (
               <div
                 role="note"
