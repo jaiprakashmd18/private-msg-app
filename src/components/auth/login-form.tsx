@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Spinner } from "@/components/ui/spinner";
 import { passwordSignInError } from "@/lib/password";
+import { isNativeApp, nativeGoogleSignIn } from "@/lib/native";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { emailSchema } from "@/lib/validation";
 
@@ -37,6 +38,21 @@ export function LoginForm({ errorKey }: { errorKey?: string }) {
   async function signIn() {
     setBusy("google");
     setError(null);
+    if (isNativeApp()) {
+      // Inside the Android / iOS app: Google's page opens in the system's secure browser window.
+      try {
+        const { Browser } = await import("@capacitor/browser");
+        const done = await Browser.addListener("browserFinished", () => {
+          setBusy(null);
+          void done.remove();
+        });
+        await nativeGoogleSignIn(getSupabaseBrowserClient());
+      } catch {
+        setBusy(null);
+        setError(ERRORS.failed!);
+      }
+      return;
+    }
     const { error: oauthError } = await getSupabaseBrowserClient().auth.signInWithOAuth({
       provider: "google",
       options: {

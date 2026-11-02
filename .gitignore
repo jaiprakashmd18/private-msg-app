@@ -13,3 +13,11 @@ next-env.d.ts
 npm-debug.log*
 supabase/.temp/
 supabase/.branches/
+
+# Mobile app signing — never commit these
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+android/keystore.properties

@@ -7,6 +7,7 @@
  * Stored per user in localStorage. The PIN itself is never stored, only a
  * salted PBKDF2-SHA-256 hash.
  */
+import { isNativeApp, NATIVE_BIOMETRIC_ID, nativeBiometricsAvailable, nativeBiometricVerify } from "@/lib/native";
 
 export interface LockConfig {
   v: 1;
@@ -144,6 +145,8 @@ export function resetFailures(userId: string): void {
 // --- Face ID / fingerprint (WebAuthn platform authenticator) -----------------
 
 export async function biometricsAvailable(): Promise<boolean> {
+  // Inside the Android / iOS app: the phone's own Face ID / fingerprint prompt.
+  if (isNativeApp()) return nativeBiometricsAvailable();
   try {
     return (
       typeof PublicKeyCredential !== "undefined" &&
@@ -160,6 +163,12 @@ export async function biometricsAvailable(): Promise<boolean> {
  * Must be called from a tap (browsers require a user gesture).
  */
 export async function registerBiometrics(user: { email: string; name: string }, appName: string): Promise<string> {
+  if (isNativeApp()) {
+    if (!(await nativeBiometricVerify("Turn on Face ID / fingerprint unlock"))) {
+      throw new Error("Face ID / fingerprint wasn't set up");
+    }
+    return NATIVE_BIOMETRIC_ID;
+  }
   const credential = (await navigator.credentials.create({
     publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
@@ -180,6 +189,7 @@ export async function registerBiometrics(user: { email: string; name: string }, 
 
 /** Asks the device to verify the user (Face ID, fingerprint or device PIN). */
 export async function verifyBiometrics(credentialId: string): Promise<boolean> {
+  if (credentialId === NATIVE_BIOMETRIC_ID) return isNativeApp() && nativeBiometricVerify("Unlock Ghostline");
   try {
     const result = await navigator.credentials.get({
       publicKey: {

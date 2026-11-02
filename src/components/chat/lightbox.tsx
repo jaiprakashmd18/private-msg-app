@@ -3,10 +3,12 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ChevronLeft, ChevronRight, Download, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { Spinner } from "@/components/ui/spinner";
 import { signedAttachmentUrl } from "@/lib/data/chat";
 import { formatDateTime } from "@/lib/format";
+import { isNativeApp, nativeSaveFile } from "@/lib/native";
 import type { Attachment } from "@/types/app";
 
 export interface LightboxItem {
@@ -61,6 +63,13 @@ export function Lightbox({
   async function download() {
     if (!current) return;
     const url = await signedAttachmentUrl(supabase, current.attachment.storage_path, current.attachment.file_name);
+    if (isNativeApp()) {
+      // In the app: download, then the share sheet offers "Save Image" / "Save to device".
+      await nativeSaveFile(url, current.attachment.file_name || "ghostline-photo.jpg").catch((err: unknown) => {
+        if (!/cancel/i.test(err instanceof Error ? err.message : "")) toast.error("Couldn't save the photo.");
+      });
+      return;
+    }
     window.location.href = url;
   }
 

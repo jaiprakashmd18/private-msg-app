@@ -1,5 +1,6 @@
 "use client";
 
+import { disableNativePush } from "@/lib/native";
 import { disablePush } from "@/lib/pwa-client";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -7,7 +8,10 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 export async function signOut(everywhere = false) {
   // Stop this device receiving notifications for the account being signed out.
   await Promise.race([
-    disablePush(getSupabaseBrowserClient()).catch(() => undefined),
+    Promise.all([
+      disablePush(getSupabaseBrowserClient()).catch(() => undefined),
+      disableNativePush(getSupabaseBrowserClient()).catch(() => undefined),
+    ]),
     new Promise((resolve) => setTimeout(resolve, 2000)),
   ]);
   try {

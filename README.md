@@ -14,6 +14,7 @@ An iMessage-style messaging app with a "liquid glass" look (light and dark) for 
 - **Photos & voice notes** — big photos are shrunk to 2048 px with chat thumbnails, up to 10 per message, full-screen viewer (swipe, zoom, download), phone camera button; hold-free voice recording (up to 5 min) with a player. Files (PDF, office docs) too; everything in a private bucket via short-lived signed URLs.
 - **Duplicate-safe sending** — every message carries a client-generated id; retries can't create duplicates. Failed sends can be retried or discarded.
 - **Reconnect handling** — automatic catch-up after network loss or tab sleep.
+- **Android and iPhone apps** — Ghostline for Google Play and the App Store (Capacitor): the same website inside a native app, with real phone notifications, Google sign-in in the secure system window, Face ID / fingerprint unlock, the Android back button and links that open the app. See [docs/MOBILE_PUBLISHING.md](docs/MOBILE_PUBLISHING.md).
 - **Installable phone app (PWA)** — "Add to Home Screen" on iPhone/Android/desktop with its own icon, full-screen mode, unread badge and an offline page. No app store needed.
 - **Fits every screen** — phones (also sideways), tablets, laptops and big monitors; respects the notch and home indicator, keeps the message box above the on-screen keyboard (iPhone and Android), no zoom-on-tap on iPhone, readable line lengths on wide screens. Checked automatically at 9 screen sizes from 320 px phones to 1920 px desktops.
 - **Push notifications** — per device, with an option to hide message text on the lock screen; sent only to active members, once per message.
@@ -43,6 +44,7 @@ An iMessage-style messaging app with a "liquid glass" look (light and dark) for 
 | Document | What's inside |
 | --- | --- |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | **Start here.** Beginner-friendly, step-by-step setup: Supabase → Google sign-in → Vercel → inviting people → backups. |
+| [docs/MOBILE_PUBLISHING.md](docs/MOBILE_PUBLISHING.md) | **Android & iPhone apps.** Step-by-step: Firebase, signing keys, building the AAB / Xcode archive, and publishing to Google Play and the App Store. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture overview, file tree, database schema, authorization design. |
 | [docs/SECURITY.md](docs/SECURITY.md) | Every security control explained, encryption model, limitations, how each policy is tested. |
 | [docs/SECURITY_TESTING_CHECKLIST.md](docs/SECURITY_TESTING_CHECKLIST.md) | Manual checklist to run after every deployment. |

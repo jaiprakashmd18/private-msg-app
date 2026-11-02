@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 import { describeDateReminder } from "@/lib/dates";
 import { logServerError } from "@/lib/errors";
+import { isNativeEndpoint, sendNative } from "@/lib/native-push.server";
 import { describeMood, describePlanReminder, formatPlanTime, tapFor } from "@/lib/love";
 
 interface VapidKeys {
@@ -173,35 +174,50 @@ export async function notifyNewMessage(
   const targets = (data ?? []) as PushTarget[];
   if (targets.length === 0) return 0;
 
-  const keys = await getVapidKeys(service);
-  const options = {
-    vapidDetails: { subject: vapidSubject(origin), publicKey: keys.publicKey, privateKey: keys.privateKey },
-    TTL: 60 * 60 * 24,
-    urgency: "high" as const,
-  };
-
-  const results = await Promise.allSettled(
-    targets.map((t) =>
-      webpush.sendNotification(
-        { endpoint: t.endpoint, keys: { p256dh: t.p256dh, auth: t.auth } },
-        JSON.stringify(buildPayload(t)),
-        options,
-      ),
-    ),
-  );
+  const web = targets.filter((t) => !isNativeEndpoint(t.endpoint));
+  const phones = targets.filter((t) => isNativeEndpoint(t.endpoint));
 
   let sent = 0;
   const expired: string[] = [];
-  results.forEach((r, i) => {
-    if (r.status === "fulfilled") {
-      sent += 1;
-      return;
-    }
-    const status = (r.reason as { statusCode?: number }).statusCode;
-    // 404/410: the browser unsubscribed or the subscription expired.
-    if (status === 404 || status === 410) expired.push(targets[i]!.endpoint);
-    else logServerError("push.send", r.reason);
-  });
+
+  if (web.length > 0) {
+    const keys = await getVapidKeys(service);
+    const options = {
+      vapidDetails: { subject: vapidSubject(origin), publicKey: keys.publicKey, privateKey: keys.privateKey },
+      TTL: 60 * 60 * 24,
+      urgency: "high" as const,
+    };
+    const results = await Promise.allSettled(
+      web.map((t) =>
+        webpush.sendNotification(
+          { endpoint: t.endpoint, keys: { p256dh: t.p256dh, auth: t.auth } },
+          JSON.stringify(buildPayload(t)),
+          options,
+        ),
+      ),
+    );
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled") {
+        sent += 1;
+        return;
+      }
+      const status = (r.reason as { statusCode?: number }).statusCode;
+      // 404/410: the browser unsubscribed or the subscription expired.
+      if (status === 404 || status === 410) expired.push(web[i]!.endpoint);
+      else logServerError("push.send", r.reason);
+    });
+  }
+
+  // The Android / iOS app (Firebase / Apple).
+  if (phones.length > 0) {
+    const results = await Promise.allSettled(phones.map((t) => sendNative(t.endpoint, buildPayload(t))));
+    results.forEach((r, i) => {
+      if (r.status === "rejected") logServerError("push.native", r.reason);
+      else if (r.value === "sent") sent += 1;
+      else if (r.value === "expired") expired.push(phones[i]!.endpoint);
+    });
+  }
+
   if (expired.length > 0) {
     await service.from("push_subscriptions").delete().in("endpoint", expired);
   }
