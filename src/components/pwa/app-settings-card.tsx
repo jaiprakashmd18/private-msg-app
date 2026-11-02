@@ -20,10 +20,22 @@ import {
   pushSupported,
   updatePushPreview,
 } from "@/lib/pwa-client";
+import {
+  disableNativePush,
+  enableNativePush,
+  isNativeApp,
+  type NativePermission,
+  nativePushAvailable,
+  nativePushEnabled,
+  nativePushPermission,
+  updateNativePushPreview,
+} from "@/lib/native";
 
 const PREVIEW_KEY = "push-show-preview";
 
 interface Env {
+  /** Inside the Ghostline Android / iOS app. */
+  native: boolean;
   standalone: boolean;
   ios: boolean;
   canPrompt: boolean;
@@ -34,8 +46,10 @@ interface Env {
 let cachedEnv: Env | null = null;
 
 function readEnv(): Env {
+  const native = isNativeApp();
   const next: Env = {
-    standalone: isStandalone(),
+    native,
+    standalone: native || isStandalone(),
     ios: isIos(),
     canPrompt: Boolean(window.__installPrompt),
     supported: pushSupported(),
@@ -73,8 +87,25 @@ export function AppSettingsCard() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+  // Inside the app: whether this build has notifications set up, and the phone's permission.
+  const [nativeState, setNativeState] = useState<{ available: boolean; permission: NativePermission } | null>(null);
 
   const refresh = useCallback(() => {
+    if (isNativeApp()) {
+      void (async () => {
+        try {
+          const available = await nativePushAvailable();
+          const permission = available ? await nativePushPermission() : "prompt";
+          setNativeState({ available, permission });
+          setEnabled(available && (await nativePushEnabled()));
+        } catch {
+          setNativeState({ available: false, permission: "prompt" });
+          setEnabled(false);
+        }
+        setShowPreview(readPreviewPref());
+      })();
+      return;
+    }
     currentPushSubscription()
       .then((sub) => {
         setEnabled(Boolean(sub) && Notification.permission === "granted");
@@ -114,10 +145,10 @@ export function AppSettingsCard() {
     setBusy(true);
     try {
       if (enabled) {
-        await disablePush(supabase);
+        await (env?.native ? disableNativePush(supabase) : disablePush(supabase));
         toast.success("Notifications turned off on this device");
       } else {
-        await enablePush(supabase, showPreview);
+        await (env?.native ? enableNativePush(supabase, showPreview) : enablePush(supabase, showPreview));
         toast.success("Notifications are on for this device");
       }
     } catch (err) {
@@ -137,13 +168,15 @@ export function AppSettingsCard() {
       // Preference still applies to this device's subscription below.
     }
     try {
-      await updatePushPreview(supabase, value);
+      await (env?.native ? updateNativePushPreview(supabase, value) : updatePushPreview(supabase, value));
     } catch (err) {
       reportError(err, "Could not save the preview setting.");
     }
   }
 
   const needsInstallForPush = env.ios && !env.standalone;
+  const supported = env.native ? nativeState?.available !== false : env.supported;
+  const denied = env.native ? nativeState?.permission === "denied" : env.permission === "denied";
 
   return (
     <Card>
@@ -189,12 +222,17 @@ export function AppSettingsCard() {
               On iPhone and iPad, notifications work only in the installed app. Add it to your Home Screen (above),
               open it from there, and come back to this page.
             </p>
-          ) : !env.supported ? (
-            <p className="text-muted-foreground">This browser doesn&apos;t support notifications.</p>
-          ) : env.permission === "denied" ? (
+          ) : !supported ? (
             <p className="text-muted-foreground">
-              Notifications are blocked for this app. Allow them in your browser or phone settings (site settings →
-              Notifications), then reload this page.
+              {env.native
+                ? "Notifications aren't set up in this version of the app yet."
+                : "This browser doesn't support notifications."}
+            </p>
+          ) : denied ? (
+            <p className="text-muted-foreground">
+              {env.native
+                ? "Notifications are blocked for Ghostline. Allow them in your phone's Settings → Ghostline → Notifications, then come back here."
+                : "Notifications are blocked for this app. Allow them in your browser or phone settings (site settings → Notifications), then reload this page."}
             </p>
           ) : enabled === null ? (
             <Skeleton className="h-10 w-48" />

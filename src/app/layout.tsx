@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
+import { NativeBridge } from "@/components/native/native-bridge";
 import { ServiceWorker } from "@/components/pwa/service-worker";
 import { ViewportSync } from "@/components/pwa/viewport-sync";
 import { APP_NAME } from "@/lib/env";
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <ServiceWorker />
         <ViewportSync />
+        <NativeBridge />
       </body>
     </html>
   );

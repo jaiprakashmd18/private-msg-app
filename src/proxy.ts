@@ -6,8 +6,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Static app files (service worker, manifest, icons, offline page) stay public.
+  // Static app files (service worker, manifest, icons, offline page, mobile app-link files) stay public.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|robots.txt|sw.js|manifest.webmanifest|offline.html|icons/).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|robots.txt|sw.js|manifest.webmanifest|offline.html|icons/|\\.well-known/).*)",
   ],
 };

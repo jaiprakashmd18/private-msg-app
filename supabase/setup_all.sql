@@ -224,7 +224,6 @@ create table public.audit_logs (
 create index audit_logs_created_idx on public.audit_logs (created_at desc);
 create index audit_logs_action_idx on public.audit_logs (action, created_at desc);
 
-
 -- >>>>> 20261028000200_access_control.sql
 -- =============================================================================
 -- 0200 — Access control: allowlist enforcement at sign-up, access helper
@@ -677,7 +676,6 @@ create policy "active users read settings"
 create policy "admins read audit logs"
   on public.audit_logs for select to authenticated
   using ((select private.is_admin()));
-
 
 -- >>>>> 20261028000300_messaging.sql
 -- =============================================================================
@@ -1236,7 +1234,6 @@ grant execute on function
   public.log_auth_event(text)
 to authenticated;
 
-
 -- >>>>> 20261028000400_admin.sql
 -- =============================================================================
 -- 0400 — Administrator RPCs, server-only functions and retention.
@@ -1735,7 +1732,6 @@ to authenticated;
 
 grant execute on function public.server_run_retention_purge() to service_role;
 
-
 -- >>>>> 20261028000500_storage_realtime.sql
 -- =============================================================================
 -- 0500 — Attachment storage and Realtime
@@ -1818,7 +1814,6 @@ begin
 end;
 $$;
 
-
 -- >>>>> 20261028000600_access_token_hook.sql
 -- =============================================================================
 -- 0600 — Custom Access Token hook (Dashboard → Authentication → Hooks).
@@ -1864,7 +1859,6 @@ begin
   end if;
 end;
 $$;
-
 
 -- >>>>> 20261029000700_push_notifications.sql
 -- =============================================================================
@@ -2068,7 +2062,6 @@ grant execute on function
   public.server_get_or_create_vapid(text, text),
   public.server_push_targets(uuid, uuid)
 to service_role;
-
 
 -- >>>>> 20261029000800_chat_features.sql
 -- =============================================================================
@@ -3161,7 +3154,6 @@ grant execute on function
   public.list_conversation_members(uuid)
 to authenticated;
 
-
 -- >>>>> 20261030000900_photos_and_requests.sql
 -- =============================================================================
 -- 0900 — Profile & group photos, and access requests.
@@ -3718,7 +3710,6 @@ to authenticated;
 
 revoke execute on function public.before_user_created_hook(jsonb) from public, anon, authenticated;
 
-
 -- >>>>> 20261031001000_password_sign_in.sql
 -- =============================================================================
 -- 1000 — Email + password sign-in.
@@ -4114,7 +4105,6 @@ begin
   end if;
 end;
 $$;
-
 
 -- >>>>> 20261101001100_couple_features.sql
 -- =============================================================================
@@ -5321,7 +5311,6 @@ revoke all on function
   private.run_scheduled_jobs()
 from public, anon, authenticated;
 
-
 -- >>>>> 20261102001200_stickers_moods_questions.sql
 -- =============================================================================
 -- 1200 — Stickers & GIFs, love taps ("I miss you", hugs, kisses), a daily
@@ -5754,7 +5743,6 @@ to authenticated;
 
 revoke execute on function public.server_push_targets(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.server_push_targets(uuid, uuid) to service_role;
-
 
 -- >>>>> 20261103001300_plans_journal_videos.sql
 -- =============================================================================
@@ -6693,3 +6681,70 @@ revoke all on function private.deliver_due_plans(uuid), private.run_scheduled_jo
   from public, anon, authenticated;
 revoke execute on function public.server_push_targets(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.server_push_targets(uuid, uuid) to service_role;
+
+-- >>>>> 20261104001400_native_push.sql
+-- =============================================================================
+-- 1400 — Notifications for the Android / iOS app
+--
+-- The phone apps can't use Web Push; they get a token from Firebase Cloud
+-- Messaging (Android) or Apple Push Notification service (iPhone). Those
+-- tokens live in the same push_subscriptions table as browsers, with the
+-- endpoint written as 'fcm:<token>' or 'apns:<token>', so who-gets-notified
+-- (server_push_targets) works unchanged. The server sends to each kind
+-- (src/lib/push.server.ts).
+-- =============================================================================
+
+alter table public.push_subscriptions drop constraint push_subscriptions_endpoint_check;
+alter table public.push_subscriptions
+  add constraint push_subscriptions_endpoint_check check (
+    char_length(endpoint) <= 1000
+    and (
+      endpoint like 'https://%'
+      or (endpoint ~ '^fcm:[A-Za-z0-9_:.-]+$' and char_length(endpoint) >= 24)
+      or (endpoint ~ '^apns:[0-9a-f]+$' and char_length(endpoint) between 37 and 205)
+    )
+  );
+
+-- Saves this phone's token for the signed-in member. Like browsers, a token
+-- that was used by another account on the same phone moves to this one.
+create or replace function public.save_native_push_token(
+  p_provider     text,
+  p_token        text,
+  p_show_preview boolean default true,
+  p_user_agent   text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := private.require_active_user();
+  v_token text := trim(coalesce(p_token, ''));
+  v_endpoint text;
+begin
+  if p_provider = 'apns' then
+    v_token := lower(v_token);
+    if v_token !~ '^[0-9a-f]+$' or char_length(v_token) not between 32 and 200 then
+      raise exception 'Invalid push token' using errcode = '22023';
+    end if;
+  elsif p_provider = 'fcm' then
+    if v_token !~ '^[A-Za-z0-9_:.-]+$' or char_length(v_token) not between 20 and 900 then
+      raise exception 'Invalid push token' using errcode = '22023';
+    end if;
+  else
+    raise exception 'Invalid push provider' using errcode = '22023';
+  end if;
+  v_endpoint := p_provider || ':' || v_token;
+
+  insert into public.push_subscriptions (user_id, endpoint, p256dh, auth, show_preview, user_agent)
+  values (v_uid, v_endpoint, p_provider, p_provider, coalesce(p_show_preview, true), left(p_user_agent, 300))
+  on conflict (endpoint) do update
+    set user_id      = excluded.user_id,
+        show_preview = excluded.show_preview,
+        user_agent   = excluded.user_agent;
+end;
+$$;
+
+revoke all on function public.save_native_push_token(text, text, boolean, text) from public, anon;
+grant execute on function public.save_native_push_token(text, text, boolean, text) to authenticated;
