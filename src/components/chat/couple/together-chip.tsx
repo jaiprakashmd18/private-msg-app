@@ -70,7 +70,7 @@ export function TogetherChip({
   if (items.length === 0 && !nextPlan) return null;
 
   return (
-    <div className="flex w-full items-stretch overflow-hidden border-b bg-gradient-to-r from-rose-500/10 via-primary/10 to-rose-500/10 text-xs font-medium">
+    <div className="mx-auto flex w-full max-w-xl items-stretch overflow-hidden rounded-full bg-gradient-to-r from-rose-500/15 via-primary/10 to-rose-500/15 text-xs font-medium ring-1 ring-border/50">
       {items.length > 0 && (
         <button
           type="button"

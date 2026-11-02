@@ -73,7 +73,7 @@ export function ChatSearch({
   const hits = result && result.q === q ? result.hits : null;
 
   return (
-    <div className="relative z-20 border-b bg-background px-3 py-2 sm:px-6">
+    <div className="relative z-20 px-3 pb-2 sm:px-6">
       <div className="relative mx-auto max-w-4xl">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <Input
@@ -82,7 +82,7 @@ export function ChatSearch({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && onClose()}
-          className="h-9 rounded-full pl-9 pr-9"
+          className="h-9 rounded-full bg-foreground/[0.08] pl-9 pr-9"
           autoFocus
         />
         <button
@@ -95,7 +95,7 @@ export function ChatSearch({
         </button>
       </div>
       {q && (
-        <div className="absolute inset-x-0 top-full max-h-[min(60dvh,26rem)] overflow-y-auto overscroll-contain border-b bg-popover shadow-xl">
+        <div className="glass-panel absolute inset-x-2 top-full max-h-[min(60dvh,26rem)] overflow-y-auto overscroll-contain rounded-[22px]">
           <div className="mx-auto max-w-4xl">
             {failed ? (
               <p className="p-4 text-center text-sm text-muted-foreground">Search failed. Try again.</p>

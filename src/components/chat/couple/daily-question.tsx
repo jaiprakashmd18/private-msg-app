@@ -32,7 +32,7 @@ export function DailyQuestionBar({
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full items-center gap-2 border-b bg-primary/5 px-4 py-1.5 text-left text-xs hover:bg-primary/10"
+      className="mx-auto flex w-full max-w-xl items-center gap-2 rounded-full bg-foreground/[0.06] py-1 pl-3 pr-1 text-left text-xs ring-1 ring-border/50 hover:bg-foreground/10"
     >
       <MessageCircleHeart className="size-4 shrink-0 text-primary" aria-hidden />
       <span className="min-w-0 flex-1 truncate">

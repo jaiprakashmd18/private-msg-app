@@ -11,7 +11,7 @@ export function SystemMessage({
   nameOf: (userId: string | null) => string;
 }) {
   return (
-    <p className="mx-auto my-2 w-fit max-w-[85%] rounded-full bg-muted px-3 py-1 text-center text-xs text-muted-foreground">
+    <p className="mx-auto my-2.5 w-fit max-w-[85%] px-3 text-center text-[11px] font-medium leading-snug text-muted-foreground">
       {describeSystemEvent(event, actorId, nameOf)}
     </p>
   );

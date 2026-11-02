@@ -25,41 +25,52 @@ export function Sidebar() {
 
   return (
     <>
-      <header className="flex items-center gap-2 px-4 pb-2 pt-[max(1rem,env(safe-area-inset-top))]">
-        <h1 className="flex-1 text-lg font-semibold tracking-tight">{APP_NAME}</h1>
-        {access.role === "admin" && (
-          <Button asChild variant="ghost" size="icon-sm" aria-label={pendingRequests ? `Admin dashboard, ${pendingRequests} access requests waiting` : "Admin dashboard"} title="Admin dashboard">
-            <Link href="/admin">
-              <span className="relative">
-                <Shield />
-                {pendingRequests > 0 && (
-                  <span className="absolute -right-1.5 -top-1.5 grid size-4 place-items-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
-                    {pendingRequests > 9 ? "9+" : pendingRequests}
+      {/* iOS-style top bar with round glass buttons, then a large title. */}
+      <header className="px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <div className="flex h-11 items-center gap-2">
+          <UserMenu />
+          <div className="flex-1" />
+          <div className="glass flex items-center gap-0.5 rounded-full p-0.5 shadow-none">
+            {access.role === "admin" && (
+              <Button
+                asChild
+                variant="ghost"
+                size="icon-sm"
+                className="text-primary hover:bg-transparent"
+                aria-label={pendingRequests ? `Admin dashboard, ${pendingRequests} access requests waiting` : "Admin dashboard"}
+                title="Admin dashboard"
+              >
+                <Link href="/admin">
+                  <span className="relative">
+                    <Shield />
+                    {pendingRequests > 0 && (
+                      <span className="absolute -right-1.5 -top-1.5 grid size-4 place-items-center rounded-full bg-destructive text-[10px] font-semibold text-white">
+                        {pendingRequests > 9 ? "9+" : pendingRequests}
+                      </span>
+                    )}
                   </span>
-                )}
-              </span>
-            </Link>
-          </Button>
-        )}
-        <Button asChild variant="ghost" size="icon-sm" aria-label="Settings" title="Settings">
-          <Link href="/settings">
-            <Settings />
-          </Link>
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="New conversation"
-          title="New conversation"
-          onClick={() => setNewOpen(true)}
-        >
-          <SquarePen />
-        </Button>
-        <UserMenu />
-      </header>
-
-      <div className="px-4 pb-3">
-        <div className="relative">
+                </Link>
+              </Button>
+            )}
+            <Button asChild variant="ghost" size="icon-sm" className="text-primary hover:bg-transparent" aria-label="Settings" title="Settings">
+              <Link href="/settings">
+                <Settings />
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-primary hover:bg-transparent"
+              aria-label="New conversation"
+              title="New conversation"
+              onClick={() => setNewOpen(true)}
+            >
+              <SquarePen />
+            </Button>
+          </div>
+        </div>
+        <h1 className="mt-1 text-[34px] font-bold leading-tight tracking-[-0.02em]">{APP_NAME}</h1>
+        <div className="relative mt-2">
           <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
@@ -68,7 +79,7 @@ export function Sidebar() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Escape" && setQuery("")}
-            className="h-9 rounded-full border-transparent bg-muted pl-9 pr-9"
+            className="h-9 rounded-xl pl-9 pr-9 text-[17px] pointer-fine:text-[15px]"
             maxLength={100}
           />
           {query && (
@@ -82,7 +93,7 @@ export function Sidebar() {
             </button>
           )}
         </div>
-      </div>
+      </header>
 
       {connection === "reconnecting" && (
         <div role="status" className="mx-4 mb-2 flex items-center gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">

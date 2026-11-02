@@ -26,6 +26,8 @@ const csp = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // The dev-only badge sits on top of the bottom-left "+" button.
+  devIndicators: false,
   poweredByHeader: false,
   async headers() {
     return [

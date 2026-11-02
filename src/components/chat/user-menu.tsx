@@ -1,10 +1,10 @@
 "use client";
 
-import { Lock, LogOut, MoreVertical, ShieldCheck, UserRound } from "lucide-react";
+import { Lock, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useAppLock } from "@/components/app-lock/app-lock-gate";
 import { useApp } from "@/components/app-provider";
-import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,9 +22,14 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Account menu">
-          <MoreVertical />
-        </Button>
+        <button type="button" aria-label="Account menu" className="rounded-full ring-1 ring-border/60 transition-transform active:scale-95">
+          <Avatar
+            name={displayNameOf(access.display_name, access.email)}
+            seed={access.user_id}
+            path={access.avatar_path}
+            className="size-9 text-xs"
+          />
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>

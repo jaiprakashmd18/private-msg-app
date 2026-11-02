@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, Mic, Paperclip, Reply, SendHorizontal, Smile, Trash2, X } from "lucide-react";
+import { ArrowUp, Camera, Check, Images, Mic, Plus, Reply, Smile, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { StickerPanel } from "@/components/chat/sticker-panel";
@@ -59,6 +59,7 @@ export function Composer({
   const [saving, setSaving] = useState(false);
   const [preparing, setPreparing] = useState(0);
   const [stickersOpen, setStickersOpen] = useState(false);
+  const [appsOpen, setAppsOpen] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -173,8 +174,8 @@ export function Composer({
 
   if (disabled && disabledReason) {
     return (
-      <div className="pb-safe border-t px-4 pt-4 text-center text-sm text-muted-foreground">
-        {disabledReason}
+      <div className="pb-safe px-4 pt-2 text-center text-sm text-muted-foreground">
+        <p className="glass mx-auto max-w-4xl rounded-[20px] px-4 py-3">{disabledReason}</p>
       </div>
     );
   }
@@ -182,27 +183,29 @@ export function Composer({
   if (recorder.state === "recording") {
     const nearLimit = recorder.elapsed > MAX_VOICE_NOTE_MS - 15_000;
     return (
-      <div className="pb-safe flex items-center gap-3 border-t bg-background/80 px-3 pt-3 backdrop-blur sm:px-6">
-        <Button variant="ghost" size="icon" aria-label="Cancel recording" onClick={recorder.cancel}>
-          <Trash2 className="text-destructive" />
-        </Button>
-        <div className="flex flex-1 items-center gap-2" role="status" aria-live="polite">
-          <span className="size-2.5 animate-pulse rounded-full bg-destructive" aria-hidden />
-          <span className={cn("tabular-nums", nearLimit && "text-destructive")}>{formatDuration(recorder.elapsed)}</span>
-          <span className="text-sm text-muted-foreground">Recording…</span>
+      <div className="pb-safe px-2 pt-2 sm:px-4">
+        <div className="glass mx-auto flex max-w-4xl items-center gap-3 rounded-full py-1 pl-1 pr-1">
+          <Button variant="ghost" size="icon" aria-label="Cancel recording" onClick={recorder.cancel}>
+            <Trash2 className="text-destructive" />
+          </Button>
+          <div className="flex flex-1 items-center gap-2" role="status" aria-live="polite">
+            <span className="size-2.5 animate-pulse rounded-full bg-destructive" aria-hidden />
+            <span className={cn("tabular-nums", nearLimit && "text-destructive")}>{formatDuration(recorder.elapsed)}</span>
+            <span className="text-sm text-muted-foreground">Recording…</span>
+          </div>
+          <Button size="icon" className="rounded-full" aria-label="Send voice message" onClick={() => void sendVoice()}>
+            <ArrowUp strokeWidth={3} />
+          </Button>
         </div>
-        <Button size="icon" className="rounded-full" aria-label="Send voice message" onClick={() => void sendVoice()}>
-          <SendHorizontal />
-        </Button>
       </div>
     );
   }
 
   return (
-    <div className="pb-safe border-t bg-background/80 px-3 pt-3 backdrop-blur sm:px-6">
+    <div className="pb-safe px-2 pt-2 sm:px-4">
       <div className="mx-auto w-full max-w-4xl">
         {editing && (
-          <div className="mb-2 flex items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-xs">
+          <div className="glass mb-2 flex items-center gap-2 rounded-2xl px-3 py-2 text-xs">
             <span className="flex-1">Editing message — Enter to save, Esc to cancel</span>
             <button type="button" onClick={onCancelEdit} aria-label="Cancel editing" className="rounded p-0.5 hover:bg-background/40">
               <X className="size-3.5" />
@@ -210,7 +213,7 @@ export function Composer({
           </div>
         )}
         {replyingTo && !editing && (
-          <div className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-primary bg-accent px-3 py-1.5 text-xs">
+          <div className="glass mb-2 flex items-center gap-2 rounded-2xl border-l-4 !border-l-primary px-3 py-2 text-xs">
             <Reply className="size-3.5 shrink-0 text-primary" aria-hidden />
             <span className="min-w-0 flex-1">
               <span className="block font-semibold">Replying to {replyingTo.author}</span>
@@ -219,6 +222,46 @@ export function Composer({
             <button type="button" onClick={onCancelReply} aria-label="Cancel reply" className="rounded p-0.5 hover:bg-background/40">
               <X className="size-3.5" />
             </button>
+          </div>
+        )}
+        {appsOpen && !editing && (
+          <div className="glass-panel mb-2 grid grid-cols-3 gap-2 rounded-[24px] p-3" role="menu" aria-label="Add to message">
+            {attachmentsEnabled && (
+              <AppTile
+                label="Camera"
+                tint="bg-zinc-500"
+                onClick={() => {
+                  setAppsOpen(false);
+                  cameraRef.current?.click();
+                }}
+              >
+                <Camera />
+              </AppTile>
+            )}
+            {attachmentsEnabled && (
+              <AppTile
+                label="Photos & files"
+                tint="bg-gradient-to-br from-sky-400 to-indigo-500"
+                onClick={() => {
+                  setAppsOpen(false);
+                  fileRef.current?.click();
+                }}
+              >
+                <Images />
+              </AppTile>
+            )}
+            {onSendSticker && (
+              <AppTile
+                label="Stickers and GIFs"
+                tint="bg-gradient-to-br from-pink-400 to-rose-500"
+                onClick={() => {
+                  setAppsOpen(false);
+                  setStickersOpen(true);
+                }}
+              >
+                <Smile />
+              </AppTile>
+            )}
           </div>
         )}
         {stickersOpen && onSendSticker && !editing && (
@@ -287,7 +330,7 @@ export function Composer({
           </p>
         )}
         <form
-          className="flex items-end gap-1.5"
+          className="flex items-end gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             void submit();
@@ -311,32 +354,27 @@ export function Composer({
                 capture="environment"
                 onChange={(e) => void addFiles(e.target.files)}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Attach photos or files"
-                title="Photos & files (max 10 MB each)"
-                disabled={disabled}
-                onClick={() => fileRef.current?.click()}
-              >
-                <Paperclip />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Take a photo"
-                title="Camera"
-                disabled={disabled}
-                className="pointer-fine:hidden"
-                onClick={() => cameraRef.current?.click()}
-              >
-                <Camera />
-              </Button>
             </>
           )}
-          <div className="relative flex-1">
+          {!editing && (attachmentsEnabled || onSendSticker) && (
+            <button
+              type="button"
+              onClick={() => {
+                setAppsOpen((o) => !o);
+                setStickersOpen(false);
+              }}
+              disabled={disabled}
+              aria-label="Add: photos, camera, stickers"
+              aria-expanded={appsOpen || stickersOpen}
+              className={cn(
+                "glass grid size-[38px] shrink-0 place-items-center rounded-full text-muted-foreground transition-transform active:scale-90 disabled:opacity-50",
+                (appsOpen || stickersOpen) && "rotate-45 text-foreground",
+              )}
+            >
+              <Plus className="size-5" strokeWidth={2.5} />
+            </button>
+          )}
+          <div className={cn("glass relative min-w-0 flex-1 rounded-[20px]", tooLong && "ring-2 ring-destructive")}>
             <label htmlFor="composer" className="sr-only">
               {editing ? "Edit message" : "Message"}
             </label>
@@ -368,26 +406,10 @@ export function Composer({
               }}
               aria-describedby="composer-hint"
               className={cn(
-                "block max-h-[200px] min-h-10 w-full resize-none rounded-2xl border border-input bg-muted/60 py-2.5 pl-4 text-base leading-snug pointer-fine:text-[15px] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30",
-                onSendSticker && !editing ? "pr-11" : "pr-4",
-                tooLong && "border-destructive",
+                "block max-h-[200px] min-h-[38px] w-full resize-none bg-transparent py-[8px] pl-4 text-[17px] leading-[22px] placeholder:text-muted-foreground focus-visible:outline-none pointer-fine:text-[15px]",
+                "pr-11",
               )}
             />
-            {onSendSticker && !editing && (
-              <button
-                type="button"
-                onClick={() => setStickersOpen((o) => !o)}
-                disabled={disabled}
-                aria-label="Stickers and GIFs"
-                aria-expanded={stickersOpen}
-                className={cn(
-                  "absolute bottom-1 right-1 grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-                  stickersOpen && "bg-accent text-primary",
-                )}
-              >
-                <Smile className="size-5" />
-              </button>
-            )}
             <span id="composer-hint" className="sr-only">
               Press Enter to send, Shift+Enter for a new line.
             </span>
@@ -399,26 +421,58 @@ export function Composer({
                 {body.length}/{MAX_MESSAGE_LENGTH}
               </span>
             )}
+            <div className="absolute bottom-[3px] right-[3px]">
+              {showMic ? (
+                <button
+                  type="button"
+                  aria-label="Record voice message"
+                  title="Voice message"
+                  disabled={disabled}
+                  onClick={() => void startRecording()}
+                  className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                >
+                  <Mic className="size-5" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  aria-label={editing ? "Save edit" : "Send message"}
+                  className="grid size-8 place-items-center rounded-full bg-primary text-primary-foreground transition-transform active:scale-90 disabled:opacity-40"
+                >
+                  {editing ? <Check className="size-[18px]" strokeWidth={3} /> : <ArrowUp className="size-[18px]" strokeWidth={3} />}
+                </button>
+              )}
+            </div>
           </div>
-          {showMic ? (
-            <Button
-              type="button"
-              size="icon"
-              className="rounded-full"
-              aria-label="Record voice message"
-              title="Voice message"
-              disabled={disabled}
-              onClick={() => void startRecording()}
-            >
-              <Mic />
-            </Button>
-          ) : (
-            <Button type="submit" size="icon" className="rounded-full" disabled={!canSubmit} aria-label={editing ? "Save edit" : "Send message"}>
-              <SendHorizontal />
-            </Button>
-          )}
         </form>
       </div>
     </div>
+  );
+}
+
+/** A big round button in the "+" panel (like the apps row in iMessage). */
+function AppTile({
+  label,
+  tint,
+  onClick,
+  children,
+}: {
+  label: string;
+  tint: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      aria-label={label}
+      className="flex flex-col items-center gap-1.5 rounded-2xl p-2 text-xs font-medium transition-transform active:scale-95"
+    >
+      <span className={cn("grid size-12 place-items-center rounded-full text-white shadow-md [&_svg]:size-6", tint)}>{children}</span>
+      {label}
+    </button>
   );
 }

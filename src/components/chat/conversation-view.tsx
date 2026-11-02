@@ -1,7 +1,8 @@
 "use client";
 
 import {
-  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   BookHeart,
   CalendarClock,
   CalendarHeart,
@@ -12,7 +13,7 @@ import {
   Info,
   ListChecks,
   MessageCircleHeart,
-  MoreVertical,
+  MoreHorizontal,
   Mountain,
   Palette,
   Search,
@@ -77,7 +78,7 @@ import {
 import { localDateString } from "@/lib/dates";
 import { moodLabel, TAPS, tapFor, type TapKind } from "@/lib/love";
 import { requestPushForMessage } from "@/lib/pwa-client";
-import { displayNameOf, formatDayDivider, formatLastSeen, formatTyping } from "@/lib/format";
+import { displayNameOf, formatLastSeen, formatTimeHeader, formatTyping } from "@/lib/format";
 import { isImage } from "@/lib/media";
 import { cn } from "@/lib/utils";
 import type {
@@ -92,6 +93,36 @@ import type {
 } from "@/types/app";
 
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
+/** A time heading ("Today 7:09 PM") appears after a pause this long. */
+const TIME_HEADER_GAP_MS = 60 * 60 * 1000;
+
+function needsTimeHeader(prev: UiMessage | undefined, m: UiMessage): boolean {
+  if (!prev) return true;
+  const a = new Date(prev.created_at);
+  const b = new Date(m.created_at);
+  return a.toDateString() !== b.toDateString() || b.getTime() - a.getTime() >= TIME_HEADER_GAP_MS;
+}
+
+/** "…" in a grey bubble while the other person is typing. */
+function TypingBubble({ name }: { name?: string }) {
+  return (
+    <div className="mt-2.5 flex flex-col items-start px-3 sm:px-5" aria-hidden>
+      {name && <span className="mb-0.5 px-3 text-xs text-muted-foreground">{name}</span>}
+      <div className="relative flex h-[38px] items-center gap-1 rounded-[19px] bg-bubble-theirs px-3.5">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="size-2 animate-bounce rounded-full bg-muted-foreground/70"
+            style={{ animationDelay: `${i * 150}ms`, animationDuration: "1s" }}
+          />
+        ))}
+        <svg viewBox="0 0 17 21" className="pointer-events-none absolute -left-[5px] bottom-0 h-[21px] w-[17px] -scale-x-100 fill-bubble-theirs">
+          <path d="M0 0v13.5C0 17.6 6.2 20.4 16.6 20.8c.3 0 .4-.3.2-.5C12.9 17.9 11 14.7 11 10V0z" />
+        </svg>
+      </div>
+    </div>
+  );
+}
 
 function receiptFor(m: UiMessage, othersRead: string | null, othersDelivered: string | null): Receipt {
   if (m.local_status) return m.local_status;
@@ -102,7 +133,7 @@ function receiptFor(m: UiMessage, othersRead: string | null, othersDelivered: st
 
 export function ConversationView({ conversationId }: { conversationId: string }) {
   const { access, settings, supabase, reportError } = useApp();
-  const { getConversation, loading: inboxLoading, onlineIds, refreshSoon } = useChat();
+  const { conversations, getConversation, loading: inboxLoading, onlineIds, refreshSoon } = useChat();
   const summary = getConversation(conversationId);
   const searchParams = useSearchParams();
   const isGroup = summary?.kind === "group";
@@ -124,6 +155,29 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const [moods, setMoods] = useState<MemberMood[]>([]);
   const [searching, setSearching] = useState(false);
   const [listTab, setListTab] = useState<ListTab>("todo");
+  // The header and message box float over the messages; the list is padded
+  // by their (changing) heights.
+  const headerRef = useRef<HTMLElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(64);
+  const [composerHeight, setComposerHeight] = useState(64);
+  useEffect(() => {
+    const header = headerRef.current;
+    const composer = composerRef.current;
+    if (!header || !composer || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      setHeaderHeight(header.offsetHeight);
+      setComposerHeight(composer.offsetHeight);
+    });
+    observer.observe(header);
+    observer.observe(composer);
+    return () => observer.disconnect();
+  }, []);
+  // Unread messages in other chats, shown on the back button like iMessage.
+  const otherUnread = useMemo(
+    () => conversations.reduce((sum, c) => (c.id === conversationId ? sum : sum + c.unread_count), 0),
+    [conversations, conversationId],
+  );
   const [streak, setStreak] = useState<{ days: number; today_done: boolean } | null>(null);
   const [burstEmojis, setBurstEmojis] = useState<string[]>(["❤️", "💖"]);
   const today = localDateString();
@@ -371,171 +425,6 @@ export function ConversationView({ conversationId }: { conversationId: string })
 
   return (
     <>
-      <header className="flex items-center gap-3 border-b px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6">
-        <Button asChild variant="ghost" size="icon-sm" className="split:hidden" aria-label="Back to conversations">
-          <Link href="/chat">
-            <ArrowLeft />
-          </Link>
-        </Button>
-        {summary ? (
-          <button
-            type="button"
-            onClick={() => setInfoOpen(true)}
-            className="-my-1 flex min-w-0 flex-1 items-center gap-3 rounded-xl px-1 py-1 text-left hover:bg-accent/60"
-            aria-label={`${title}: ${isGroup ? "group info" : "contact info"}`}
-          >
-            <span className="relative">
-              {isGroup ? (
-                <GroupAvatar path={summary.avatar_path} name={title} />
-              ) : (
-                <Avatar name={title} seed={summary.other_user_id} path={summary.other_avatar_path} />
-              )}
-              {!isGroup && moods.find((m) => m.user_id === summary.other_user_id) && (
-                <span
-                  className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-popover text-xs shadow ring-1 ring-border"
-                  aria-hidden
-                >
-                  {moods.find((m) => m.user_id === summary.other_user_id)!.mood}
-                </span>
-              )}
-              {!isGroup && summary.other_user_id && onlineIds.has(summary.other_user_id) && !otherInactive && (
-                <span className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-background bg-success" aria-hidden />
-              )}
-            </span>
-            <span className="min-w-0 flex-1">
-              <h2 className="truncate font-semibold">{title}</h2>
-              <p
-                className={typingIds.length ? "truncate text-xs text-primary" : "truncate text-xs text-muted-foreground"}
-                aria-live="polite"
-              >
-                {subtitle}
-              </p>
-            </span>
-          </button>
-        ) : (
-          <div className="flex flex-1 items-center gap-3">
-            <Skeleton className="size-10 rounded-full" />
-            <Skeleton className="h-4 w-32" />
-          </div>
-        )}
-        {summary && (
-          <>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-rose-500 hover:text-rose-500"
-                  aria-label="Love taps: thinking of you, I miss you, hug, kiss"
-                  title="Love taps"
-                  disabled={otherInactive}
-                >
-                  <Heart className="fill-current" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-52">
-                {TAPS.map((t) => (
-                  <DropdownMenuItem key={t.kind} onSelect={() => void nudge(t.kind)}>
-                    <span className="text-lg leading-none" aria-hidden>
-                      {t.emoji}
-                    </span>
-                    {t.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="More">
-                  <MoreVertical />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-52">
-                <DropdownMenuItem onSelect={() => setSearching(true)}>
-                  <Search /> Search in chat
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setPanel("mood")}>
-                  <Smile /> My mood
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setPanel("daily")}>
-                  <MessageCircleHeart /> Question of the day
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => {
-                    setListTab("todo");
-                    setPanel("list");
-                  }}
-                >
-                  <ListChecks /> Our list
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => {
-                    setListTab("bucket");
-                    setPanel("list");
-                  }}
-                >
-                  <Mountain /> Bucket list
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setPanel("plans")}>
-                  <CalendarClock /> Date plans
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setPanel("dates")}>
-                  <CalendarHeart /> Special dates
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href={`/chat/${conversationId}/journal`}>
-                    <BookHeart /> Our journal
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href={`/chat/${conversationId}/memories`}>
-                    <Images /> Memories
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setPanel("notes")} disabled={otherInactive}>
-                  <Clock /> Love note for later
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setPanel("look")}>
-                  <Palette /> Chat look
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => setInfoOpen(true)}>
-                  <Info /> {isGroup ? "Group info" : "Contact info"}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </>
-        )}
-      </header>
-      {searching && (
-        <ChatSearch
-          conversationId={conversationId}
-          nameOf={nameOf}
-          onJump={(id) => setJumpTarget(id)}
-          onClose={() => setSearching(false)}
-        />
-      )}
-      <TogetherChip
-        dates={specialDates ?? []}
-        streak={streak}
-        plans={plans ?? []}
-        onOpen={() => setPanel("dates")}
-        onOpenPlans={() => setPanel("plans")}
-      />
-      {summary && !otherInactive && (
-        <DailyQuestionBar answers={dailyAnswers} otherName={isGroup ? "the others" : title} onOpen={() => setPanel("daily")} />
-      )}
-
-      {settings?.admin_can_read_messages && (
-        <div
-          role="note"
-          className="flex items-center gap-2 border-b bg-amber-500/10 px-4 py-2 text-xs text-amber-800 dark:text-amber-200 sm:px-6"
-        >
-          <Eye className="size-3.5 shrink-0" aria-hidden />
-          The administrator has enabled audited access to message content in this app.
-        </div>
-      )}
-
       <div className={cn("relative flex min-h-0 flex-1 flex-col", appearance.bubble_color && `bubble-${appearance.bubble_color}`)}>
         {wallpaperUrl && (
           <div
@@ -550,7 +439,8 @@ export function ConversationView({ conversationId }: { conversationId: string })
         <div
           ref={scrollRef}
           onScroll={onScroll}
-          className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain py-4"
+          className="absolute inset-0 overflow-y-auto overflow-x-hidden overscroll-contain"
+          style={{ paddingTop: headerHeight + 12, paddingBottom: composerHeight + 12 }}
           role="log"
           aria-live="polite"
           aria-relevant="additions"
@@ -600,14 +490,12 @@ export function ConversationView({ conversationId }: { conversationId: string })
                 )}
                 {messages.map((m, i) => {
                   const prev = messages[i - 1];
-                  const newDay =
-                    !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString();
+                  const next = messages[i + 1];
+                  const newDay = needsTimeHeader(prev, m);
                   const divider = newDay && (
-                    <div className="my-4 flex justify-center">
-                      <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-                        {formatDayDivider(m.created_at)}
-                      </span>
-                    </div>
+                    <p className="mb-1 mt-5 text-center text-[11px] font-medium text-muted-foreground">
+                      {formatTimeHeader(m.created_at)}
+                    </p>
                   );
                   if (m.system_event) {
                     return (
@@ -623,6 +511,13 @@ export function ConversationView({ conversationId }: { conversationId: string })
                     !prev?.system_event &&
                     prev?.sender_id === m.sender_id &&
                     new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < GROUP_WINDOW_MS;
+                  // The tail goes on the last bubble of a run from the same person.
+                  const tail =
+                    !next ||
+                    Boolean(next.system_event) ||
+                    next.sender_id !== m.sender_id ||
+                    needsTimeHeader(m, next) ||
+                    new Date(next.created_at).getTime() - new Date(m.created_at).getTime() >= GROUP_WINDOW_MS;
                   const canEdit = editWindowMs > 0 && now - new Date(m.created_at).getTime() < editWindowMs;
                   const receipt = mine
                     ? receiptFor(m, summary?.other_last_read_at ?? null, summary?.other_last_delivered_at ?? null)
@@ -635,6 +530,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
                         mine={mine}
                         myId={access.user_id}
                         grouped={grouped}
+                        tail={tail}
                         senderName={isGroup ? nameOf(m.sender_id) : undefined}
                         nameOf={nameOf}
                         receipt={receipt}
@@ -659,7 +555,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
                       />
                       {m.id === lastMineId && receipt && receipt !== "sending" && receipt !== "failed" && (
                         <p
-                          className="mt-1 flex items-center justify-end gap-1 px-4 text-[11px] text-muted-foreground sm:px-7"
+                          className="mt-1 flex items-center justify-end gap-1 px-4 text-[11px] font-medium text-muted-foreground sm:px-6"
                           aria-live="polite"
                         >
                           <ReceiptIcon receipt={receipt} className="size-3.5" />
@@ -671,24 +567,214 @@ export function ConversationView({ conversationId }: { conversationId: string })
                 })}
               </>
             )}
+            {typingIds.length > 0 && (
+              <TypingBubble name={isGroup ? typingIds.map((id) => nameOf(id)).join(", ") : undefined} />
+            )}
           </div>
+        </div>
+              {/* Floating glass header: back, photo + name in the middle, actions. */}
+        <header
+          ref={headerRef}
+          className="absolute inset-x-0 top-0 z-20 border-b border-border/40 glass-bar pt-[max(0.25rem,env(safe-area-inset-top))]"
+        >
+          <div className="mx-auto flex max-w-4xl items-start px-1.5 pb-1.5">
+            <div className="flex h-12 w-[5.5rem] shrink-0 items-center">
+              <Link
+                href="/chat"
+                aria-label="Back to conversations"
+                className="flex items-center rounded-full py-1 pr-2 text-primary split:invisible"
+              >
+                <ChevronLeft className="size-8" strokeWidth={2.25} aria-hidden />
+                {otherUnread > 0 && (
+                  <span className="-ml-1 min-w-6 rounded-full bg-primary px-1.5 text-center text-[13px] font-semibold leading-6 text-primary-foreground">
+                    {otherUnread > 99 ? "99+" : otherUnread}
+                  </span>
+                )}
+              </Link>
+            </div>
+            {summary ? (
+              <button
+                type="button"
+                onClick={() => setInfoOpen(true)}
+                className="flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-2 pt-0.5"
+                aria-label={`${title}: ${isGroup ? "group info" : "contact info"}`}
+              >
+                <span className="relative">
+                  {isGroup ? (
+                    <GroupAvatar path={summary.avatar_path} name={title} className="size-11" />
+                  ) : (
+                    <Avatar name={title} seed={summary.other_user_id} path={summary.other_avatar_path} className="size-11" />
+                  )}
+                  {!isGroup && moods.find((m) => m.user_id === summary.other_user_id) && (
+                  <span
+                    className="absolute -right-1.5 -top-1 grid size-5 place-items-center rounded-full bg-popover text-xs shadow ring-1 ring-border"
+                    aria-hidden
+                  >
+                    {moods.find((m) => m.user_id === summary.other_user_id)!.mood}
+                  </span>
+                )}
+                  {!isGroup && summary.other_user_id && onlineIds.has(summary.other_user_id) && !otherInactive && (
+                    <span className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-background bg-success" aria-hidden />
+                  )}
+                </span>
+                <span className="flex max-w-full items-center gap-0.5">
+                  <h2 className="truncate text-[13px] font-medium">{title}</h2>
+                  <ChevronRight className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+                </span>
+                <p
+                  className={cn("max-w-full truncate text-[11px] leading-tight", typingIds.length ? "text-primary" : "text-muted-foreground")}
+                  aria-live="polite"
+                >
+                  {subtitle}
+                </p>
+              </button>
+            ) : (
+              <div className="flex flex-1 flex-col items-center gap-1.5 pt-1">
+                <Skeleton className="size-11 rounded-full" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            )}
+            <div className="flex h-12 w-[5.5rem] shrink-0 items-center justify-end">
+              {summary && (
+                <>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-rose-500 hover:bg-transparent hover:text-rose-500"
+                      aria-label="Love taps: thinking of you, I miss you, hug, kiss"
+                      title="Love taps"
+                      disabled={otherInactive}
+                    >
+                      <Heart className="fill-current" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-52">
+                    {TAPS.map((t) => (
+                      <DropdownMenuItem key={t.kind} onSelect={() => void nudge(t.kind)}>
+                        <span className="text-lg leading-none" aria-hidden>
+                          {t.emoji}
+                        </span>
+                        {t.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" aria-label="More" className="text-primary hover:bg-transparent">
+                      <MoreHorizontal className="!size-6" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-52">
+                    <DropdownMenuItem onSelect={() => setSearching(true)}>
+                      <Search /> Search in chat
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setPanel("mood")}>
+                      <Smile /> My mood
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setPanel("daily")}>
+                      <MessageCircleHeart /> Question of the day
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setListTab("todo");
+                        setPanel("list");
+                      }}
+                    >
+                      <ListChecks /> Our list
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setListTab("bucket");
+                        setPanel("list");
+                      }}
+                    >
+                      <Mountain /> Bucket list
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setPanel("plans")}>
+                      <CalendarClock /> Date plans
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setPanel("dates")}>
+                      <CalendarHeart /> Special dates
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href={`/chat/${conversationId}/journal`}>
+                        <BookHeart /> Our journal
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href={`/chat/${conversationId}/memories`}>
+                        <Images /> Memories
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setPanel("notes")} disabled={otherInactive}>
+                      <Clock /> Love note for later
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setPanel("look")}>
+                      <Palette /> Chat look
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => setInfoOpen(true)}>
+                      <Info /> {isGroup ? "Group info" : "Contact info"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                </>
+              )}
+            </div>
+          </div>
+        {searching && (
+          <ChatSearch
+            conversationId={conversationId}
+            nameOf={nameOf}
+            onJump={(id) => setJumpTarget(id)}
+            onClose={() => setSearching(false)}
+          />
+        )}
+          <div className="flex flex-col gap-1.5 px-3 pb-2 empty:hidden">
+            <TogetherChip
+              dates={specialDates ?? []}
+              streak={streak}
+              plans={plans ?? []}
+              onOpen={() => setPanel("dates")}
+              onOpenPlans={() => setPanel("plans")}
+            />
+            {summary && !otherInactive && (
+              <DailyQuestionBar answers={dailyAnswers} otherName={isGroup ? "the others" : title} onOpen={() => setPanel("daily")} />
+            )}
+            {settings?.admin_can_read_messages && (
+              <div
+                role="note"
+                className="mx-auto flex w-full max-w-xl items-center gap-2 rounded-2xl bg-amber-500/15 px-3 py-1.5 text-xs text-amber-800 dark:text-amber-200"
+              >
+                <Eye className="size-3.5 shrink-0" aria-hidden />
+                The administrator has enabled audited access to message content in this app.
+              </div>
+            )}
+          </div>
+        </header>
+        <div ref={composerRef} className="absolute inset-x-0 bottom-0 z-20">
+          <Composer
+            disabled={loading || otherInactive}
+            disabledReason={otherInactive ? `${title} no longer has access, so you can't send new messages.` : undefined}
+            attachmentsEnabled={settings?.attachments_enabled ?? false}
+            allowViewOnce={!isGroup}
+            editing={editing}
+            replyingTo={replyState}
+            onSend={handleSend}
+            onSendSticker={(payload) => void sendSticker(payload)}
+            onSaveEdit={edit}
+            onCancelEdit={() => setEditing(null)}
+            onCancelReply={() => setReplyingTo(null)}
+            onTyping={notifyTyping}
+          />
         </div>
       </div>
 
-      <Composer
-        disabled={loading || otherInactive}
-        disabledReason={otherInactive ? `${title} no longer has access, so you can't send new messages.` : undefined}
-        attachmentsEnabled={settings?.attachments_enabled ?? false}
-        allowViewOnce={!isGroup}
-        editing={editing}
-        replyingTo={replyState}
-        onSend={handleSend}
-        onSendSticker={(payload) => void sendSticker(payload)}
-        onSaveEdit={edit}
-        onCancelEdit={() => setEditing(null)}
-        onCancelReply={() => setReplyingTo(null)}
-        onTyping={notifyTyping}
-      />
+
 
       {summary && (
         <ConversationInfoDialog

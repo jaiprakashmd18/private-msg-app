@@ -46,6 +46,24 @@ export function formatDayDivider(iso: string, now = new Date()): string {
   return date.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 
+/**
+ * iMessage-style time heading between messages: "Today 7:09 PM",
+ * "Yesterday 9:30 AM", "Monday 8:15 PM" (this week), "Sat, 3 Nov at 7:09 PM".
+ */
+export function formatTimeHeader(iso: string, now = new Date()): string {
+  const date = new Date(iso);
+  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  if (sameDay(date, now)) return `Today ${time}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (sameDay(date, yesterday)) return `Yesterday ${time}`;
+  if (now.getTime() - date.getTime() < 6 * 86_400_000) {
+    return `${date.toLocaleDateString(undefined, { weekday: "long" })} ${time}`;
+  }
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return `${date.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: sameYear ? undefined : "numeric" })} at ${time}`;
+}
+
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString(undefined, {

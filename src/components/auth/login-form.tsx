@@ -81,11 +81,11 @@ export function LoginForm({ errorKey }: { errorKey?: string }) {
   }
 
   return (
-    <div className="grid gap-5 rounded-2xl border bg-card/80 p-5 shadow-xl backdrop-blur sm:p-6">
+    <div className="glass-panel grid gap-5 rounded-[28px] p-5 sm:p-6">
       <Button
         size="lg"
         variant="outline"
-        className="h-12 bg-background/60 text-base"
+        className="h-12 text-base"
         onClick={() => void signIn()}
         disabled={busy !== null}
       >

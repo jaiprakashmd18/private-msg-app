@@ -1,6 +1,6 @@
 "use client";
 
-import { Film, ImageIcon, Mic, Paperclip } from "lucide-react";
+import { ChevronRight, Film, ImageIcon, Mic, Paperclip } from "lucide-react";
 import Link from "next/link";
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
@@ -120,7 +120,7 @@ export function ConversationList({
   }
 
   return (
-    <ul className="space-y-0.5 px-2 pb-4">
+    <ul className="pb-4">
       {visible.map((c) => {
         const name = conversationName(c);
         const online = c.kind === "direct" && c.other_user_id !== null && onlineIds.has(c.other_user_id) && c.other_is_active;
@@ -132,50 +132,65 @@ export function ConversationList({
               href={`/chat/${c.id}`}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-accent/60",
-                active && "bg-accent",
+                "group mx-2 flex items-center gap-2 rounded-2xl py-2 pl-1 pr-3 transition-colors active:bg-accent pointer-fine:hover:bg-accent/60",
+                active && "bg-primary text-primary-foreground pointer-fine:hover:bg-primary",
               )}
             >
+              {/* Unread: a blue dot, like iMessage. */}
+              <span className="grid w-3 shrink-0 place-items-center" aria-hidden>
+                {unread && <span className={cn("size-2.5 rounded-full", active ? "bg-primary-foreground" : "bg-primary")} />}
+              </span>
               <span className="relative shrink-0">
                 {c.kind === "group" ? (
-                  <GroupAvatar path={c.avatar_path} name={name} className="size-11" />
+                  <GroupAvatar path={c.avatar_path} name={name} className="size-[52px]" />
                 ) : (
                   <Avatar
                     name={name}
                     seed={c.other_user_id}
                     path={c.other_avatar_path}
-                    className={cn("size-11", !c.other_is_active && "opacity-50")}
+                    className={cn("size-[52px]", !c.other_is_active && "opacity-50")}
                   />
                 )}
                 {online && (
-                  <span className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-sidebar bg-success">
+                  <span className="absolute bottom-0.5 right-0.5 size-3.5 rounded-full border-2 border-sidebar bg-success">
                     <span className="sr-only">online</span>
                   </span>
                 )}
               </span>
-              <div className="min-w-0 flex-1">
+              <div
+                className={cn(
+                  "min-w-0 flex-1 border-b py-1.5 pl-1 group-last-of-type:border-transparent",
+                  active ? "border-transparent" : "border-border/60",
+                )}
+              >
                 <div className="flex items-baseline gap-2">
-                  <span className={cn("flex-1 truncate", unread ? "font-semibold" : "font-medium")}>{name}</span>
+                  <span className="flex-1 truncate text-[17px] font-semibold tracking-[-0.01em]">{name}</span>
                   {c.last_message_created_at && (
                     <time
                       dateTime={c.last_message_created_at}
-                      className={cn("shrink-0 text-xs", unread ? "text-primary" : "text-muted-foreground")}
+                      className={cn("shrink-0 text-[15px]", active ? "text-primary-foreground/80" : "text-muted-foreground")}
                     >
                       {formatListTime(c.last_message_created_at)}
                     </time>
                   )}
+                  <ChevronRight
+                    className={cn("size-4 shrink-0 self-center", active ? "text-primary-foreground/70" : "text-muted-foreground/60")}
+                    aria-hidden
+                  />
                 </div>
-                <div className="flex items-center gap-2">
-                  <p className={cn("flex-1 truncate text-sm", unread ? "text-foreground" : "text-muted-foreground")}>
-                    {preview(c, access.user_id)}
-                  </p>
-                  {unread && (
-                    <span className="grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
-                      <span className="sr-only">Unread messages: </span>
-                      {c.unread_count > 99 ? "99+" : c.unread_count}
-                    </span>
+                <p
+                  className={cn(
+                    "line-clamp-2 text-[15px] leading-5",
+                    active ? "text-primary-foreground/85" : unread ? "text-foreground" : "text-muted-foreground",
                   )}
-                </div>
+                >
+                  {preview(c, access.user_id)}
+                </p>
+                {unread && (
+                  <span className="sr-only">
+                    Unread messages: {c.unread_count > 99 ? "99+" : c.unread_count}
+                  </span>
+                )}
               </div>
             </Link>
           </li>

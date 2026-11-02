@@ -1,11 +1,12 @@
 # Ghostline — private, invitation-only messaging
 
-A minimal, dark-mode messaging app for a closed group of people. People sign in with their Google (Gmail) account, or with an email and password, but only emails the administrator has approved get in, and the database itself enforces who can read and send what.
+An iMessage-style messaging app with a "liquid glass" look (light and dark) for a closed group of people. People sign in with their Google (Gmail) account, or with an email and password, but only emails the administrator has approved get in, and the database itself enforces who can read and send what.
 
 **Stack:** Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui-style components · Supabase (Postgres, Auth with Google + password, Realtime, Storage) · Vercel
 
 ## Features
 
+- **iMessage-style design with liquid glass** — blue/grey bubbles with tails, floating frosted-glass header and message bar, a "+" button for camera, photos and stickers, long-press (or right-click) a bubble for tapbacks and actions, time headings between conversations, iOS-style lists, switches, menus and lock-screen keypad. Uses the iPhone system font; falls back to solid panels when "Reduce transparency" is on.
 - **Invitation-only sign-in** — *Continue with Google*, or **email + password** for people without a Google account (or who prefer it). Nobody can sign themselves up: password accounts are created only by the administrator, with a temporary password the member must replace on first sign-in. Members can add or change a password in Settings. Unapproved accounts can't create an account or obtain a token.
 - **Instant revocation** — disabling an account cuts off existing sessions immediately (checked on every query), ends refresh tokens, and blocks new tokens.
 - **1:1 and group chats** (up to 50 people, group admins, add/remove/rename, leave) with realtime delivery, WhatsApp-style ticks (✓ sent, ✓✓ delivered — as soon as the notification reaches their phone — and blue ✓✓ seen, plus a Sent / Delivered / Seen label under your latest message), unread counts, previews, paginated history, search, multiline messages, edit (time-limited) and delete-for-everyone.
