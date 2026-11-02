@@ -177,7 +177,7 @@ function PeoplePicker({
             <span className="font-medium">Invite someone</span>
           </button>
         )}
-        {mode === "chat" && people !== null && people.length > 1 && !needle && (
+        {mode === "chat" && people !== null && people.length > 0 && !needle && (
           <button
             type="button"
             onClick={onGroupMode}
