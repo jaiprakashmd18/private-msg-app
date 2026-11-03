@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp, Camera, Check, Images, Mic, Plus, Reply, Smile, Trash2, X } from "lucide-react";
+import { ArrowUp, Camera, Check, Images, MapPin, Mic, Plus, Reply, Smile, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { StickerPanel } from "@/components/chat/sticker-panel";
@@ -35,6 +35,7 @@ export function Composer({
   replyingTo,
   onSend,
   onSendSticker,
+  onShareLocation,
   onSaveEdit,
   onCancelEdit,
   onCancelReply,
@@ -49,6 +50,8 @@ export function Composer({
   replyingTo: ReplyingState | null;
   onSend: (body: string, files: PendingFile[]) => void;
   onSendSticker?: (payload: StickerPayload) => void;
+  /** "+" → Location: send the current location (the chat asks to confirm first). */
+  onShareLocation?: () => void;
   onSaveEdit: (id: string, body: string) => Promise<boolean>;
   onCancelEdit: () => void;
   onCancelReply: () => void;
@@ -259,6 +262,17 @@ export function Composer({
                 <Smile />
               </AppTile>
             )}
+            {onShareLocation && (
+              <AppTile
+                label="Location"
+                onClick={() => {
+                  setAppsOpen(false);
+                  onShareLocation();
+                }}
+              >
+                <MapPin />
+              </AppTile>
+            )}
           </div>
         )}
         {stickersOpen && onSendSticker && !editing && (
@@ -353,7 +367,7 @@ export function Composer({
               />
             </>
           )}
-          {!editing && (attachmentsEnabled || onSendSticker) && (
+          {!editing && (attachmentsEnabled || onSendSticker || onShareLocation) && (
             <button
               type="button"
               onClick={() => {

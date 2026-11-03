@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { MessageAttachments } from "@/components/chat/attachment-view";
 import { LinkifiedText, LinkPreviewCard } from "@/components/chat/link-preview";
+import { LocationCard } from "@/components/chat/location-card";
 import { Sticker } from "@/components/chat/sticker";
 import {
   DropdownMenu,
@@ -29,6 +30,7 @@ import {
 import { formatBytes, formatMessageTime } from "@/lib/format";
 import { formatDuration, isAudio, isImage } from "@/lib/media";
 import { isEmojiOnly } from "@/lib/stickers";
+import { parseLocation } from "@/lib/location";
 import { cn } from "@/lib/utils";
 import type { Reaction, ReplyPreview, UiMessage } from "@/types/app";
 
@@ -76,6 +78,7 @@ function GifImage({ gif }: { gif: NonNullable<UiMessage["gif"]> }) {
 /** One-line description of a message, for reply quotes. */
 export function describeMessage(m: Pick<ReplyPreview, "body" | "deleted_at" | "attachments">): string {
   if (m.deleted_at) return "Message deleted";
+  if (parseLocation(m.body)) return "📍 Location";
   if (m.body.trim()) return m.body;
   const first = m.attachments?.[0]?.mime_type ?? "";
   if (m.attachments?.[0]?.view_once) return "📷 View-once photo";
@@ -206,6 +209,7 @@ export function MessageBubble({
     !(message.attachments?.length || message.local_files?.length) &&
     isEmojiOnly(message.body);
   const hasMedia = (message.attachments?.length ?? 0) > 0 && !message.body;
+  const sharedLocation = !deleted && !special ? parseLocation(message.body) : null;
   const bare = special || bigEmoji;
   const local = Boolean(message.local_status);
   const interactive = !deleted && !local;
@@ -372,6 +376,8 @@ export function MessageBubble({
                   <Sticker id={message.sticker} />
                 ) : message.gif ? (
                   <GifImage gif={message.gif} />
+                ) : sharedLocation ? (
+                  <LocationCard location={sharedLocation} mine={mine} />
                 ) : bigEmoji ? (
                   <p className="text-5xl leading-tight" aria-label={message.body}>
                     {message.body}

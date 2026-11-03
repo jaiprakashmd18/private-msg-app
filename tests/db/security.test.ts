@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   asOwner,
   asUser,
+  connect,
   createUser,
   directConversation,
   freshEmail,
@@ -769,6 +770,7 @@ describe("push notifications", () => {
 
 describe("group chats", () => {
   async function group(admin: string, members: string[], title = "Weekend plans") {
+    for (const m of members) await connect(admin, m);
     const [row] = await asUser<{ id: string }>(admin, "select public.create_group($1, $2) as id", [title, members]);
     return row.id;
   }
@@ -814,6 +816,7 @@ describe("group chats", () => {
     await expect(asUser(b.id, "select public.rename_group($1, 'Hacked')", [g])).rejects.toThrow(/Only group admins/i);
     await expect(asUser(b.id, "select public.set_group_admin($1, $2, true)", [g, b.id])).rejects.toThrow(/Only group admins/i);
 
+    await connect(a.id, c.id);
     await asUser(a.id, "select public.add_group_members($1, $2)", [g, [c.id]]);
     await asUser(a.id, "select public.rename_group($1, 'Renamed')", [g]);
     const events = await asUser<{ e: { type: string } }>(
@@ -838,6 +841,7 @@ describe("group chats", () => {
     expect(await asUser(b.id, "select * from public.list_conversations() where id = $1", [g])).toHaveLength(0);
     await expect(sendTo(b.id, g, "still here?")).rejects.toThrow(/not a member/i);
     await expect(asUser(b.id, "select * from public.list_conversation_members($1)", [g])).rejects.toThrow(/not a member/i);
+    await connect(a.id, b.id);
     await asUser(a.id, "select public.add_group_members($1, $2)", [g, [b.id]]);
     expect((await asUser(b.id, "select 1 from public.messages where conversation_id = $1 and system_event is null", [g])).length).toBe(1);
   });
@@ -1113,6 +1117,7 @@ describe("profile and group photos", () => {
     await expect(putAvatar(a.id, `users/${b.id}/${randomUUID()}.jpg`)).rejects.toThrow(/row-level security/i);
     await asUser(a.id, "select public.set_avatar($1)", [own]);
     await expect(asUser(b.id, "select public.set_avatar($1)", [own])).rejects.toThrow(/Invalid photo/i);
+    await connect(a.id, b.id);
     const [row] = await asUser<{ avatar_path: string }>(b.id, "select avatar_path from public.list_directory() where id = $1", [a.id]);
     expect(row.avatar_path).toBe(own);
     expect(await asUser(b.id, "select 1 from storage.objects where name = $1", [own])).toHaveLength(1);
@@ -1130,6 +1135,7 @@ describe("profile and group photos", () => {
   it("only group admins change the group photo", async () => {
     const a = await createUser();
     const b = await createUser();
+    await connect(a.id, b.id);
     const [g] = await asUser<{ id: string }>(a.id, "select public.create_group('Photo club', $1) as id", [[b.id]]);
     const path = `groups/${g.id}/${randomUUID()}.jpg`;
     await expect(putAvatar(b.id, `groups/${g.id}/${randomUUID()}.jpg`)).rejects.toThrow(/row-level security/i);

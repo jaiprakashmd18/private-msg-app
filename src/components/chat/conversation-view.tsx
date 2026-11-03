@@ -17,10 +17,13 @@ import {
   Mountain,
   Palette,
   Search,
+  MapPin,
   Smile,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
@@ -65,7 +68,7 @@ import { useLiveRows } from "@/hooks/use-live-rows";
 import { useSignedUrl } from "@/hooks/use-signed-url";
 import { useTyping } from "@/hooks/use-typing";
 import { AVATARS_BUCKET } from "@/lib/constants";
-import { listConversationMembers } from "@/lib/data/chat";
+import { deleteChatForMe, listConversationMembers } from "@/lib/data/chat";
 import {
   getChatAppearance,
   getMoods,
@@ -80,6 +83,7 @@ import { moodLabel, TAPS, tapFor, type TapKind } from "@/lib/love";
 import { requestPushForMessage } from "@/lib/pwa-client";
 import { displayNameOf, formatLastSeen, formatTimeHeader, formatTyping } from "@/lib/format";
 import { isImage } from "@/lib/media";
+import { getCurrentLocation, LocationError, locationMessage } from "@/lib/location";
 import { cn } from "@/lib/utils";
 import type {
   ChatAppearance,
@@ -147,6 +151,10 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [replyingTo, setReplyingTo] = useState<UiMessage | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [confirmDeleteChat, setConfirmDeleteChat] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const router = useRouter();
   const [infoOpen, setInfoOpen] = useState(false);
   const [panel, setPanel] = useState<"list" | "dates" | "notes" | "look" | "daily" | "mood" | "plans" | null>(null);
   const { rows: plans, reload: reloadPlans } = useLiveRows<DatePlan>("date_plans", conversationId, () =>
@@ -293,6 +301,31 @@ export function ConversationView({ conversationId }: { conversationId: string })
   }, [supabase, conversationId, lastMessageId]);
 
   // Someone who just sent a message has stopped typing.
+  async function shareLocation() {
+    setLocating(true);
+    try {
+      const here = await getCurrentLocation();
+      handleSend(locationMessage(here), []);
+      setLocationOpen(false);
+    } catch (err) {
+      toast.error(err instanceof LocationError ? err.message : "Couldn't share your location.");
+    } finally {
+      setLocating(false);
+    }
+  }
+
+  async function deleteChat() {
+    setConfirmDeleteChat(false);
+    try {
+      await deleteChatForMe(supabase, conversationId);
+      refreshSoon();
+      toast.success("Chat deleted");
+      router.replace("/chat");
+    } catch (err) {
+      reportError(err, "Could not delete the chat.");
+    }
+  }
+
   const lastMessage = messages[messages.length - 1];
   useEffect(() => {
     if (lastMessage?.sender_id) clearUser(lastMessage.sender_id);
@@ -737,6 +770,9 @@ export function ConversationView({ conversationId }: { conversationId: string })
                     <DropdownMenuItem onSelect={() => setInfoOpen(true)}>
                       <Info /> {isGroup ? "Group info" : "Contact info"}
                     </DropdownMenuItem>
+                    <DropdownMenuItem destructive onSelect={() => setConfirmDeleteChat(true)}>
+                      <Trash2 /> Delete chat
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -781,6 +817,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
             replyingTo={replyState}
             onSend={handleSend}
             onSendSticker={(payload) => void sendSticker(payload)}
+            onShareLocation={() => setLocationOpen(true)}
             onSaveEdit={edit}
             onCancelEdit={() => setEditing(null)}
             onCancelReply={() => setReplyingTo(null)}
@@ -859,6 +896,45 @@ export function ConversationView({ conversationId }: { conversationId: string })
       />
 
       <Lightbox items={photos} index={lightboxIndex} onIndexChange={setLightboxIndex} onClose={() => setLightboxIndex(null)} />
+
+      <AlertDialog open={locationOpen} onOpenChange={(o) => !locating && setLocationOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send your current location?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isGroup ? "Everyone in this group" : title} will see where you are right now on a map. It&apos;s sent once — it
+              doesn&apos;t follow you.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={locating}>Cancel</AlertDialogCancel>
+            <Button
+              onClick={() => void shareLocation()}
+              disabled={locating}
+            >
+              {locating ? <Spinner /> : <MapPin />} {locating ? "Finding you…" : "Send location"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmDeleteChat} onOpenChange={setConfirmDeleteChat}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this chat?</AlertDialogTitle>
+            <AlertDialogDescription>
+              All messages, photos and voice notes in this chat are removed for you. {isGroup ? "The others keep" : `${title} keeps`}{" "}
+              their copy. If a new message arrives, the chat comes back, starting empty.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction destructive onClick={() => void deleteChat()}>
+              Delete chat
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={confirmDelete !== null} onOpenChange={(open) => !open && setConfirmDelete(null)}>
         <AlertDialogContent>

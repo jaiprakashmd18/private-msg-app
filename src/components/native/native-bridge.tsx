@@ -2,11 +2,49 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { isNativeApp, nativePlatform, openExternal, pathForAppUrl, refreshNativePush } from "@/lib/native";
+import { toast } from "sonner";
+import {
+  enableNativePush,
+  isNativeApp,
+  nativePlatform,
+  nativePushAvailable,
+  nativePushEnabled,
+  nativePushPermission,
+  openExternal,
+  pathForAppUrl,
+  refreshNativePush,
+} from "@/lib/native";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 /** Pages where Android's back button leaves the app instead of going back. */
 const ROOT_PATHS = new Set(["/", "/chat", "/login", "/unauthorized", "/set-password"]);
+
+const ASKED_KEY = "native-push-offered";
+
+/** Shows a one-time "Turn on notifications" message when someone first opens their chats in the app. */
+async function offerNotificationsOnce(showPreview: boolean) {
+  try {
+    if (!window.location.pathname.startsWith("/chat")) return;
+    if (localStorage.getItem(ASKED_KEY)) return;
+    if (!(await nativePushAvailable()) || (await nativePushEnabled())) return;
+    if ((await nativePushPermission()) === "denied") return;
+    localStorage.setItem(ASKED_KEY, "1");
+  } catch {
+    return;
+  }
+  toast("Get notified about new messages?", {
+    description: "You can change this any time in Settings.",
+    duration: 15_000,
+    action: {
+      label: "Turn on",
+      onClick: () => {
+        void enableNativePush(getSupabaseBrowserClient(), showPreview)
+          .then(() => toast.success("Notifications are on"))
+          .catch((err: unknown) => toast.error(err instanceof Error ? err.message : "Couldn't turn on notifications."));
+      },
+    },
+  });
+}
 
 /** Closes the top-most dialog, menu, sheet or photo viewer, like pressing Esc. Returns false if none is open. */
 function closeTopLayer(): boolean {
@@ -108,6 +146,9 @@ export function NativeBridge() {
         // Default: show previews.
       }
       void refreshNativePush(getSupabaseBrowserClient(), showPreview).catch(() => undefined);
+
+      // First time in the chats: offer notifications once (the phone asks for permission).
+      void offerNotificationsOnce(showPreview);
     })();
 
     // --- Links to other websites open in the system browser -----------------------
@@ -124,6 +165,11 @@ export function NativeBridge() {
       if (url.protocol !== "http:" && url.protocol !== "https:") return; // mailto:, tel: → the phone handles them
       if (url.origin === window.location.origin) return;
       e.preventDefault();
+      if (anchor.dataset.open === "system") {
+        // Map links: let the phone hand them to Google Maps / Apple Maps.
+        window.location.href = url.href;
+        return;
+      }
       void openExternal(url.href);
     };
     document.addEventListener("click", onClick, true);

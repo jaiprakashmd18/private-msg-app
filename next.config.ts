@@ -25,7 +25,13 @@ const csp = [
   "manifest-src 'self'",
 ].join("; ");
 
+// Identifies this deployment, so open tabs and apps can tell a newer one is live
+// (see src/lib/app-version.ts). Vercel provides the git commit.
+const BUILD_ID =
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || process.env.VERCEL_DEPLOYMENT_ID || `local-${Date.now().toString(36)}`;
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_BUILD_ID: BUILD_ID },
   // The dev-only badge sits on top of the bottom-left "+" button.
   devIndicators: false,
   poweredByHeader: false,
@@ -46,7 +52,7 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "no-referrer" },
-          { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=()" },
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=(self)" },
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
         ],
       },

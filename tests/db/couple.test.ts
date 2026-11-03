@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { asOwner, asUser, createUser, directConversation } from "./helpers";
+import { asOwner, asUser, connect, createUser, directConversation } from "./helpers";
 
 async function upload(userId: string, path: string, mimetype = "image/jpeg", bucket = "attachments") {
   await asUser(
@@ -118,6 +118,7 @@ describe("view-once photos", () => {
   it("is not allowed in groups", async () => {
     const a = await createUser();
     const b = await createUser();
+    await connect(a.id, b.id);
     const [g] = await asUser<{ id: string }>(a.id, "select public.create_group('Fam', $1::uuid[]) as id", [[b.id]]);
     await expect(sendViewOnce(a.id, g.id)).rejects.toThrow(/one-to-one/);
   });

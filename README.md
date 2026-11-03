@@ -1,6 +1,6 @@
 # Ghostline — private, invitation-only messaging
 
-An iMessage-style messaging app with a "liquid glass" look (light and dark) for a closed group of people. People sign in with their Google (Gmail) account, or with an email and password, but only emails the administrator has approved get in, and the database itself enforces who can read and send what.
+An iMessage-style messaging app with a "liquid glass" look (light and dark) for a closed group of people. People sign in with their Google (Gmail) account, or with an email and password, but only people who were invited (by the administrator or by another member) get in, and the database itself enforces who can read and send what.
 
 **Stack:** Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui-style components · Supabase (Postgres, Auth with Google + password, Realtime, Storage) · Vercel
 
@@ -15,10 +15,14 @@ An iMessage-style messaging app with a "liquid glass" look (light and dark) for 
 - **Duplicate-safe sending** — every message carries a client-generated id; retries can't create duplicates. Failed sends can be retried or discarded.
 - **Reconnect handling** — automatic catch-up after network loss or tab sleep.
 - **Android and iPhone apps** — Ghostline for Google Play and the App Store (Capacitor): the same website inside a native app, with real phone notifications, Google sign-in in the secure system window, Face ID / fingerprint unlock, the Android back button and links that open the app. See [docs/MOBILE_PUBLISHING.md](docs/MOBILE_PUBLISHING.md).
+- **Updates reach everyone** — every deployment reaches the website, the installed web app and the Android/iPhone apps: open tabs and apps notice the new version and reload by themselves (or offer "Update" while you're typing, so nothing is lost). For changes to the phone apps themselves, a store-update reminder or a required update can be switched on from Vercel. See [docs/MOBILE_PUBLISHING.md](docs/MOBILE_PUBLISHING.md).
 - **Installable phone app (PWA)** — "Add to Home Screen" on iPhone/Android/desktop with its own icon, full-screen mode, unread badge and an offline page. No app store needed.
 - **Fits every screen** — phones (also sideways), tablets, laptops and big monitors; respects the notch and home indicator, keeps the message box above the on-screen keyboard (iPhone and Android), no zoom-on-tap on iPhone, readable line lengths on wide screens. Checked automatically at 9 screen sizes from 320 px phones to 1920 px desktops.
 - **Push notifications** — per device, with an option to hide message text on the lock screen; sent only to active members, once per message.
 - **Profile and group photos** — members pick their own photo (cropped to a square in the browser); group admins set the group photo. Stored in a private bucket, visible only to active members.
+- **Members invite their own people** — *New conversation → Invite someone*: enter an email and that person can sign in straight away (no administrator approval), with a ready-made invite message to share. Everyone sees **only their own contacts** (people they invited, who invited them, or already chat with); group members still see each other inside the group. Members can invite up to 20 people a day and withdraw unused invites; emails the administrator disabled can't be re-invited.
+- **Delete chat (for me)** — ••• → *Delete chat* removes the chat and its history for you only; the other person keeps theirs, and a new message brings the chat back, starting empty.
+- **Send my location** — *+ → Location* sends your current location once (after you confirm) as a map card that opens Google Maps / Apple Maps. Nothing follows you afterwards.
 - **Access requests** — when someone not on the list tries to sign in with Google, a request appears in *Admin → Access requests* (with a badge on the shield icon). Accept lets them in on their next sign-in; Decline keeps them out. No account is created until you accept.
 - **Made for two** — features for a couple's chat:
   - **App lock** — PIN, plus Face ID / fingerprint where the device supports it; locks on start and after a chosen time away; slows down guessing.

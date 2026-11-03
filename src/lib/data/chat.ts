@@ -31,6 +31,39 @@ export async function listDirectory(supabase: SupabaseClient): Promise<Directory
   return (data ?? []) as DirectoryEntry[];
 }
 
+export interface InviteResult {
+  /** "invited": they can sign in now. "connected": already a member — you're now contacts. */
+  status: "invited" | "connected";
+  user_id: string | null;
+  display_name: string | null;
+}
+
+/** Lets someone in (by email) and makes them your contact. */
+export async function inviteContact(supabase: SupabaseClient, email: string, name?: string): Promise<InviteResult> {
+  const { data, error } = await supabase
+    .rpc("invite_contact", { p_email: email, p_name: name?.trim() || null })
+    .single<InviteResult>();
+  if (error) throw error;
+  return data;
+}
+
+export async function listMyInvitations(supabase: SupabaseClient): Promise<Array<{ email: string; created_at: string }>> {
+  const { data, error } = await supabase.rpc("list_my_invitations");
+  if (error) throw error;
+  return (data ?? []) as Array<{ email: string; created_at: string }>;
+}
+
+export async function cancelInvitation(supabase: SupabaseClient, email: string): Promise<void> {
+  const { error } = await supabase.rpc("cancel_invitation", { p_email: email });
+  if (error) throw error;
+}
+
+/** Hides this chat and its history for me only. */
+export async function deleteChatForMe(supabase: SupabaseClient, conversationId: string): Promise<void> {
+  const { error } = await supabase.rpc("delete_chat_for_me", { p_conversation_id: conversationId });
+  if (error) throw error;
+}
+
 export async function getOrCreateConversation(supabase: SupabaseClient, otherUserId: string): Promise<string> {
   const { data, error } = await supabase.rpc("get_or_create_direct_conversation", {
     p_other_user_id: otherUserId,
