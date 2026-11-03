@@ -283,11 +283,26 @@ where you and Meenu can install it with the TestFlight app before release.
 
 ## Everyday work after publishing
 
-* **Website changes** (most changes): just deploy to Vercel. The apps show
-  them on next launch — no store update needed.
+* **Website changes** (most changes): just deploy to Vercel. Everyone gets
+  them automatically — the website, the installed web app, and the Android and
+  iPhone apps. Open tabs and apps check for a new version when they come back
+  to the screen and every 5 minutes: they reload by themselves if nothing
+  would be lost, or show *"A new version of Ghostline is ready · Update"* while
+  someone is typing or in a dialog. No store update needed.
 * **App changes** (icon, permissions, plugins, `capacitor.config.ts`, files
   in `android/` or `ios/`): run `npx cap sync`, raise the version numbers,
-  build, and upload a new version to each store.
+  build, and upload a new version to each store. Then tell older apps about it
+  with these Vercel environment variables (and redeploy):
+
+  | Name | Effect |
+  | --- | --- |
+  | `LATEST_ANDROID_BUILD` / `LATEST_IOS_BUILD` | Apps with a lower build number get **one** reminder: "A new version of the app is available · Update" (opens the store). |
+  | `MIN_ANDROID_BUILD` / `MIN_IOS_BUILD` | Apps with a lower build number show a full-screen **"Update Ghostline"** with a button to the store, until updated. Use this only when the old app really can't work any more. |
+  | `IOS_APP_STORE_ID` | The number in your App Store link (`apps.apple.com/app/id123456789` → `123456789`), so the button opens Ghostline's page directly. |
+
+  The build number is `versionCode` in `android/app/build.gradle` and
+  **Build** in Xcode (target App → General). Only raise the minimum after
+  the new version is live in the store.
 * **New icon or splash:** replace the images in `mobile/assets/` (or edit
   `mobile/assets/make-sources.cjs` and run it with `node`), then:
 
