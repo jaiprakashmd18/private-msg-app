@@ -1,4 +1,5 @@
 import type { CapacitorConfig } from "@capacitor/cli";
+import { KeyboardResize } from "@capacitor/keyboard";
 
 /**
  * Loveline for Android and iOS.
@@ -37,6 +38,13 @@ const config: CapacitorConfig = {
     scrollEnabled: true,
   },
   plugins: {
+    Keyboard: {
+      // The web view shrinks to sit above the on-screen keyboard, so the
+      // message box stays pinned just above it instead of the page scrolling
+      // up and leaving the composer floating over the messages (iOS).
+      resize: KeyboardResize.Native,
+      resizeOnFullScreen: true,
+    },
     SplashScreen: {
       launchShowDuration: 1500,
       launchAutoHide: true,
