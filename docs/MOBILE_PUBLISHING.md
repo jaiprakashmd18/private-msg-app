@@ -175,6 +175,54 @@ Android phone.
 
 ---
 
+## Install on your own iPhone from a Windows PC (no Mac, no App Store)
+
+This puts the app on your own iPhone for testing, using a **free Apple ID**.
+The app stops working after **7 days** (just reinstall to renew), and push
+notifications don’t work on a free account. No Mac needed.
+
+### 1. Make a free Apple ID
+If you don’t have one: on the iPhone, Settings → tap “Sign in” → **Create Apple
+ID**, or go to <https://account.apple.com>. It’s free.
+
+### 2. Get the app file (.ipa) from GitHub
+1. On your PC, open the repo → **Actions** → **Mobile apps** → the latest
+   successful run (green ✓).
+2. Scroll to **Artifacts** → download **ghostline-ios-unsigned** (a zip).
+3. Unzip it — inside is **`Ghostline-unsigned.ipa`**. (Downloads expire after
+   14 days; re-run the workflow to get a fresh one.)
+
+### 3. Install it with Sideloadly
+1. On your PC install **iTunes** (from apple.com, the version *with* Apple
+   Mobile Device Support) and **Sideloadly** (<https://sideloadly.io>).
+2. Plug your iPhone into the PC with a cable; on the iPhone tap **Trust** and
+   enter your passcode.
+3. Open **Sideloadly**. Pick your iPhone at the top. Drag
+   **`Ghostline-unsigned.ipa`** into the window.
+4. Enter your **Apple ID** email and password (an app-specific password if you
+   use two-factor — create one at <https://account.apple.com> → Sign-In and
+   Security). If asked, let it **remove unsupported entitlements**.
+5. Click **Start**. It builds and installs onto your iPhone.
+
+### 4. Trust the app on the iPhone
+1. iPhone → **Settings → General → VPN & Device Management**.
+2. Under “Developer App”, tap your Apple ID → **Trust**.
+3. Open **Ghostline** from the Home Screen and sign in with email + password,
+   or with Google.
+
+### Keeping it working
+- A free Apple ID signature lasts **7 days**. When the app won’t open, plug in
+  and run Sideloadly again to reinstall (your chats are safe — they live on the
+  server).
+- **AltStore** (<https://altstore.io>) is an alternative that can refresh the
+  app over Wi‑Fi automatically, so you reinstall less often.
+- For a version that lasts a **year** and supports **notifications**, get a paid
+  **Apple Developer** account ($99/yr) and either sign in Sideloadly with it, or
+  use the App Store / TestFlight route below.
+
+> Email + password sign-in always works. Google sign-in still returns to the
+> app through its `com.jaiprakash.ghostline://` link even when sideloaded.
+
 ## Part 3 — iPhone / App Store
 
 ### 3.1 What you need
