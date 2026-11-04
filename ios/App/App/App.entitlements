@@ -8,7 +8,7 @@
 	<!-- Universal links: links to the website open the app (needs /.well-known/apple-app-site-association). -->
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:private-msg-app-jai-prakash.vercel.app</string>
+		<string>applinks:loveline.space</string>
 	</array>
 </dict>
 </plist>

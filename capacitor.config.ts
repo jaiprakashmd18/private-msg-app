@@ -12,7 +12,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * To try a Vercel preview build instead of production:
  *   CAP_SERVER_URL=https://<preview>.vercel.app npx cap sync
  */
-const SERVER_URL = process.env.CAP_SERVER_URL ?? "https://private-msg-app-jai-prakash.vercel.app";
+const SERVER_URL = process.env.CAP_SERVER_URL ?? "https://loveline.space";
 
 const config: CapacitorConfig = {
   appId: "com.jaiprakash.ghostline",

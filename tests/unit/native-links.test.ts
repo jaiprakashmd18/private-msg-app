@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { androidCertFingerprints, appleTeamId } from "@/lib/native-links.server";
 import { isNativeApp, NATIVE_AUTH_CALLBACK, pathForAppUrl } from "@/lib/native";
 
-const SITE = "https://private-msg-app-jai-prakash.vercel.app";
+const SITE = "https://loveline.space";
 
 describe("links that open the app", () => {
   it("finishes Google sign-in on the website's own callback page", () => {

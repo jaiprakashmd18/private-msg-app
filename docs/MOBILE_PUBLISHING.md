@@ -5,7 +5,7 @@ written for someone who has never published an app. Do the parts in order.
 
 **How the app works:** the Android and iPhone apps are a native "shell"
 (Capacitor) that opens your live website,
-`https://private-msg-app-jai-prakash.vercel.app`. Your website, Supabase,
+`https://loveline.space`. Your website, Supabase,
 accounts and messages stay exactly as they are; when you deploy the website,
 the apps update too. Only native things (the app icon, notifications,
 the Google sign-in window, Face ID, the back button) live in the app.
@@ -152,7 +152,7 @@ Android phone.
 3. **Test and release → App integrity → App signing**: copy both **SHA-256
    certificate fingerprints** (the app signing key and the upload key) into
    Vercel as `ANDROID_CERT_SHA256`, separated by a comma. After the redeploy,
-   `https://private-msg-app-jai-prakash.vercel.app/.well-known/assetlinks.json`
+   `https://loveline.space/.well-known/assetlinks.json`
    shows them, and website links open the app.
 4. Fill in **Grow users → Store presence → Main store listing**: short and
    full description, the icon (`mobile/assets/icon-only.png` is 1024×1024;
@@ -160,7 +160,7 @@ Android phone.
    and at least 2 phone screenshots (plus 7" and 10" tablet ones if you list
    tablets).
 5. **Policy → App content**: complete every item:
-   * **Privacy policy URL**: `https://private-msg-app-jai-prakash.vercel.app/privacy`
+   * **Privacy policy URL**: `https://loveline.space/privacy`
    * **App access**: "All or some functionality is restricted" → give a
      **test account** (an email + password you approved in Admin) and say the
      app is invitation-only.
@@ -209,7 +209,7 @@ Capabilities**:
 * Tick **Automatically manage signing** and choose your **Team**.
 * Bundle Identifier: `com.jaiprakash.ghostline` (already set).
 * You should see **Push Notifications** and **Associated Domains**
-  (`applinks:private-msg-app-jai-prakash.vercel.app`) — they come from
+  (`applinks:loveline.space`) — they come from
   `ios/App/App/App.entitlements`. If Xcode shows a red error for either,
   click **+ Capability** and add it.
 
@@ -253,7 +253,7 @@ where you and Meenu can install it with the TestFlight app before release.
 * **App Privacy**: same data as the Play "Data safety" list in 2.6 — not used
   for tracking. The app also includes a privacy manifest
   (`ios/App/App/PrivacyInfo.xcprivacy`).
-* **Privacy Policy URL**: `https://private-msg-app-jai-prakash.vercel.app/privacy`
+* **Privacy Policy URL**: `https://loveline.space/privacy`
 * **App Review Information → Sign-in required**: give a working test
   account (email + password) and explain: "Ghostline is a private,
   invitation-only messenger. Use this demo account."

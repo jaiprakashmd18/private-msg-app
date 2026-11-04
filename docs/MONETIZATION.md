@@ -46,7 +46,7 @@ projects created from `setup_all.sql` already have it.)
 3. **Developers → API keys** → copy the **Secret key** (`sk_live_…`, or
    `sk_test_…` while testing).
 4. **Developers → Webhooks → Add endpoint**:
-   - URL: `https://private-msg-app-jai-prakash.vercel.app/api/webhooks/stripe`
+   - URL: `https://loveline.space/api/webhooks/stripe`
    - Events: `checkout.session.completed`, `customer.subscription.created`,
      `customer.subscription.updated`, `customer.subscription.deleted`
    - Save, then copy the **Signing secret** (`whsec_…`).
@@ -79,7 +79,7 @@ Do this after your apps exist in the stores (see `docs/MOBILE_PUBLISHING.md`).
    - Create an **Entitlement** called `plus` and attach both store products to
      an **Offering**.
    - **Integrations → Webhooks → Add**: URL
-     `https://private-msg-app-jai-prakash.vercel.app/api/webhooks/revenuecat`,
+     `https://loveline.space/api/webhooks/revenuecat`,
      and set an **Authorization header** value (any long random string).
    - Copy RevenueCat's **public SDK keys** (one for Apple, one for Google).
 4. Vercel environment variables (then redeploy):

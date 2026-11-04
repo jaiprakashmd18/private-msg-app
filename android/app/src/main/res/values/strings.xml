@@ -4,5 +4,5 @@
     <string name="title_activity_main">Ghostline</string>
     <string name="package_name">com.jaiprakash.ghostline</string>
     <string name="custom_url_scheme">com.jaiprakash.ghostline</string>
-    <string name="app_link_host" translatable="false">private-msg-app-jai-prakash.vercel.app</string>
+    <string name="app_link_host" translatable="false">loveline.space</string>
 </resources>
