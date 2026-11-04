@@ -259,7 +259,7 @@ function PeoplePicker({
 /** The message to pass on to the person you invited (the app doesn't send emails). */
 function inviteMessage(email: string) {
   const url = window.location.origin;
-  return `I invited you to Ghostline, our private chat app. Open ${url} and sign in with Google using ${email}.`;
+  return `I invited you to Loveline, our private chat app. Open ${url} and sign in with Google using ${email}.`;
 }
 
 async function shareInvite(email: string) {
@@ -267,11 +267,11 @@ async function shareInvite(email: string) {
   try {
     if (isNativeApp()) {
       const { Share } = await import("@capacitor/share");
-      await Share.share({ title: "Join me on Ghostline", text, dialogTitle: "Send the invite" });
+      await Share.share({ title: "Join me on Loveline", text, dialogTitle: "Send the invite" });
       return;
     }
     if (navigator.share) {
-      await navigator.share({ title: "Join me on Ghostline", text });
+      await navigator.share({ title: "Join me on Loveline", text });
       return;
     }
   } catch (err) {
@@ -340,7 +340,7 @@ function InviteForm({ onDone }: { onDone: () => void }) {
         <div role="status" className="grid gap-3 rounded-2xl bg-primary/10 p-4 text-sm">
           {result.status === "connected" ? (
             <p>
-              <strong>{result.display_name ?? result.email}</strong> is already on Ghostline — you&apos;re now contacts. Find
+              <strong>{result.display_name ?? result.email}</strong> is already on Loveline — you&apos;re now contacts. Find
               them in your contacts list.
             </p>
           ) : (

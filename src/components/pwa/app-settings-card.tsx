@@ -34,7 +34,7 @@ import {
 const PREVIEW_KEY = "push-show-preview";
 
 interface Env {
-  /** Inside the Ghostline Android / iOS app. */
+  /** Inside the Loveline Android / iOS app. */
   native: boolean;
   standalone: boolean;
   ios: boolean;
@@ -231,7 +231,7 @@ export function AppSettingsCard() {
           ) : denied ? (
             <p className="text-muted-foreground">
               {env.native
-                ? "Notifications are blocked for Ghostline. Allow them in your phone's Settings → Ghostline → Notifications, then come back here."
+                ? "Notifications are blocked for Loveline. Allow them in your phone's Settings → Loveline → Notifications, then come back here."
                 : "Notifications are blocked for this app. Allow them in your browser or phone settings (site settings → Notifications), then reload this page."}
             </p>
           ) : enabled === null ? (

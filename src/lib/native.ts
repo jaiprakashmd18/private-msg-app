@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Everything the website does differently when it runs inside the Ghostline
+ * Everything the website does differently when it runs inside the Loveline
  * Android / iOS app (Capacitor). In a normal browser every function here is a
  * no-op or returns "not native", so the website behaves exactly as before.
  *
@@ -84,7 +84,7 @@ export function pathForAppUrl(rawUrl: string, siteOrigin: string): string | null
 interface GhostlinePlugin {
   info(): Promise<{ pushAvailable: boolean }>;
 }
-const Ghostline = registerPlugin<GhostlinePlugin>("Ghostline");
+const LovelinePlugin = registerPlugin<GhostlinePlugin>("Ghostline");
 
 const TOKEN_KEY = "native-push-token";
 
@@ -118,7 +118,7 @@ export async function nativePushAvailable(): Promise<boolean> {
   if (!isNativeApp()) return false;
   if (nativePlatform() === "ios") return true;
   try {
-    return (await Ghostline.info()).pushAvailable;
+    return (await LovelinePlugin.info()).pushAvailable;
   } catch {
     return false;
   }
@@ -217,7 +217,7 @@ export async function enableNativePush(supabase: SupabaseClient, showPreview: bo
     ({ receive } = await PushNotifications.requestPermissions());
   }
   if (receive !== "granted") {
-    throw new Error("Notifications are blocked for Ghostline. Allow them in your phone's Settings → Ghostline → Notifications.");
+    throw new Error("Notifications are blocked for Loveline. Allow them in your phone's Settings → Loveline → Notifications.");
   }
   await saveToken(supabase, await requestToken(), showPreview);
 }
@@ -276,7 +276,7 @@ export async function nativeBiometricVerify(reason: string): Promise<boolean> {
       reason,
       cancelTitle: "Use PIN",
       allowDeviceCredential: true,
-      androidTitle: "Unlock Ghostline",
+      androidTitle: "Unlock Loveline",
       androidSubtitle: reason,
       androidConfirmationRequired: false,
     });

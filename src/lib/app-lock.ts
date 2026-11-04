@@ -189,7 +189,7 @@ export async function registerBiometrics(user: { email: string; name: string }, 
 
 /** Asks the device to verify the user (Face ID, fingerprint or device PIN). */
 export async function verifyBiometrics(credentialId: string): Promise<boolean> {
-  if (credentialId === NATIVE_BIOMETRIC_ID) return isNativeApp() && nativeBiometricVerify("Unlock Ghostline");
+  if (credentialId === NATIVE_BIOMETRIC_ID) return isNativeApp() && nativeBiometricVerify("Unlock Loveline");
   try {
     const result = await navigator.credentials.get({
       publicKey: {

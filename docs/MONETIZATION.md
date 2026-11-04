@@ -1,6 +1,6 @@
-# Ghostline Plus — subscriptions
+# Loveline Plus — subscriptions
 
-Ghostline Plus is a paid tier that unlocks the **couple pack**: journal,
+Loveline Plus is a paid tier that unlocks the **couple pack**: journal,
 bucket list, date planner, special dates and love-notes scheduling. Everything
 else stays free. In a one-to-one chat, **if either partner has Plus, both get
 the couple pack.**
@@ -22,7 +22,7 @@ allow card forms or Stripe for digital subscriptions in a store app, and will
 reject the app. The website can use Stripe. One tool, **RevenueCat**, handles
 the Apple + Google side so the app has a single "buy" button.
 
-All of them end up in the same place: a webhook tells Ghostline's server, which
+All of them end up in the same place: a webhook tells Loveline's server, which
 updates the `subscriptions` table. The app then reads one answer — "is this
 person Plus?" — everywhere.
 
@@ -41,7 +41,7 @@ projects created from `setup_all.sql` already have it.)
 ## Part 1 — Website payments (Stripe)
 
 1. Create a **Stripe** account: <https://dashboard.stripe.com>
-2. **Product catalog → Add product** → "Ghostline Plus", recurring, monthly,
+2. **Product catalog → Add product** → "Loveline Plus", recurring, monthly,
    set your price → save. Copy the **Price ID** (`price_…`).
 3. **Developers → API keys** → copy the **Secret key** (`sk_live_…`, or
    `sk_test_…` while testing).
@@ -96,7 +96,7 @@ Do this after your apps exist in the stores (see `docs/MOBILE_PUBLISHING.md`).
    then, the app tells users to subscribe on the website or ask the admin.
 
    > **Important (RevenueCat app user id):** the app must identify each buyer to
-   > RevenueCat by their Ghostline user id (`access.user_id`). That id is what
+   > RevenueCat by their Loveline user id (`access.user_id`). That id is what
    > the webhook reads as `app_user_id`, so the right account gets Plus.
 
 ## Granting Plus for free (anytime)

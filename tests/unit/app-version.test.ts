@@ -28,7 +28,7 @@ describe("store updates for the Android and iOS apps", () => {
       url: "https://play.google.com/store/apps/details?id=com.jaiprakash.ghostline",
     });
     expect(info.ios).toEqual({ min: 0, latest: 0, url: "https://apps.apple.com/app/id6740001234" });
-    expect(versionInfo({}).ios.url).toBe("https://apps.apple.com/search?term=Ghostline");
+    expect(versionInfo({}).ios.url).toBe("https://apps.apple.com/search?term=Loveline");
   });
 
   it("requires an update below the minimum and suggests one below the latest", () => {

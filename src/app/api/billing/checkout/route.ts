@@ -4,7 +4,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 
 /**
- * Starts a Stripe Checkout for Ghostline Plus and returns { url } to redirect to.
+ * Starts a Stripe Checkout for Loveline Plus and returns { url } to redirect to.
  * Off (ok:false, reason:"not_configured") until STRIPE_SECRET_KEY and
  * STRIPE_PRICE_ID are set in Vercel. Web only — the apps use the store.
  */

@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 /**
- * Ghostline for Android and iOS.
+ * Loveline for Android and iOS.
  *
  * The app shows the live website (server.url) inside a native shell, so the
  * website, Supabase backend, accounts and realtime messaging stay exactly as
@@ -16,7 +16,7 @@ const SERVER_URL = process.env.CAP_SERVER_URL ?? "https://loveline.space";
 
 const config: CapacitorConfig = {
   appId: "com.jaiprakash.ghostline",
-  appName: "Ghostline",
+  appName: "Loveline",
   // Only the offline page lives in the app; everything else loads from SERVER_URL.
   webDir: "mobile/www",
   backgroundColor: "#000000",

@@ -45,7 +45,7 @@ export function versionInfo(env: Record<string, string | undefined> = process.en
     ios: {
       min: intEnv(env.MIN_IOS_BUILD),
       latest: intEnv(env.LATEST_IOS_BUILD),
-      url: iosId ? `https://apps.apple.com/app/id${iosId}` : "https://apps.apple.com/search?term=Ghostline",
+      url: iosId ? `https://apps.apple.com/app/id${iosId}` : "https://apps.apple.com/search?term=Loveline",
     },
   };
 }

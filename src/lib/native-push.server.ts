@@ -4,7 +4,7 @@ import http2 from "node:http2";
 import type { PushPayload } from "@/lib/push.server";
 
 /**
- * Notifications for the Ghostline Android / iOS app.
+ * Notifications for the Loveline Android / iOS app.
  *
  *  - Android: Firebase Cloud Messaging (HTTP v1 API). Needs the Firebase
  *    service account JSON in FIREBASE_SERVICE_ACCOUNT (plain JSON or base64).

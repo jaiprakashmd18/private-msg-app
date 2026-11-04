@@ -1,6 +1,6 @@
-# Ghostline on Google Play and the App Store
+# Loveline on Google Play and the App Store
 
-This guide takes you from this repository to Ghostline in both stores. It is
+This guide takes you from this repository to Loveline in both stores. It is
 written for someone who has never published an app. Do the parts in order.
 
 **How the app works:** the Android and iPhone apps are a native "shell"
@@ -12,7 +12,7 @@ the Google sign-in window, Face ID, the back button) live in the app.
 
 | What | Value |
 | --- | --- |
-| App name | Ghostline |
+| App name | Loveline |
 | App ID (Android package / iOS bundle ID) | `com.jaiprakash.ghostline` — can never change after publishing |
 | App link scheme | `com.jaiprakash.ghostline://` |
 | Website the app opens | set in `capacitor.config.ts` (`server.url`) |
@@ -85,7 +85,7 @@ npx cap sync android
 
 ### 2.3 Firebase (Android notifications)
 
-1. Firebase console → **Add project** → name it "Ghostline" → you can turn
+1. Firebase console → **Add project** → name it "Loveline" → you can turn
    Google Analytics off.
 2. **Add app** → Android icon → Android package name
    `com.jaiprakash.ghostline` → **Register app** → **Download
@@ -145,7 +145,7 @@ Android phone.
 
 ### 2.6 Create the app in Play Console
 
-1. **Create app** → name **Ghostline**, App, Free → accept the declarations.
+1. **Create app** → name **Loveline**, App, Free → accept the declarations.
 2. **Test and release → Testing → Closed testing** (or **Internal testing**
    first) → create a release → upload `app-release.aab`. Accept **Play App
    Signing** when asked.
@@ -218,7 +218,7 @@ Try it on your iPhone: plug it in, pick it at the top of Xcode, press ▶︎.
 ### 3.3 iPhone notifications key
 
 <https://developer.apple.com/account/resources/authkeys/list> → **+** →
-name "Ghostline push" → tick **Apple Push Notifications service (APNs)** →
+name "Loveline push" → tick **Apple Push Notifications service (APNs)** →
 Configure → **Sandbox & Production** → Save → **Download** the `.p8` file
 (you can only download it once — back it up). Put into Vercel:
 
@@ -233,7 +233,7 @@ you run from Xcode.
 ### 3.4 Create the app in App Store Connect
 
 <https://appstoreconnect.apple.com> → **Apps** → **+ New App** → iOS, name
-**Ghostline**, language, Bundle ID `com.jaiprakash.ghostline`, SKU
+**Loveline**, language, Bundle ID `com.jaiprakash.ghostline`, SKU
 `ghostline`.
 
 ### 3.5 Upload a build
@@ -255,7 +255,7 @@ where you and Meenu can install it with the TestFlight app before release.
   (`ios/App/App/PrivacyInfo.xcprivacy`).
 * **Privacy Policy URL**: `https://loveline.space/privacy`
 * **App Review Information → Sign-in required**: give a working test
-  account (email + password) and explain: "Ghostline is a private,
+  account (email + password) and explain: "Loveline is a private,
   invitation-only messenger. Use this demo account."
 * Export compliance is pre-answered (standard HTTPS only).
 * **Submit for Review**.
@@ -274,7 +274,7 @@ where you and Meenu can install it with the TestFlight app before release.
   be accepted, but Apple can ask for **Sign in with Apple**. If the review
   asks, it can be added (Supabase supports it).
 * **"Just a website" (App Store 4.2).** Apple rejects apps that only wrap a
-  website. Ghostline has native notifications, Face ID unlock, camera,
+  website. Loveline has native notifications, Face ID unlock, camera,
   microphone and photo saving, which helps — mention them in the review notes.
 * **Test accounts.** Both reviewers need to sign in. Keep the demo account
   approved and active, with a sample chat in it.
@@ -287,7 +287,7 @@ where you and Meenu can install it with the TestFlight app before release.
   them automatically — the website, the installed web app, and the Android and
   iPhone apps. Open tabs and apps check for a new version when they come back
   to the screen and every 5 minutes: they reload by themselves if nothing
-  would be lost, or show *"A new version of Ghostline is ready · Update"* while
+  would be lost, or show *"A new version of Loveline is ready · Update"* while
   someone is typing or in a dialog. No store update needed.
 * **App changes** (icon, permissions, plugins, `capacitor.config.ts`, files
   in `android/` or `ios/`): run `npx cap sync`, raise the version numbers,
@@ -297,8 +297,8 @@ where you and Meenu can install it with the TestFlight app before release.
   | Name | Effect |
   | --- | --- |
   | `LATEST_ANDROID_BUILD` / `LATEST_IOS_BUILD` | Apps with a lower build number get **one** reminder: "A new version of the app is available · Update" (opens the store). |
-  | `MIN_ANDROID_BUILD` / `MIN_IOS_BUILD` | Apps with a lower build number show a full-screen **"Update Ghostline"** with a button to the store, until updated. Use this only when the old app really can't work any more. |
-  | `IOS_APP_STORE_ID` | The number in your App Store link (`apps.apple.com/app/id123456789` → `123456789`), so the button opens Ghostline's page directly. |
+  | `MIN_ANDROID_BUILD` / `MIN_IOS_BUILD` | Apps with a lower build number show a full-screen **"Update Loveline"** with a button to the store, until updated. Use this only when the old app really can't work any more. |
+  | `IOS_APP_STORE_ID` | The number in your App Store link (`apps.apple.com/app/id123456789` → `123456789`), so the button opens Loveline's page directly. |
 
   The build number is `versionCode` in `android/app/build.gradle` and
   **Build** in Xcode (target App → General). Only raise the minimum after
@@ -338,7 +338,7 @@ CAP_SERVER_URL=https://your-preview.vercel.app npx cap sync
 * **Delivered ticks:** browsers mark a message ✓✓ "Delivered" when the
   notification arrives. In the phone app this happens when the app is next
   opened (the website code can't run while the app is closed).
-* **Notifications inside the open app:** while Ghostline is open, new messages
+* **Notifications inside the open app:** while Loveline is open, new messages
   appear live in the chat instead of as a banner.
 * **Saving photos:** the download button opens the share sheet — choose
   **Save Image** (iPhone) or **Save** / your gallery (Android).

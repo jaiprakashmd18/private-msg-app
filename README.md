@@ -1,4 +1,4 @@
-# Ghostline — private, invitation-only messaging
+# Loveline — private, invitation-only messaging
 
 An iMessage-style messaging app with a "liquid glass" look (light and dark) for a closed group of people. People sign in with their Google (Gmail) account, or with an email and password, but only people who were invited (by the administrator or by another member) get in, and the database itself enforces who can read and send what.
 
@@ -14,7 +14,7 @@ An iMessage-style messaging app with a "liquid glass" look (light and dark) for 
 - **Photos & voice notes** — big photos are shrunk to 2048 px with chat thumbnails, up to 10 per message, full-screen viewer (swipe, zoom, download), phone camera button; hold-free voice recording (up to 5 min) with a player. Files (PDF, office docs) too; everything in a private bucket via short-lived signed URLs.
 - **Duplicate-safe sending** — every message carries a client-generated id; retries can't create duplicates. Failed sends can be retried or discarded.
 - **Reconnect handling** — automatic catch-up after network loss or tab sleep.
-- **Android and iPhone apps** — Ghostline for Google Play and the App Store (Capacitor): the same website inside a native app, with real phone notifications, Google sign-in in the secure system window, Face ID / fingerprint unlock, the Android back button and links that open the app. See [docs/MOBILE_PUBLISHING.md](docs/MOBILE_PUBLISHING.md).
+- **Android and iPhone apps** — Loveline for Google Play and the App Store (Capacitor): the same website inside a native app, with real phone notifications, Google sign-in in the secure system window, Face ID / fingerprint unlock, the Android back button and links that open the app. See [docs/MOBILE_PUBLISHING.md](docs/MOBILE_PUBLISHING.md).
 - **Updates reach everyone** — every deployment reaches the website, the installed web app and the Android/iPhone apps: open tabs and apps notice the new version and reload by themselves (or offer "Update" while you're typing, so nothing is lost). For changes to the phone apps themselves, a store-update reminder or a required update can be switched on from Vercel. See [docs/MOBILE_PUBLISHING.md](docs/MOBILE_PUBLISHING.md).
 - **Installable phone app (PWA)** — "Add to Home Screen" on iPhone/Android/desktop with its own icon, full-screen mode, unread badge and an offline page. No app store needed.
 - **Fits every screen** — phones (also sideways), tablets, laptops and big monitors; respects the notch and home indicator, keeps the message box above the on-screen keyboard (iPhone and Android), no zoom-on-tap on iPhone, readable line lengths on wide screens. Checked automatically at 9 screen sizes from 320 px phones to 1920 px desktops.
@@ -40,7 +40,7 @@ An iMessage-style messaging app with a "liquid glass" look (light and dark) for 
   - **Search in a chat**, **clickable links with preview cards**, and **videos** (up to 50 MB, with a thumbnail).
   - **🔥 Streaks** (days in a row you both wrote) and a **💞 countdown** to your next meet.
   - **Bucket list** (ticked off with a photo), **date planner** with reminders, and **our journal** — one entry each per day, with a photo.
-- **Ghostline Plus (subscriptions)** — an optional paid tier that unlocks the couple pack (journal, bucket list, date planner, special dates, love-notes scheduling); if one partner subscribes, both get it. Pay on the web (Stripe) or in the apps (Apple / Google via RevenueCat); an admin can grant Plus for free. See [docs/MONETIZATION.md](docs/MONETIZATION.md).
+- **Loveline Plus (subscriptions)** — an optional paid tier that unlocks the couple pack (journal, bucket list, date planner, special dates, love-notes scheduling); if one partner subscribes, both get it. Pay on the web (Stripe) or in the apps (Apple / Google via RevenueCat); an admin can grant Plus for free. See [docs/MONETIZATION.md](docs/MONETIZATION.md).
 - **Admin dashboard** — allowlist management, account deletion, conversation metadata, storage usage, retention settings, and an append-only audit log.
 - **Explicit privacy policy for admins** — administrators *cannot* read messages unless an audited, member-visible policy is switched on.
 
@@ -49,7 +49,7 @@ An iMessage-style messaging app with a "liquid glass" look (light and dark) for 
 | Document | What's inside |
 | --- | --- |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | **Start here.** Beginner-friendly, step-by-step setup: Supabase → Google sign-in → Vercel → inviting people → backups. |
-| [docs/MONETIZATION.md](docs/MONETIZATION.md) | **Ghostline Plus subscriptions.** Stripe (web) + RevenueCat (Apple/Google), webhooks, admin grant, and gating the couple pack. |
+| [docs/MONETIZATION.md](docs/MONETIZATION.md) | **Loveline Plus subscriptions.** Stripe (web) + RevenueCat (Apple/Google), webhooks, admin grant, and gating the couple pack. |
 | [docs/MOBILE_PUBLISHING.md](docs/MOBILE_PUBLISHING.md) | **Android & iPhone apps.** Step-by-step: Firebase, signing keys, building the AAB / Xcode archive, and publishing to Google Play and the App Store. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture overview, file tree, database schema, authorization design. |
 | [docs/SECURITY.md](docs/SECURITY.md) | Every security control explained, encryption model, limitations, how each policy is tested. |

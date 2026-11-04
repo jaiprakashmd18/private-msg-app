@@ -19,7 +19,7 @@ const SOURCE_LABEL: Record<string, string> = {
   admin: "the administrator",
 };
 
-/** Settings card: your Ghostline Plus status, and a Subscribe / Manage button. */
+/** Settings card: your Loveline Plus status, and a Subscribe / Manage button. */
 export function PlusCard() {
   const { supabase, access } = useApp();
   const [sub, setSub] = useState<SubscriptionState | null>(null);

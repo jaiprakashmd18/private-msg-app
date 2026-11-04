@@ -5,7 +5,7 @@ const myAccess = (id: string) => asUser<{ is_plus: boolean }>(id, "select is_plu
 const mySub = (id: string) =>
   asUser<{ is_plus: boolean; status: string; source: string | null }>(id, "select is_plus, status, source from public.my_subscription()").then((r) => r[0]!);
 
-describe("Ghostline Plus entitlement", () => {
+describe("Loveline Plus entitlement", () => {
   it("nobody is Plus by default; the admin can grant and revoke it", async () => {
     const admin = await createUser({ role: "admin" });
     const a = await createUser();

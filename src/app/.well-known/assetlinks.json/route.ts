@@ -1,7 +1,7 @@
 import { NATIVE_APP_ID_SERVER, androidCertFingerprints } from "@/lib/native-links.server";
 
 /**
- * Android App Links: proves to Android that the Ghostline app may open links
+ * Android App Links: proves to Android that the Loveline app may open links
  * to this website. Off (404) until ANDROID_CERT_SHA256 is set in Vercel.
  */
 export function GET() {

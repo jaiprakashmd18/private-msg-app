@@ -8,7 +8,7 @@ const publicSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url({ message: "NEXT_PUBLIC_SUPABASE_URL must be a URL" }),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20, "NEXT_PUBLIC_SUPABASE_ANON_KEY is missing"),
   NEXT_PUBLIC_SITE_URL: z.url().optional(),
-  NEXT_PUBLIC_APP_NAME: z.string().min(1).max(40).default("Ghostline"),
+  NEXT_PUBLIC_APP_NAME: z.string().min(1).max(40).default("Loveline"),
 });
 
 export type PublicEnv = z.infer<typeof publicSchema>;
@@ -32,4 +32,4 @@ export function getPublicEnv(): PublicEnv {
   return cached;
 }
 
-export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Ghostline";
+export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Loveline";

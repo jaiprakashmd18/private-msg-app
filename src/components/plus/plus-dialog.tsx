@@ -10,7 +10,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { PLUS_FEATURES, PLUS_NAME, PLUS_PRICE, startSubscribe } from "@/lib/plus";
 
 /**
- * The paywall. Shows what Ghostline Plus unlocks and a Subscribe button.
+ * The paywall. Shows what Loveline Plus unlocks and a Subscribe button.
  * Opened whenever someone without Plus taps a couple-pack feature.
  */
 export function PlusDialog({

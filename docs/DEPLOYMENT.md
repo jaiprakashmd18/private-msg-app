@@ -43,7 +43,7 @@ There are **no SMS costs**: people sign in with their Google (Gmail) account.
 ## 4. Set up "Sign in with Google"
 
 ### 4a. Google Cloud (creates the login keys; free)
-1. Go to https://console.cloud.google.com and sign in. At the top, click the project picker → **New project** → name it (e.g. "Ghostline") → **Create**, then select it.
+1. Go to https://console.cloud.google.com and sign in. At the top, click the project picker → **New project** → name it (e.g. "Loveline") → **Create**, then select it.
 2. Open **APIs & Services → OAuth consent screen** (newer UI: **Google Auth Platform → Branding**). Click **Get started**:
    - App name: your app's name. User support email: your Gmail.
    - Audience: **External**.
