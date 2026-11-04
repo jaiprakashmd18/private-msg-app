@@ -25,6 +25,12 @@ export function ViewportSync() {
     if (!vv) return;
     const root = document.documentElement;
     let frame = 0;
+    // The tallest visible height seen with no keyboard, in the current
+    // orientation. Compared against to detect the keyboard: on modern iOS
+    // home-screen web apps `window.innerHeight` shrinks together with the
+    // keyboard, so it can't tell us the keyboard is up on its own.
+    let baseline = 0;
+    let portraitNow = window.innerHeight >= window.innerWidth;
 
     // iOS only (navigator.standalone exists only there), installed app only.
     const iosApp = (navigator as Navigator & { standalone?: boolean }).standalone === true;
@@ -54,7 +60,17 @@ export function ViewportSync() {
       const typing =
         active instanceof HTMLElement &&
         (active.isContentEditable || (active.matches("input, textarea, select") && !(active as HTMLInputElement).readOnly));
-      const keyboardOpen = typing && window.innerHeight - vv.height > 120;
+      // Rotating starts the baseline over for the new orientation.
+      const portrait = window.innerHeight >= window.innerWidth;
+      if (portrait !== portraitNow) {
+        portraitNow = portrait;
+        baseline = 0;
+      }
+      // While no keyboard is up, the visible area is as tall as it gets: record it.
+      if (!typing) baseline = Math.max(baseline, vv.height, window.innerHeight);
+      // Keyboard is open when the visible area is well short of that full height.
+      const fullHeight = Math.max(baseline, window.innerHeight);
+      const keyboardOpen = typing && fullHeight - vv.height > 120;
       if (keyboardOpen) root.dataset.keyboard = "open";
       else delete root.dataset.keyboard;
     };
