@@ -11,9 +11,19 @@ export interface Access {
   avatar_path: string | null;
   is_active: boolean;
   role: AppRole | null;
+  /** Ghostline Plus subscriber (unlocks the couple pack). */
+  is_plus: boolean;
   has_password: boolean;
   has_google: boolean;
   must_change_password: boolean;
+}
+
+export interface SubscriptionState {
+  is_plus: boolean;
+  status: "active" | "trialing" | "past_due" | "canceled" | "inactive";
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  source: "stripe" | "apple" | "google" | "admin" | null;
 }
 
 export interface AppSettings {
@@ -193,6 +203,7 @@ export interface AllowlistEntry {
   last_seen_at: string | null;
   has_password: boolean;
   password_pending: boolean;
+  is_plus: boolean;
 }
 
 export interface AdminConversation {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, CheckCircle2, Copy, KeyRound, LogOut, Plus, Trash2, UserX } from "lucide-react";
+import { Ban, CheckCircle2, Copy, KeyRound, LogOut, Plus, Trash2, UserX, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -275,6 +275,22 @@ export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
                           >
                             <LogOut /> Sign out
                           </ConfirmButton>
+                        )}
+                        {n.user_id && n.status === "active" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() =>
+                              run(
+                                n.id,
+                                async () => await supabase.rpc("admin_set_plus", { p_user_id: n.user_id, p_on: !n.is_plus }),
+                                n.is_plus ? "Plus removed" : "Plus granted",
+                              )
+                            }
+                          >
+                            <Sparkles className={n.is_plus ? "text-primary" : undefined} /> {n.is_plus ? "Remove Plus" : "Grant Plus"}
+                          </Button>
                         )}
                         <ConfirmButton
                           size="sm"

@@ -7,6 +7,7 @@ import { useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { AppLockCard } from "@/components/app-lock/app-lock-card";
+import { PlusCard } from "@/components/plus/plus-card";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { PhotoEditor } from "@/components/photo-editor";
 import { AppSettingsCard } from "@/components/pwa/app-settings-card";
@@ -145,6 +146,8 @@ export function SettingsView() {
           </Card>
 
           <PasswordCard />
+
+          <PlusCard />
 
           <AppLockCard />
 

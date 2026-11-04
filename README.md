@@ -40,6 +40,7 @@ An iMessage-style messaging app with a "liquid glass" look (light and dark) for 
   - **Search in a chat**, **clickable links with preview cards**, and **videos** (up to 50 MB, with a thumbnail).
   - **🔥 Streaks** (days in a row you both wrote) and a **💞 countdown** to your next meet.
   - **Bucket list** (ticked off with a photo), **date planner** with reminders, and **our journal** — one entry each per day, with a photo.
+- **Ghostline Plus (subscriptions)** — an optional paid tier that unlocks the couple pack (journal, bucket list, date planner, special dates, love-notes scheduling); if one partner subscribes, both get it. Pay on the web (Stripe) or in the apps (Apple / Google via RevenueCat); an admin can grant Plus for free. See [docs/MONETIZATION.md](docs/MONETIZATION.md).
 - **Admin dashboard** — allowlist management, account deletion, conversation metadata, storage usage, retention settings, and an append-only audit log.
 - **Explicit privacy policy for admins** — administrators *cannot* read messages unless an audited, member-visible policy is switched on.
 
@@ -48,6 +49,7 @@ An iMessage-style messaging app with a "liquid glass" look (light and dark) for 
 | Document | What's inside |
 | --- | --- |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | **Start here.** Beginner-friendly, step-by-step setup: Supabase → Google sign-in → Vercel → inviting people → backups. |
+| [docs/MONETIZATION.md](docs/MONETIZATION.md) | **Ghostline Plus subscriptions.** Stripe (web) + RevenueCat (Apple/Google), webhooks, admin grant, and gating the couple pack. |
 | [docs/MOBILE_PUBLISHING.md](docs/MOBILE_PUBLISHING.md) | **Android & iPhone apps.** Step-by-step: Firebase, signing keys, building the AAB / Xcode archive, and publishing to Google Play and the App Store. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture overview, file tree, database schema, authorization design. |
 | [docs/SECURITY.md](docs/SECURITY.md) | Every security control explained, encryption model, limitations, how each policy is tested. |
