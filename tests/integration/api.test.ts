@@ -28,7 +28,7 @@ describe.skipIf(!enabled)("Next.js API routes", () => {
     for (const [query, reason] of cases) {
       const res = await fetch(`${appUrl}/auth/callback?${query}`, { redirect: "manual" });
       expect(res.status).toBe(307);
-      expect(res.headers.get("location")).toMatch(new RegExp(`/login\\?error=${reason}$`));
+      expect(res.headers.get("location")).toMatch(new RegExp(`/login\\?error=${reason}(&detail=|$)`));
     }
     const page = await (await fetch(`${appUrl}/login?error=not_authorized`)).text();
     expect(page).toContain("isn&#x27;t approved");
