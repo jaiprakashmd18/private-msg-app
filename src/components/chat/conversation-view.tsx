@@ -610,55 +610,54 @@ export function ConversationView({ conversationId }: { conversationId: string })
               {/* Floating glass header: back, photo + name in the middle, actions. */}
         <header
           ref={headerRef}
-          className="absolute inset-x-0 top-0 z-20 glass-bar pt-[max(0.25rem,env(safe-area-inset-top))]"
+          className="absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-background via-background/80 to-transparent pt-[max(0.25rem,env(safe-area-inset-top))]"
         >
-          <div className="mx-auto flex max-w-4xl items-start px-1.5 pb-1.5">
-            <div className="flex h-12 w-[5.5rem] shrink-0 items-center">
-              <Link
-                href="/chat"
-                aria-label="Back to conversations"
-                className="flex items-center rounded-full py-1 pr-2 text-primary split:invisible"
-              >
-                <ChevronLeft className="size-8" strokeWidth={2.25} aria-hidden />
-                {otherUnread > 0 && (
-                  <span className="-ml-1 min-w-6 rounded-full bg-primary px-1.5 text-center text-[13px] font-semibold leading-6 text-primary-foreground">
-                    {otherUnread > 99 ? "99+" : otherUnread}
-                  </span>
-                )}
-              </Link>
-            </div>
+          <div className="mx-auto flex max-w-4xl items-start justify-between gap-2 px-3 pb-2">
+            <Link
+              href="/chat"
+              aria-label="Back to conversations"
+              className="glass mt-0.5 flex h-10 shrink-0 items-center gap-1 rounded-full pl-2 pr-2.5 text-primary shadow-md ring-1 ring-foreground/10 split:invisible"
+            >
+              <ChevronLeft className="size-6" strokeWidth={2.5} aria-hidden />
+              {otherUnread > 0 && (
+                <span className="grid min-w-[1.4rem] place-items-center rounded-full bg-white px-1 text-[13px] font-semibold leading-5 text-black">
+                  {otherUnread > 99 ? "99+" : otherUnread}
+                </span>
+              )}
+            </Link>
             {summary ? (
               <button
                 type="button"
                 onClick={() => setInfoOpen(true)}
-                className="flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-2 pt-0.5"
+                className="relative flex min-w-0 flex-1 flex-col items-center"
                 aria-label={`${title}: ${isGroup ? "group info" : "contact info"}`}
               >
                 <span className="relative">
                   {isGroup ? (
-                    <GroupAvatar path={summary.avatar_path} name={title} className="size-10" />
+                    <GroupAvatar path={summary.avatar_path} name={title} className="size-14 shadow-sm" />
                   ) : (
-                    <Avatar name={title} seed={summary.other_user_id} path={summary.other_avatar_path} className="size-10" />
+                    <Avatar name={title} seed={summary.other_user_id} path={summary.other_avatar_path} className="size-14 shadow-sm" />
                   )}
                   {!isGroup && moods.find((m) => m.user_id === summary.other_user_id) && (
-                  <span
-                    className="absolute -right-1.5 -top-1 grid size-5 place-items-center rounded-full bg-popover text-xs shadow ring-1 ring-border"
-                    aria-hidden
-                  >
-                    {moods.find((m) => m.user_id === summary.other_user_id)!.mood}
-                  </span>
-                )}
+                    <span
+                      className="absolute -right-1 -top-0.5 grid size-5 place-items-center rounded-full bg-popover text-xs shadow ring-1 ring-border"
+                      aria-hidden
+                    >
+                      {moods.find((m) => m.user_id === summary.other_user_id)!.mood}
+                    </span>
+                  )}
                   {!isGroup && summary.other_user_id && onlineIds.has(summary.other_user_id) && !otherInactive && (
-                    <span className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-background bg-success" aria-hidden />
+                    <span className="absolute bottom-1 right-1 size-3 rounded-full border-2 border-background bg-success" aria-hidden />
                   )}
                 </span>
-                <span className="flex max-w-full items-center gap-0.5">
+                {/* Name in a glass pill overlapping the avatar's lower edge. */}
+                <span className="glass relative -mt-3 flex max-w-full items-center gap-0.5 rounded-full py-0.5 pl-3 pr-2 shadow-md ring-1 ring-foreground/10">
                   <h2 className="truncate text-[15px] font-semibold tracking-[-0.01em]">{title}</h2>
                   <ChevronRight className="size-3 shrink-0 text-muted-foreground/70" aria-hidden />
                 </span>
                 <p
                   className={cn(
-                    "flex max-w-full items-center justify-center gap-1 truncate text-[11px] leading-tight empty:hidden",
+                    "mt-1 flex max-w-full items-center justify-center gap-1 truncate text-[11px] leading-tight empty:hidden",
                     typingIds.length ? "text-primary" : "text-muted-foreground",
                   )}
                   aria-live="polite"
@@ -672,20 +671,20 @@ export function ConversationView({ conversationId }: { conversationId: string })
                 </p>
               </button>
             ) : (
-              <div className="flex flex-1 flex-col items-center gap-1.5 pt-1">
-                <Skeleton className="size-11 rounded-full" />
-                <Skeleton className="h-3 w-20" />
+              <div className="flex flex-1 flex-col items-center gap-2 pt-1">
+                <Skeleton className="size-14 rounded-full" />
+                <Skeleton className="h-6 w-24 rounded-full" />
               </div>
             )}
-            <div className="flex h-12 w-[5.5rem] shrink-0 items-center justify-end">
+            <div className="mt-0.5 shrink-0">
               {summary && (
-                <>
+                <div className="glass flex h-10 items-center gap-0.5 rounded-full px-1 shadow-md ring-1 ring-foreground/10">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
-                      size="icon"
-                      className="text-rose-500 hover:bg-transparent hover:text-rose-500"
+                      size="icon-sm"
+                      className="size-8 rounded-full text-rose-500 hover:bg-foreground/10 hover:text-rose-500"
                       aria-label="Love taps: thinking of you, I miss you, hug, kiss"
                       title="Love taps"
                       disabled={otherInactive}
@@ -706,10 +705,10 @@ export function ConversationView({ conversationId }: { conversationId: string })
                 </DropdownMenu>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" aria-label="More" className="relative text-primary hover:bg-transparent">
-                      <MoreHorizontal className="!size-6" />
+                    <Button variant="ghost" size="icon-sm" aria-label="More" className="relative size-8 rounded-full text-primary hover:bg-foreground/10">
+                      <MoreHorizontal className="!size-5" />
                       {daily?.needsMe && !otherInactive && (
-                        <span className="absolute right-1.5 top-2 size-2 rounded-full bg-primary" aria-hidden />
+                        <span className="absolute right-1 top-1 size-2 rounded-full bg-primary" aria-hidden />
                       )}
                     </Button>
                   </DropdownMenuTrigger>
@@ -780,8 +779,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-
-                </>
+                </div>
               )}
             </div>
           </div>
