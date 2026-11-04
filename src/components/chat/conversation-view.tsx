@@ -19,6 +19,7 @@ import {
   Search,
   MapPin,
   Smile,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
@@ -83,6 +84,7 @@ import { moodLabel, TAPS, tapFor, type TapKind } from "@/lib/love";
 import { requestPushForMessage } from "@/lib/pwa-client";
 import { displayNameOf, formatLastSeen, formatTimeHeader, formatTyping } from "@/lib/format";
 import { isImage } from "@/lib/media";
+import { PlusDialog } from "@/components/plus/plus-dialog";
 import { getCurrentLocation, LocationError, locationMessage } from "@/lib/location";
 import { cn } from "@/lib/utils";
 import type {
@@ -157,6 +159,28 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const router = useRouter();
   const [infoOpen, setInfoOpen] = useState(false);
   const [panel, setPanel] = useState<"list" | "dates" | "notes" | "look" | "daily" | "mood" | "plans" | null>(null);
+  // Ghostline Plus: the couple pack is unlocked if either partner subscribes.
+  const [otherPlus, setOtherPlus] = useState(false);
+  const [plus, setPlus] = useState<{ open: boolean; feature?: string }>({ open: false });
+  const coupleUnlocked = access.is_plus || otherPlus;
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase.rpc("conversation_is_plus", { p_conversation_id: conversationId });
+      if (!cancelled) setOtherPlus(data === true);
+    })().catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, conversationId]);
+  /** Runs the couple-pack action, or shows the paywall when it's locked. */
+  const requirePlus = useCallback(
+    (feature: string, run: () => void) => {
+      if (coupleUnlocked) run();
+      else setPlus({ open: true, feature });
+    },
+    [coupleUnlocked],
+  );
   const { rows: plans, reload: reloadPlans } = useLiveRows<DatePlan>("date_plans", conversationId, () =>
     listPlans(supabase, conversationId),
   );
@@ -741,31 +765,36 @@ export function ConversationView({ conversationId }: { conversationId: string })
                       <ListChecks /> Our list
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onSelect={() => {
-                        setListTab("bucket");
-                        setPanel("list");
-                      }}
+                      onSelect={() =>
+                        requirePlus("The bucket list", () => {
+                          setListTab("bucket");
+                          setPanel("list");
+                        })
+                      }
                     >
-                      <Mountain /> Bucket list
+                      <Mountain /> Bucket list {!coupleUnlocked && <Sparkles className="ml-auto size-3.5 text-primary" aria-label="Plus feature" />}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setPanel("plans")}>
-                      <CalendarClock /> Date plans
+                    <DropdownMenuItem onSelect={() => requirePlus("The date planner", () => setPanel("plans"))}>
+                      <CalendarClock /> Date plans {!coupleUnlocked && <Sparkles className="ml-auto size-3.5 text-primary" aria-label="Plus feature" />}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setPanel("dates")}>
-                      <CalendarHeart /> Special dates
+                    <DropdownMenuItem onSelect={() => requirePlus("Special dates", () => setPanel("dates"))}>
+                      <CalendarHeart /> Special dates {!coupleUnlocked && <Sparkles className="ml-auto size-3.5 text-primary" aria-label="Plus feature" />}
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href={`/chat/${conversationId}/journal`}>
-                        <BookHeart /> Our journal
-                      </Link>
+                    <DropdownMenuItem
+                      onSelect={() => requirePlus("Our journal", () => router.push(`/chat/${conversationId}/journal`))}
+                    >
+                      <BookHeart /> Our journal {!coupleUnlocked && <Sparkles className="ml-auto size-3.5 text-primary" aria-label="Plus feature" />}
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link href={`/chat/${conversationId}/memories`}>
                         <Images /> Memories
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setPanel("notes")} disabled={otherInactive}>
-                      <Clock /> Love note for later
+                    <DropdownMenuItem
+                      onSelect={() => requirePlus("Love notes for later", () => setPanel("notes"))}
+                      disabled={otherInactive}
+                    >
+                      <Clock /> Love note for later {!coupleUnlocked && <Sparkles className="ml-auto size-3.5 text-primary" aria-label="Plus feature" />}
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setPanel("look")}>
                       <Palette /> Chat look
@@ -796,8 +825,8 @@ export function ConversationView({ conversationId }: { conversationId: string })
               dates={specialDates ?? []}
               streak={streak}
               plans={plans ?? []}
-              onOpen={() => setPanel("dates")}
-              onOpenPlans={() => setPanel("plans")}
+              onOpen={() => requirePlus("Special dates", () => setPanel("dates"))}
+              onOpenPlans={() => requirePlus("The date planner", () => setPanel("plans"))}
               showStreak={false}
             />
             {settings?.admin_can_read_messages && (
@@ -845,8 +874,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
         />
       )}
 
+      <PlusDialog open={plus.open} onOpenChange={(o) => setPlus((p) => ({ ...p, open: o }))} feature={plus.feature} />
+
       <SharedListDialog
         conversationId={conversationId}
+        allowBucket={coupleUnlocked}
         open={panel === "list"}
         onOpenChange={(o) => setPanel(o ? "list" : null)}
         nameOf={nameOf}

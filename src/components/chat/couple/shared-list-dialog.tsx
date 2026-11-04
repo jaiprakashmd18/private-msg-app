@@ -31,6 +31,7 @@ export function SharedListDialog({
   nameOf,
   tab,
   onTabChange,
+  allowBucket = true,
 }: {
   conversationId: string;
   open: boolean;
@@ -38,8 +39,11 @@ export function SharedListDialog({
   nameOf: (userId: string | null) => string;
   tab: ListTab;
   onTabChange: (tab: ListTab) => void;
+  /** Bucket list is part of Ghostline Plus; hide its tab when not unlocked. */
+  allowBucket?: boolean;
 }) {
   const { supabase, reportError } = useApp();
+  const activeTab: ListTab = allowBucket ? tab : "todo";
   const { rows, reload } = useLiveRows<ListItem>("shared_list_items", conversationId, () => listItems(supabase, conversationId), open);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -67,11 +71,11 @@ export function SharedListDialog({
   }
 
   const items = (rows ?? [])
-    .filter((r) => (r.list_kind ?? "todo") === tab)
+    .filter((r) => (r.list_kind ?? "todo") === activeTab)
     .map((r) => (r.id in pendingDone ? { ...r, done: pendingDone[r.id]! } : r));
   const todo = items.filter((i) => !i.done);
   const done = items.filter((i) => i.done);
-  const bucket = tab === "bucket";
+  const bucket = activeTab === "bucket";
 
   const row = (item: ListItem) => (
     <li key={item.id} className="group rounded-xl px-2 py-1.5 hover:bg-accent/50">
@@ -133,6 +137,7 @@ export function SharedListDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {allowBucket && (
         <div role="tablist" aria-label="Lists" className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
           {(["todo", "bucket"] as const).map((t) => (
             <button
@@ -150,6 +155,7 @@ export function SharedListDialog({
             </button>
           ))}
         </div>
+        )}
 
         <form onSubmit={add} className="flex gap-2">
           <Input
