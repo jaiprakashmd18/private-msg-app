@@ -636,9 +636,9 @@ export function ConversationView({ conversationId }: { conversationId: string })
               >
                 <span className="relative">
                   {isGroup ? (
-                    <GroupAvatar path={summary.avatar_path} name={title} className="size-11" />
+                    <GroupAvatar path={summary.avatar_path} name={title} className="size-10" />
                   ) : (
-                    <Avatar name={title} seed={summary.other_user_id} path={summary.other_avatar_path} className="size-11" />
+                    <Avatar name={title} seed={summary.other_user_id} path={summary.other_avatar_path} className="size-10" />
                   )}
                   {!isGroup && moods.find((m) => m.user_id === summary.other_user_id) && (
                   <span
@@ -653,17 +653,22 @@ export function ConversationView({ conversationId }: { conversationId: string })
                   )}
                 </span>
                 <span className="flex max-w-full items-center gap-0.5">
-                  <h2 className="truncate text-[13px] font-medium">{title}</h2>
-                  <ChevronRight className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+                  <h2 className="truncate text-[15px] font-semibold tracking-[-0.01em]">{title}</h2>
+                  <ChevronRight className="size-3 shrink-0 text-muted-foreground/70" aria-hidden />
                 </span>
                 <p
                   className={cn(
-                    "max-w-full truncate text-[11px] leading-tight empty:hidden",
+                    "flex max-w-full items-center justify-center gap-1 truncate text-[11px] leading-tight empty:hidden",
                     typingIds.length ? "text-primary" : "text-muted-foreground",
                   )}
                   aria-live="polite"
                 >
-                  {subtitle}
+                  {subtitle && <span className="truncate">{subtitle}</span>}
+                  {!isGroup && !typingIds.length && streak && streak.days > 0 && (
+                    <span className={cn("shrink-0", streak.today_done ? "" : "opacity-60")}>
+                      {subtitle && <span className="mr-1" aria-hidden>·</span>}🔥 {streak.days}
+                    </span>
+                  )}
                 </p>
               </button>
             ) : (
@@ -788,13 +793,14 @@ export function ConversationView({ conversationId }: { conversationId: string })
             onClose={() => setSearching(false)}
           />
         )}
-          <div className="flex flex-col gap-1.5 px-3 pb-1.5 empty:hidden">
+          <div className="flex flex-col gap-1 px-3 pb-2 empty:hidden">
             <TogetherChip
               dates={specialDates ?? []}
               streak={streak}
               plans={plans ?? []}
               onOpen={() => setPanel("dates")}
               onOpenPlans={() => setPanel("plans")}
+              showStreak={false}
             />
             {settings?.admin_can_read_messages && (
               <div

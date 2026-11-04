@@ -18,12 +18,15 @@ export function TogetherChip({
   plans,
   onOpen,
   onOpenPlans,
+  showStreak = true,
 }: {
   dates: SpecialDate[];
   streak: { days: number; today_done: boolean } | null;
   plans: DatePlan[];
   onOpen: () => void;
   onOpenPlans: () => void;
+  /** The header can show the streak on the status line instead, to keep this line for dates only. */
+  showStreak?: boolean;
 }) {
   // The next date plan in the coming week.
   const [now] = useState(() => Date.now());
@@ -47,7 +50,7 @@ export function TogetherChip({
   const days = together ? daysTogether(together.on_date) : null;
 
   const items: React.ReactNode[] = [];
-  if (streak && streak.days > 0) {
+  if (showStreak && streak && streak.days > 0) {
     items.push(
       <span
         key="streak"
