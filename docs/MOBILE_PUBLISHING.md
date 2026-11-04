@@ -189,7 +189,7 @@ ID**, or go to <https://account.apple.com>. It’s free.
 1. On your PC, open the repo → **Actions** → **Mobile apps** → the latest
    successful run (green ✓).
 2. Scroll to **Artifacts** → download **ghostline-ios-unsigned** (a zip).
-3. Unzip it — inside is **`Ghostline-unsigned.ipa`**. (Downloads expire after
+3. Unzip it — inside is **`Loveline-unsigned.ipa`**. (Downloads expire after
    14 days; re-run the workflow to get a fresh one.)
 
 ### 3. Install it with Sideloadly
@@ -198,7 +198,7 @@ ID**, or go to <https://account.apple.com>. It’s free.
 2. Plug your iPhone into the PC with a cable; on the iPhone tap **Trust** and
    enter your passcode.
 3. Open **Sideloadly**. Pick your iPhone at the top. Drag
-   **`Ghostline-unsigned.ipa`** into the window.
+   **`Loveline-unsigned.ipa`** into the window.
 4. Enter your **Apple ID** email and password (an app-specific password if you
    use two-factor — create one at <https://account.apple.com> → Sign-In and
    Security). If asked, let it **remove unsupported entitlements**.
@@ -207,7 +207,7 @@ ID**, or go to <https://account.apple.com>. It’s free.
 ### 4. Trust the app on the iPhone
 1. iPhone → **Settings → General → VPN & Device Management**.
 2. Under “Developer App”, tap your Apple ID → **Trust**.
-3. Open **Ghostline** from the Home Screen and sign in with email + password,
+3. Open **Loveline** from the Home Screen and sign in with email + password,
    or with Google.
 
 ### Keeping it working
