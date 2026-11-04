@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Sparkles } from "lucide-react";
+import { Check, CreditCard, Smartphone, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -11,11 +11,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { formatDateTime } from "@/lib/format";
-import { PLUS_NAME, startSubscribe } from "@/lib/plus";
+import { isNativeApp } from "@/lib/native";
+import { PLUS_NAME, STRIPE_ENABLED, startSubscribe } from "@/lib/plus";
+import { payWithRazorpay, RAZORPAY_ENABLED } from "@/lib/razorpay";
 import type { SubscriptionState } from "@/types/app";
 
 const SOURCE_LABEL: Record<string, string> = {
   stripe: "the website",
+  razorpay: "UPI / card",
   apple: "the App Store",
   google: "Google Play",
   admin: "the administrator",
@@ -27,7 +30,8 @@ export function PlusCard() {
   const router = useRouter();
   const [sub, setSub] = useState<SubscriptionState | null>(null);
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"rz" | "stripe" | null>(null);
+  const canPayHere = !isNativeApp();
   // True while finishing a just-completed checkout (confirming the payment).
   const [activating, setActivating] = useState(false);
   // The return-from-checkout handler must run exactly once, even though it
@@ -125,10 +129,23 @@ export function PlusCard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function payRazorpay() {
+    setBusy("rz");
+    const result = await payWithRazorpay();
+    setBusy(null);
+    if (result.ok) {
+      toast.success("You’re a Plus member — enjoy! 🎉");
+      load();
+      router.refresh();
+    } else if (result.message) {
+      toast(result.message);
+    }
+  }
+
   async function subscribe() {
-    setBusy(true);
+    setBusy("stripe");
     const result = await startSubscribe();
-    setBusy(false);
+    setBusy(null);
     if (!result.ok) toast(result.message);
   }
 
@@ -167,13 +184,26 @@ export function PlusCard() {
           </>
         ) : (
           <>
-            <p className="text-muted-foreground">You&apos;re on the free plan. Subscribe to unlock the couple pack for both of you.</p>
+            <p className="text-muted-foreground">
+              You&apos;re on the free plan. Unlock the couple pack for both of you — one payment, forever.
+            </p>
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setOpen(true)}>
+              {canPayHere && RAZORPAY_ENABLED && (
+                <Button onClick={() => void payRazorpay()} disabled={busy !== null}>
+                  {busy === "rz" ? <Spinner /> : <Smartphone />} Pay with UPI / Google Pay
+                </Button>
+              )}
+              {canPayHere && STRIPE_ENABLED && (
+                <Button
+                  variant={RAZORPAY_ENABLED ? "outline" : "default"}
+                  onClick={() => void subscribe()}
+                  disabled={busy !== null}
+                >
+                  {busy === "stripe" ? <Spinner /> : <CreditCard />} Pay by card
+                </Button>
+              )}
+              <Button variant="ghost" onClick={() => setOpen(true)}>
                 <Sparkles /> See what&apos;s included
-              </Button>
-              <Button variant="outline" onClick={() => void subscribe()} disabled={busy}>
-                Subscribe
               </Button>
             </div>
           </>

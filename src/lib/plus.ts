@@ -14,7 +14,10 @@ import { isNativeApp } from "@/lib/native";
 export const PLUS_NAME = "Loveline Plus";
 
 /** Shown on the paywall. Just the price label, set in Vercel; billing is configured separately. */
-export const PLUS_PRICE = process.env.NEXT_PUBLIC_PLUS_PRICE || "$4.99 / month";
+export const PLUS_PRICE = process.env.NEXT_PUBLIC_PLUS_PRICE || "₹399 · lifetime";
+
+/** Card payments (Stripe) show on the paywall only when turned on. */
+export const STRIPE_ENABLED = Boolean(process.env.NEXT_PUBLIC_STRIPE_ENABLED);
 
 /** The couple pack — everything Plus unlocks. */
 export const PLUS_FEATURES: Array<{ emoji: string; title: string; detail: string }> = [

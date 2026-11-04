@@ -1,13 +1,16 @@
 "use client";
 
-import { Check, Sparkles } from "lucide-react";
+import { Check, CreditCard, Smartphone, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
-import { PLUS_FEATURES, PLUS_NAME, PLUS_PRICE, startSubscribe } from "@/lib/plus";
+import { isNativeApp } from "@/lib/native";
+import { PLUS_FEATURES, PLUS_NAME, PLUS_PRICE, STRIPE_ENABLED, startSubscribe } from "@/lib/plus";
+import { payWithRazorpay, RAZORPAY_ENABLED } from "@/lib/razorpay";
 
 /**
  * The paywall. Shows what Loveline Plus unlocks and a Subscribe button.
@@ -24,12 +27,28 @@ export function PlusDialog({
   feature?: string;
 }) {
   const { access } = useApp();
-  const [busy, setBusy] = useState(false);
+  const router = useRouter();
+  const [busy, setBusy] = useState<"rz" | "stripe" | null>(null);
+  const native = isNativeApp();
+  const canPayHere = !native;
+
+  async function payRazorpay() {
+    setBusy("rz");
+    const result = await payWithRazorpay();
+    setBusy(null);
+    if (result.ok) {
+      toast.success("You’re a Plus member — enjoy! 🎉");
+      onOpenChange(false);
+      router.refresh();
+    } else if (result.message) {
+      toast(result.message);
+    }
+  }
 
   async function subscribe() {
-    setBusy(true);
+    setBusy("stripe");
     const result = await startSubscribe();
-    setBusy(false);
+    setBusy(null);
     if (!result.ok) toast(result.message);
   }
 
@@ -42,7 +61,7 @@ export function PlusDialog({
           </span>
           <DialogTitle className="text-2xl">{PLUS_NAME}</DialogTitle>
           <DialogDescription>
-            {feature ? `${feature} is part of ${PLUS_NAME}.` : "Unlock the couple pack."} One subscription covers both of you.
+            {feature ? `${feature} is part of ${PLUS_NAME}.` : "Unlock the couple pack."} One payment covers both of you.
           </DialogDescription>
         </DialogHeader>
 
@@ -66,11 +85,30 @@ export function PlusDialog({
           </p>
         ) : (
           <div className="grid gap-2">
-            <Button size="lg" onClick={() => void subscribe()} disabled={busy}>
-              {busy ? <Spinner /> : <Sparkles />} Subscribe · {PLUS_PRICE}
-            </Button>
+            {canPayHere && RAZORPAY_ENABLED && (
+              <Button size="lg" onClick={() => void payRazorpay()} disabled={busy !== null}>
+                {busy === "rz" ? <Spinner /> : <Smartphone />} Pay with UPI / Google Pay · {PLUS_PRICE}
+              </Button>
+            )}
+            {canPayHere && STRIPE_ENABLED && (
+              <Button
+                size="lg"
+                variant={RAZORPAY_ENABLED ? "outline" : "default"}
+                onClick={() => void subscribe()}
+                disabled={busy !== null}
+              >
+                {busy === "stripe" ? <Spinner /> : <CreditCard />} Pay by card · {PLUS_PRICE}
+              </Button>
+            )}
+            {(!canPayHere || (!RAZORPAY_ENABLED && !STRIPE_ENABLED)) && (
+              <p className="rounded-2xl bg-muted/60 p-3 text-center text-sm text-muted-foreground">
+                {native
+                  ? "Open Loveline in your web browser to unlock Plus, or ask the administrator to turn it on for you."
+                  : "Payments aren’t set up yet. Ask the administrator to unlock Plus for you."}
+              </p>
+            )}
             <p className="text-center text-xs text-muted-foreground">
-              Cancel anytime. If one of you subscribes, you both get the couple pack.
+              One payment unlocks the couple pack for both of you — forever.
             </p>
           </div>
         )}

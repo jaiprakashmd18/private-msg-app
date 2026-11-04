@@ -71,4 +71,17 @@ describe("Loveline Plus entitlement", () => {
       asUser(null, "select public.server_apply_subscription($1, 'paypal', 'active')", [a.id], "service_role"),
     ).rejects.toThrow(/Invalid subscription source/i);
   });
+
+  it("a Razorpay (one-time) payment unlocks Plus for life — no end date", async () => {
+    const a = await createUser();
+    await asUser(null, "select public.server_apply_subscription($1, 'razorpay', 'active', null, null, 'order_1')", [a.id], "service_role");
+    expect(await myAccess(a.id)).toBe(true);
+    expect(await mySub(a.id)).toMatchObject({ is_plus: true, status: "active", source: "razorpay" });
+    // Lifetime: no current_period_end, so it never expires.
+    const row = await asOwner<{ current_period_end: string | null }>(
+      "select current_period_end from public.subscriptions where user_id = $1",
+      [a.id],
+    );
+    expect(row[0]!.current_period_end).toBeNull();
+  });
 });

@@ -10,7 +10,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  *  - RevenueCat (Apple / Google, from the apps): /api/webhooks/revenuecat
  */
 
-export type Source = "stripe" | "apple" | "google";
+export type Source = "stripe" | "apple" | "google" | "razorpay";
 export type Status = "active" | "trialing" | "past_due" | "canceled" | "inactive";
 
 export interface SubscriptionUpdate {
@@ -145,4 +145,56 @@ export function bearerMatches(header: string | null, secret: string | undefined)
   const a = Buffer.from(given);
   const b = Buffer.from(secret);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+// --- Razorpay (one-time payment: UPI / Google Pay / cards, India) ----------------
+
+const hmacEquals = (expectedHex: string, givenHex: string | null | undefined): boolean => {
+  if (!givenHex) return false;
+  const a = Buffer.from(expectedHex);
+  const b = Buffer.from(givenHex);
+  return a.length === b.length && timingSafeEqual(a, b);
+};
+
+/**
+ * Verifies a Razorpay Checkout success on return: the signature is
+ * HMAC-SHA256("<order_id>|<payment_id>", key_secret). Proves the payment is
+ * genuine and belongs to that order.
+ */
+export function verifyRazorpayPaymentSignature(orderId: string, paymentId: string, signature: string, secret: string): boolean {
+  if (!orderId || !paymentId || !secret) return false;
+  return hmacEquals(createHmac("sha256", secret).update(`${orderId}|${paymentId}`).digest("hex"), signature);
+}
+
+/** Verifies a Razorpay webhook body against the X-Razorpay-Signature header. */
+export function verifyRazorpayWebhookSignature(payload: string, signature: string | null, secret: string): boolean {
+  if (!secret) return false;
+  return hmacEquals(createHmac("sha256", secret).update(payload).digest("hex"), signature);
+}
+
+interface RazorpayWebhookBody {
+  event?: string;
+  payload?: {
+    payment?: { entity?: { id?: string; order_id?: string; notes?: Record<string, unknown> } };
+    order?: { entity?: { id?: string; notes?: Record<string, unknown> } };
+  };
+}
+
+/** Maps a Razorpay webhook (a successful one-time payment) to a lifetime unlock. */
+export function parseRazorpayWebhook(body: RazorpayWebhookBody): SubscriptionUpdate | null {
+  if (body.event !== "payment.captured" && body.event !== "order.paid") return null;
+  const payment = body.payload?.payment?.entity;
+  const order = body.payload?.order?.entity;
+  const notes = (payment?.notes ?? order?.notes ?? {}) as Record<string, unknown>;
+  const userId = notes.user_id;
+  if (!isUuid(userId)) return null;
+  return {
+    userId,
+    source: "razorpay",
+    status: "active",
+    currentPeriodEnd: null, // one-time = lifetime, no end date
+    externalCustomer: null,
+    externalSub: typeof payment?.order_id === "string" ? payment.order_id : typeof order?.id === "string" ? order.id : null,
+    cancelAtPeriodEnd: false,
+  };
 }

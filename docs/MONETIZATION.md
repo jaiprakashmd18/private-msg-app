@@ -27,16 +27,60 @@ updates the `subscriptions` table. The app then reads one answer — "is this
 person Plus?" — everywhere.
 
 ```
-Website  → Stripe Checkout ───→ /api/webhooks/stripe ─────┐
-iPhone   → Apple IAP  ┐                                    ├─→ subscriptions table → is_plus
-Android  → Play Billing├→ RevenueCat → /api/webhooks/revenuecat ┘
-Admin grant (free) ───────────────→ admin_set_plus ───────┘
+Website → Razorpay (UPI / GPay / cards) → verify + /api/webhooks/razorpay ─┐
+Website → Stripe Checkout ──────────────→ /api/webhooks/stripe ────────────┤
+iPhone  → Apple IAP  ┐                                                      ├─→ subscriptions → is_plus
+Android → Play Billing├→ RevenueCat ────→ /api/webhooks/revenuecat ────────┤
+Admin grant (free) ──────────────────────→ admin_set_plus ─────────────────┘
 ```
+
+Each gateway is independent and shows up only when its keys are set — so in
+India you can run **Razorpay alone** and leave Stripe off.
 
 ## Part 0 — Database (required)
 
-Supabase → **SQL Editor** → run `supabase/update_subscriptions.sql` once. (New
-projects created from `setup_all.sql` already have it.)
+Supabase → **SQL Editor** → run `supabase/update_subscriptions.sql`, then
+`supabase/update_razorpay.sql`, once each. (New projects created from
+`setup_all.sql` already have both.)
+
+## Part 1a — Website payments, India (Razorpay — UPI / Google Pay / cards)
+
+Razorpay's checkout shows **UPI (Google Pay, PhonePe, Paytm), cards, netbanking
+and wallets** — so this one integration gives you Google Pay. Loveline sells Plus
+here as a **one-time lifetime** unlock.
+
+1. Create a **Razorpay** account and complete KYC: <https://dashboard.razorpay.com>
+2. **Settings → API Keys → Generate Key**. Copy the **Key Id** (`rzp_live_…` or
+   `rzp_test_…`) and the **Key Secret** (shown once).
+3. *(Optional but recommended)* **Settings → Webhooks → Add**:
+   - URL: `https://loveline.space/api/webhooks/razorpay`
+   - Active events: `payment.captured` (and `order.paid`)
+   - Set a **secret** and copy it.
+4. Vercel → **Settings → Environment Variables** (tick **Production** and
+   **Preview**), then redeploy:
+
+   | Name | Value |
+   | --- | --- |
+   | `NEXT_PUBLIC_RAZORPAY_KEY_ID` | `rzp_…` (the Key Id — public, shows the button) |
+   | `RAZORPAY_KEY_SECRET` | the Key Secret (mark Sensitive) |
+   | `RAZORPAY_AMOUNT` | price in **paise**, e.g. `39900` for ₹399 |
+   | `RAZORPAY_CURRENCY` | `INR` (default) |
+   | `RAZORPAY_WEBHOOK_SECRET` | the webhook secret (mark Sensitive, if you added one) |
+   | `NEXT_PUBLIC_PLUS_PRICE` | the label shown on the button, e.g. `₹399 · lifetime` |
+
+Now the website shows **Pay with UPI / Google Pay**. When the payment succeeds,
+Loveline verifies Razorpay's signature on return and unlocks Plus immediately;
+the webhook is the backup if the browser closes first. Test with Razorpay **Test
+Mode** keys first (UPI success id `success@razorpay`).
+
+> Even without the webhook, a paid checkout unlocks Plus on return (that step
+> only needs `NEXT_PUBLIC_RAZORPAY_KEY_ID` + `RAZORPAY_KEY_SECRET`). The webhook
+> just covers the rare case where the browser closes mid-payment.
+
+## Part 1 — Website payments (Stripe, outside India)
+
+Stripe is best for non-Indian cards. To show its **Pay by card** button, also set
+`NEXT_PUBLIC_STRIPE_ENABLED=1`. Skip this whole part if you only use Razorpay.
 
 ## Part 1 — Website payments (Stripe)
 
@@ -120,9 +164,11 @@ recorded in the audit log and never expires unless you remove it.
 | `src/lib/plus.ts` | The paywall copy and the web "start subscribing" flow |
 | `src/components/plus/` | The paywall dialog and the Settings card |
 | `src/lib/billing.server.ts` | Turns Stripe / RevenueCat webhooks into one update (signature-checked) |
+| `src/lib/razorpay.ts` | Web Razorpay Checkout flow (UPI / GPay / cards) |
 | `src/app/api/billing/checkout` | Creates the Stripe Checkout session |
-| `src/app/api/billing/confirm` | On return from checkout, verifies the paid session and unlocks Plus right away |
-| `src/app/api/webhooks/stripe`, `.../revenuecat` | Receive events and update the table |
+| `src/app/api/billing/confirm` | On return from Stripe, verifies the paid session and unlocks Plus right away |
+| `src/app/api/billing/razorpay/order`, `.../verify` | Create a Razorpay order; verify the paid signature and unlock |
+| `src/app/api/webhooks/stripe`, `.../revenuecat`, `.../razorpay` | Receive events and update the table |
 
 ## Store rules to remember
 
