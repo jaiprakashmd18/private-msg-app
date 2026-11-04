@@ -27,7 +27,9 @@ export async function POST(request: Request) {
       mode: "subscription",
       "line_items[0][price]": price,
       "line_items[0][quantity]": "1",
-      success_url: `${origin}/settings?plus=success`,
+      // {CHECKOUT_SESSION_ID} is filled in by Stripe, so the app can confirm
+      // the payment on return and unlock right away (not waiting on the webhook).
+      success_url: `${origin}/settings?plus=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/settings?plus=cancel`,
       client_reference_id: userId,
       "subscription_data[metadata][user_id]": userId,

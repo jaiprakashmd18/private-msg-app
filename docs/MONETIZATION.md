@@ -60,9 +60,16 @@ projects created from `setup_all.sql` already have it.)
    | `STRIPE_WEBHOOK_SECRET` | `whsec_…` (mark Sensitive) |
    | `NEXT_PUBLIC_PLUS_PRICE` | The label shown on the paywall, e.g. `$4.99 / month` |
 
-Now the website's **Subscribe** button opens Stripe Checkout, and a completed
-payment turns on Plus automatically. Test with Stripe's test card
+Now the website's **Subscribe** button opens Stripe Checkout. When the payment
+succeeds, the person is sent back to **Settings**, where Plus unlocks within a
+second or two — the app confirms the paid checkout directly (`/api/billing/confirm`)
+instead of waiting for the webhook. The webhook stays the source of truth for
+renewals and cancellations. Test with Stripe's test card
 `4242 4242 4242 4242`, any future date and CVC, while using the `sk_test_…` key.
+
+> Even if you haven't set up the webhook yet, a paid checkout still unlocks Plus
+> on return (the confirm step only needs `STRIPE_SECRET_KEY`). Add the webhook so
+> that later renewals and cancellations keep Plus in sync automatically.
 
 ## Part 2 — App payments (RevenueCat → Apple & Google)
 
@@ -114,6 +121,7 @@ recorded in the audit log and never expires unless you remove it.
 | `src/components/plus/` | The paywall dialog and the Settings card |
 | `src/lib/billing.server.ts` | Turns Stripe / RevenueCat webhooks into one update (signature-checked) |
 | `src/app/api/billing/checkout` | Creates the Stripe Checkout session |
+| `src/app/api/billing/confirm` | On return from checkout, verifies the paid session and unlocks Plus right away |
 | `src/app/api/webhooks/stripe`, `.../revenuecat` | Receive events and update the table |
 
 ## Store rules to remember
