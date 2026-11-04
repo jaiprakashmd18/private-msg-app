@@ -20,23 +20,26 @@ function reasonFor(message: string | null | undefined): string {
  */
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
-  const toLogin = (reason: string) => {
+  // `detail` is a short, non-secret hint shown under the error, to diagnose
+  // sign-in problems (what Google/Supabase actually reported).
+  const toLogin = (reason: string, detail?: string | null) => {
     const target = new URL("/login", url.origin);
     target.searchParams.set("error", reason);
+    if (detail) target.searchParams.set("detail", detail.slice(0, 160));
     return NextResponse.redirect(target);
   };
 
   const providerError = url.searchParams.get("error_description") ?? url.searchParams.get("error");
-  if (providerError) return toLogin(reasonFor(providerError));
+  if (providerError) return toLogin(reasonFor(providerError), `provider: ${providerError}`);
 
   const code = url.searchParams.get("code");
-  if (!code) return toLogin("failed");
+  if (!code) return toLogin("failed", "no sign-in code came back (implicit flow, or the link was reloaded)");
 
   const supabase = await getSupabaseServerClient();
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
     if (error.status && error.status >= 500) logServerError("auth/callback", error);
-    return toLogin(reasonFor(error.message));
+    return toLogin(reasonFor(error.message), `exchange ${error.status ?? ""}: ${error.message}`);
   }
 
   await supabase.rpc("log_auth_event", { p_action: "auth.sign_in" });

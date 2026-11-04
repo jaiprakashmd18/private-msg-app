@@ -6,7 +6,7 @@ import { APP_NAME } from "@/lib/env";
 export const metadata: Metadata = { title: "Sign in" };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
-  const { error } = await searchParams;
+  const { error, detail } = await searchParams;
   return (
     <main
       id="main"
@@ -22,7 +22,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <h1 className="text-[34px] font-bold tracking-[-0.02em]">{APP_NAME}</h1>
           <p className="mt-1 text-sm text-muted-foreground">Private messaging for invited members.</p>
         </div>
-        <LoginForm errorKey={typeof error === "string" ? error : undefined} />
+        <LoginForm errorKey={typeof error === "string" ? error : undefined} errorDetail={typeof detail === "string" ? detail : undefined} />
         <p className="mt-8 text-center text-xs text-muted-foreground">
           Access is by invitation only. Read the{" "}
           <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground">
