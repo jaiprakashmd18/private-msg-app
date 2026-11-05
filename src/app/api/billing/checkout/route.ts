@@ -4,7 +4,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 
 /**
- * Starts a Stripe Checkout for Ghostline Plus and returns { url } to redirect to.
+ * Starts a Stripe Checkout for Loveline Plus and returns { url } to redirect to.
  * Off (ok:false, reason:"not_configured") until STRIPE_SECRET_KEY and
  * STRIPE_PRICE_ID are set in Vercel. Web only — the apps use the store.
  */
@@ -27,7 +27,9 @@ export async function POST(request: Request) {
       mode: "subscription",
       "line_items[0][price]": price,
       "line_items[0][quantity]": "1",
-      success_url: `${origin}/settings?plus=success`,
+      // {CHECKOUT_SESSION_ID} is filled in by Stripe, so the app can confirm
+      // the payment on return and unlock right away (not waiting on the webhook).
+      success_url: `${origin}/settings?plus=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/settings?plus=cancel`,
       client_reference_id: userId,
       "subscription_data[metadata][user_id]": userId,

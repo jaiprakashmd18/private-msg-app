@@ -11,7 +11,7 @@ export interface Access {
   avatar_path: string | null;
   is_active: boolean;
   role: AppRole | null;
-  /** Ghostline Plus subscriber (unlocks the couple pack). */
+  /** Loveline Plus subscriber (unlocks the couple pack). */
   is_plus: boolean;
   has_password: boolean;
   has_google: boolean;

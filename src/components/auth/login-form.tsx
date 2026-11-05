@@ -29,7 +29,7 @@ function GoogleIcon() {
   );
 }
 
-export function LoginForm({ errorKey }: { errorKey?: string }) {
+export function LoginForm({ errorKey, errorDetail }: { errorKey?: string; errorDetail?: string }) {
   const [busy, setBusy] = useState<"google" | "password" | null>(null);
   const [error, setError] = useState<string | null>(errorKey ? (ERRORS[errorKey] ?? ERRORS.failed!) : null);
   const [email, setEmail] = useState("");
@@ -147,9 +147,10 @@ export function LoginForm({ errorKey }: { errorKey?: string }) {
       </form>
 
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
+        <div role="alert" className="grid gap-1">
+          <p className="text-sm text-destructive">{error}</p>
+          {errorDetail && <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">Details: {errorDetail}</p>}
+        </div>
       ) : (
         <p className="text-center text-xs text-muted-foreground">
           Only accounts approved by the administrator can sign in. Forgot your password? Ask the administrator to

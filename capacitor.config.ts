@@ -1,7 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli";
+import { KeyboardResize } from "@capacitor/keyboard";
 
 /**
- * Ghostline for Android and iOS.
+ * Loveline for Android and iOS.
  *
  * The app shows the live website (server.url) inside a native shell, so the
  * website, Supabase backend, accounts and realtime messaging stay exactly as
@@ -12,11 +13,11 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * To try a Vercel preview build instead of production:
  *   CAP_SERVER_URL=https://<preview>.vercel.app npx cap sync
  */
-const SERVER_URL = process.env.CAP_SERVER_URL ?? "https://private-msg-app-jai-prakash.vercel.app";
+const SERVER_URL = process.env.CAP_SERVER_URL ?? "https://loveline.space";
 
 const config: CapacitorConfig = {
   appId: "com.jaiprakash.ghostline",
-  appName: "Ghostline",
+  appName: "Loveline",
   // Only the offline page lives in the app; everything else loads from SERVER_URL.
   webDir: "mobile/www",
   backgroundColor: "#000000",
@@ -37,6 +38,13 @@ const config: CapacitorConfig = {
     scrollEnabled: true,
   },
   plugins: {
+    Keyboard: {
+      // The web view shrinks to sit above the on-screen keyboard, so the
+      // message box stays pinned just above it instead of the page scrolling
+      // up and leaving the composer floating over the messages (iOS).
+      resize: KeyboardResize.Native,
+      resizeOnFullScreen: true,
+    },
     SplashScreen: {
       launchShowDuration: 1500,
       launchAutoHide: true,

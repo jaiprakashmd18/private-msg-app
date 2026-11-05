@@ -114,6 +114,26 @@ jobs:
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             build | tail -n 40
           test "${PIPESTATUS[0]}" -eq 0
+
+      - name: Package an unsigned .ipa (for Sideloadly / AltStore)
+        run: |
+          APP="$RUNNER_TEMP/dd/Build/Products/Release-iphoneos/App.app"
+          test -d "$APP" || { echo "App.app not found at $APP"; exit 1; }
+          WORK="$RUNNER_TEMP/ipa"
+          rm -rf "$WORK" && mkdir -p "$WORK/Payload"
+          cp -R "$APP" "$WORK/Payload/App.app"
+          # Strip entitlements a free Apple ID can't sign (push, associated domains).
+          rm -f "$WORK/Payload/App.app/App.entitlements" || true
+          ( cd "$WORK" && zip -qry "$RUNNER_TEMP/Ghostline-unsigned.ipa" Payload )
+          echo "Built $(du -h "$RUNNER_TEMP/Ghostline-unsigned.ipa" | cut -f1) unsigned ipa"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ghostline-ios-unsigned
+          path: ${{ runner.temp }}/Ghostline-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Build for the iOS Simulator
         run: |
           xcodebuild \

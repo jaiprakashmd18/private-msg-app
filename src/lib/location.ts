@@ -53,7 +53,7 @@ export async function getCurrentLocation(): Promise<SharedLocation & { accuracy:
       status = await Geolocation.requestPermissions({ permissions: ["location"] }).catch(() => null);
     }
     if (status?.location === "denied") {
-      throw new LocationError("Location is off for Ghostline. Turn it on in your phone's Settings → Ghostline → Location.");
+      throw new LocationError("Location is off for Loveline. Turn it on in your phone's Settings → Loveline → Location.");
     }
     try {
       const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15_000, maximumAge: 30_000 });

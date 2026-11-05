@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Ghostline Plus: the paid tier that unlocks the "couple pack". The real
+ * Loveline Plus: the paid tier that unlocks the "couple pack". The real
  * subscription state is decided by the server (see my_subscription); this file
  * is only the shared copy and the "start subscribing" flow.
  *
@@ -11,10 +11,13 @@
  */
 import { isNativeApp } from "@/lib/native";
 
-export const PLUS_NAME = "Ghostline Plus";
+export const PLUS_NAME = "Loveline Plus";
 
 /** Shown on the paywall. Just the price label, set in Vercel; billing is configured separately. */
-export const PLUS_PRICE = process.env.NEXT_PUBLIC_PLUS_PRICE || "$4.99 / month";
+export const PLUS_PRICE = process.env.NEXT_PUBLIC_PLUS_PRICE || "₹399 · lifetime";
+
+/** Card payments (Stripe) show on the paywall only when turned on. */
+export const STRIPE_ENABLED = Boolean(process.env.NEXT_PUBLIC_STRIPE_ENABLED);
 
 /** The couple pack — everything Plus unlocks. */
 export const PLUS_FEATURES: Array<{ emoji: string; title: string; detail: string }> = [
@@ -51,7 +54,7 @@ export async function startSubscribe(): Promise<SubscribeResult> {
     ok: false,
     message:
       json.reason === "not_configured"
-        ? "Subscriptions aren’t set up yet. Ask the administrator to turn on Ghostline Plus."
+        ? "Subscriptions aren’t set up yet. Ask the administrator to turn on Loveline Plus."
         : "Couldn’t start checkout. Please try again.",
   };
 }

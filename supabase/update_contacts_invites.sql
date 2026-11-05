@@ -25,7 +25,7 @@
 -- -----------------------------------------------------------------------------
 -- Tables
 -- -----------------------------------------------------------------------------
-create table public.contacts (
+create table if not exists public.contacts (
   user_id     uuid not null references public.profiles (id) on delete cascade,
   contact_id  uuid not null references public.profiles (id) on delete cascade,
   created_at  timestamptz not null default now(),
@@ -33,9 +33,9 @@ create table public.contacts (
   check (user_id <> contact_id)
 );
 
-create index contacts_contact_idx on public.contacts (contact_id);
+create index if not exists contacts_contact_idx on public.contacts (contact_id);
 
-create table public.invitations (
+create table if not exists public.invitations (
   id          uuid primary key default gen_random_uuid(),
   inviter_id  uuid not null references public.profiles (id) on delete cascade,
   email       text not null
@@ -45,22 +45,24 @@ create table public.invitations (
   unique (inviter_id, email)
 );
 
-create index invitations_email_idx on public.invitations (email);
+create index if not exists invitations_email_idx on public.invitations (email);
 
 revoke all on table public.contacts, public.invitations from anon, authenticated;
 grant select on table public.contacts, public.invitations to authenticated;
 alter table public.contacts enable row level security;
 alter table public.invitations enable row level security;
 
+drop policy if exists "users read own contacts" on public.contacts;
 create policy "users read own contacts"
   on public.contacts for select to authenticated
   using (user_id = (select auth.uid()) and (select private.is_active_user()));
 
+drop policy if exists "users read own invitations" on public.invitations;
 create policy "users read own invitations"
   on public.invitations for select to authenticated
   using (inviter_id = (select auth.uid()) and (select private.is_active_user()));
 
-alter table public.conversation_members add column cleared_at timestamptz;
+alter table public.conversation_members add column if not exists cleared_at timestamptz;
 
 -- -----------------------------------------------------------------------------
 -- Helpers
@@ -177,6 +179,7 @@ $$;
 
 revoke execute on function private.link_invited_profile() from public, anon, authenticated;
 
+drop trigger if exists profiles_link_invited on public.profiles;
 create trigger profiles_link_invited
   after insert on public.profiles
   for each row execute function private.link_invited_profile();
@@ -184,7 +187,8 @@ create trigger profiles_link_invited
 -- -----------------------------------------------------------------------------
 -- Who can see whom
 -- -----------------------------------------------------------------------------
-drop policy "active users read profiles" on public.profiles;
+drop policy if exists "active users read profiles" on public.profiles;
+drop policy if exists "people read their contacts' profiles" on public.profiles;
 create policy "people read their contacts' profiles"
   on public.profiles for select to authenticated
   using (
@@ -484,7 +488,7 @@ begin
 end;
 $$;
 
-drop policy "members read messages" on public.messages;
+drop policy if exists "members read messages" on public.messages;
 create policy "members read messages"
   on public.messages for select to authenticated
   using (
@@ -493,7 +497,7 @@ create policy "members read messages"
     and created_at > coalesce(private.my_cleared_at(conversation_id), '-infinity'::timestamptz)
   );
 
-drop policy "members read attachments" on public.attachments;
+drop policy if exists "members read attachments" on public.attachments;
 create policy "members read attachments"
   on public.attachments for select to authenticated
   using (

@@ -58,7 +58,7 @@ function closeTopLayer(): boolean {
 }
 
 /**
- * Native glue for the Ghostline Android / iOS app. Renders nothing and does
+ * Native glue for the Loveline Android / iOS app. Renders nothing and does
  * nothing in a normal browser.
  *
  * - Android back button: closes dialogs/menus, goes back, or leaves the app

@@ -159,7 +159,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const router = useRouter();
   const [infoOpen, setInfoOpen] = useState(false);
   const [panel, setPanel] = useState<"list" | "dates" | "notes" | "look" | "daily" | "mood" | "plans" | null>(null);
-  // Ghostline Plus: the couple pack is unlocked if either partner subscribes.
+  // Loveline Plus: the couple pack is unlocked if either partner subscribes.
   const [otherPlus, setOtherPlus] = useState(false);
   const [plus, setPlus] = useState<{ open: boolean; feature?: string }>({ open: false });
   const coupleUnlocked = access.is_plus || otherPlus;

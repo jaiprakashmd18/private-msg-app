@@ -39,7 +39,7 @@ export function SharedListDialog({
   nameOf: (userId: string | null) => string;
   tab: ListTab;
   onTabChange: (tab: ListTab) => void;
-  /** Bucket list is part of Ghostline Plus; hide its tab when not unlocked. */
+  /** Bucket list is part of Loveline Plus; hide its tab when not unlocked. */
   allowBucket?: boolean;
 }) {
   const { supabase, reportError } = useApp();

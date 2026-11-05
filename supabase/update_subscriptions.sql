@@ -20,7 +20,7 @@
 -- client with its own subscription state.
 -- =============================================================================
 
-create table public.subscriptions (
+create table if not exists public.subscriptions (
   user_id             uuid primary key references public.profiles (id) on delete cascade,
   plan                text not null default 'plus' check (plan in ('plus')),
   status              text not null default 'inactive'
@@ -36,8 +36,9 @@ create table public.subscriptions (
   updated_at          timestamptz not null default now()
 );
 
-create index subscriptions_external_sub_idx on public.subscriptions (external_sub);
+create index if not exists subscriptions_external_sub_idx on public.subscriptions (external_sub);
 
+drop trigger if exists subscriptions_updated_at on public.subscriptions;
 create trigger subscriptions_updated_at
   before update on public.subscriptions
   for each row execute function private.set_updated_at();
@@ -47,6 +48,7 @@ grant select on table public.subscriptions to authenticated;
 alter table public.subscriptions enable row level security;
 
 -- A member can read only their own subscription; the provider ids are not selectable.
+drop policy if exists "users read own subscription" on public.subscriptions;
 create policy "users read own subscription"
   on public.subscriptions for select to authenticated
   using (user_id = (select auth.uid()));
@@ -121,7 +123,7 @@ revoke execute on function public.conversation_is_plus(uuid) from public, anon;
 grant execute on function public.conversation_is_plus(uuid) to authenticated;
 
 -- my_access carries is_plus too, so the app knows on load (all other fields kept).
-drop function public.my_access();
+drop function if exists public.my_access();
 create or replace function public.my_access()
 returns table (
   user_id               uuid,
@@ -258,7 +260,7 @@ grant execute on function public.server_apply_subscription(uuid, text, text, tim
 -- -----------------------------------------------------------------------------
 -- The admin member list also shows each member's Plus status.
 -- -----------------------------------------------------------------------------
-drop function public.admin_list_allowlist();
+drop function if exists public.admin_list_allowlist();
 create or replace function public.admin_list_allowlist()
 returns table (
   id               uuid,

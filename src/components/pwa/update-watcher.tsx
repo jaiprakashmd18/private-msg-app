@@ -65,7 +65,7 @@ export function UpdateWatcher() {
     let storeChecked = false;
 
     const offerUpdate = () => {
-      toast("A new version of Ghostline is ready", {
+      toast("A new version of Loveline is ready", {
         id: TOAST_ID,
         duration: Infinity,
         action: { label: "Update", onClick: () => window.location.reload() },
@@ -160,7 +160,7 @@ export function UpdateWatcher() {
       </div>
       <div>
         <h1 id="store-update-title" className="text-2xl font-bold">
-          Update Ghostline
+          Update Loveline
         </h1>
         <p className="mt-2 text-muted-foreground">
           This version of the app is out of date. Install the update to keep chatting — your messages are safe.

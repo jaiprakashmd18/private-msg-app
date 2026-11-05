@@ -1,18 +1,18 @@
-# Ghostline on Google Play and the App Store
+# Loveline on Google Play and the App Store
 
-This guide takes you from this repository to Ghostline in both stores. It is
+This guide takes you from this repository to Loveline in both stores. It is
 written for someone who has never published an app. Do the parts in order.
 
 **How the app works:** the Android and iPhone apps are a native "shell"
 (Capacitor) that opens your live website,
-`https://private-msg-app-jai-prakash.vercel.app`. Your website, Supabase,
+`https://loveline.space`. Your website, Supabase,
 accounts and messages stay exactly as they are; when you deploy the website,
 the apps update too. Only native things (the app icon, notifications,
 the Google sign-in window, Face ID, the back button) live in the app.
 
 | What | Value |
 | --- | --- |
-| App name | Ghostline |
+| App name | Loveline |
 | App ID (Android package / iOS bundle ID) | `com.jaiprakash.ghostline` — can never change after publishing |
 | App link scheme | `com.jaiprakash.ghostline://` |
 | Website the app opens | set in `capacitor.config.ts` (`server.url`) |
@@ -85,7 +85,7 @@ npx cap sync android
 
 ### 2.3 Firebase (Android notifications)
 
-1. Firebase console → **Add project** → name it "Ghostline" → you can turn
+1. Firebase console → **Add project** → name it "Loveline" → you can turn
    Google Analytics off.
 2. **Add app** → Android icon → Android package name
    `com.jaiprakash.ghostline` → **Register app** → **Download
@@ -145,14 +145,14 @@ Android phone.
 
 ### 2.6 Create the app in Play Console
 
-1. **Create app** → name **Ghostline**, App, Free → accept the declarations.
+1. **Create app** → name **Loveline**, App, Free → accept the declarations.
 2. **Test and release → Testing → Closed testing** (or **Internal testing**
    first) → create a release → upload `app-release.aab`. Accept **Play App
    Signing** when asked.
 3. **Test and release → App integrity → App signing**: copy both **SHA-256
    certificate fingerprints** (the app signing key and the upload key) into
    Vercel as `ANDROID_CERT_SHA256`, separated by a comma. After the redeploy,
-   `https://private-msg-app-jai-prakash.vercel.app/.well-known/assetlinks.json`
+   `https://loveline.space/.well-known/assetlinks.json`
    shows them, and website links open the app.
 4. Fill in **Grow users → Store presence → Main store listing**: short and
    full description, the icon (`mobile/assets/icon-only.png` is 1024×1024;
@@ -160,7 +160,7 @@ Android phone.
    and at least 2 phone screenshots (plus 7" and 10" tablet ones if you list
    tablets).
 5. **Policy → App content**: complete every item:
-   * **Privacy policy URL**: `https://private-msg-app-jai-prakash.vercel.app/privacy`
+   * **Privacy policy URL**: `https://loveline.space/privacy`
    * **App access**: "All or some functionality is restricted" → give a
      **test account** (an email + password you approved in Admin) and say the
      app is invitation-only.
@@ -174,6 +174,54 @@ Android phone.
    accounts) → **Production** → create release → **Send for review**.
 
 ---
+
+## Install on your own iPhone from a Windows PC (no Mac, no App Store)
+
+This puts the app on your own iPhone for testing, using a **free Apple ID**.
+The app stops working after **7 days** (just reinstall to renew), and push
+notifications don’t work on a free account. No Mac needed.
+
+### 1. Make a free Apple ID
+If you don’t have one: on the iPhone, Settings → tap “Sign in” → **Create Apple
+ID**, or go to <https://account.apple.com>. It’s free.
+
+### 2. Get the app file (.ipa) from GitHub
+1. On your PC, open the repo → **Actions** → **Mobile apps** → the latest
+   successful run (green ✓).
+2. Scroll to **Artifacts** → download **ghostline-ios-unsigned** (a zip).
+3. Unzip it — inside is **`Loveline-unsigned.ipa`**. (Downloads expire after
+   14 days; re-run the workflow to get a fresh one.)
+
+### 3. Install it with Sideloadly
+1. On your PC install **iTunes** (from apple.com, the version *with* Apple
+   Mobile Device Support) and **Sideloadly** (<https://sideloadly.io>).
+2. Plug your iPhone into the PC with a cable; on the iPhone tap **Trust** and
+   enter your passcode.
+3. Open **Sideloadly**. Pick your iPhone at the top. Drag
+   **`Loveline-unsigned.ipa`** into the window.
+4. Enter your **Apple ID** email and password (an app-specific password if you
+   use two-factor — create one at <https://account.apple.com> → Sign-In and
+   Security). If asked, let it **remove unsupported entitlements**.
+5. Click **Start**. It builds and installs onto your iPhone.
+
+### 4. Trust the app on the iPhone
+1. iPhone → **Settings → General → VPN & Device Management**.
+2. Under “Developer App”, tap your Apple ID → **Trust**.
+3. Open **Loveline** from the Home Screen and sign in with email + password,
+   or with Google.
+
+### Keeping it working
+- A free Apple ID signature lasts **7 days**. When the app won’t open, plug in
+  and run Sideloadly again to reinstall (your chats are safe — they live on the
+  server).
+- **AltStore** (<https://altstore.io>) is an alternative that can refresh the
+  app over Wi‑Fi automatically, so you reinstall less often.
+- For a version that lasts a **year** and supports **notifications**, get a paid
+  **Apple Developer** account ($99/yr) and either sign in Sideloadly with it, or
+  use the App Store / TestFlight route below.
+
+> Email + password sign-in always works. Google sign-in still returns to the
+> app through its `com.jaiprakash.ghostline://` link even when sideloaded.
 
 ## Part 3 — iPhone / App Store
 
@@ -209,7 +257,7 @@ Capabilities**:
 * Tick **Automatically manage signing** and choose your **Team**.
 * Bundle Identifier: `com.jaiprakash.ghostline` (already set).
 * You should see **Push Notifications** and **Associated Domains**
-  (`applinks:private-msg-app-jai-prakash.vercel.app`) — they come from
+  (`applinks:loveline.space`) — they come from
   `ios/App/App/App.entitlements`. If Xcode shows a red error for either,
   click **+ Capability** and add it.
 
@@ -218,7 +266,7 @@ Try it on your iPhone: plug it in, pick it at the top of Xcode, press ▶︎.
 ### 3.3 iPhone notifications key
 
 <https://developer.apple.com/account/resources/authkeys/list> → **+** →
-name "Ghostline push" → tick **Apple Push Notifications service (APNs)** →
+name "Loveline push" → tick **Apple Push Notifications service (APNs)** →
 Configure → **Sandbox & Production** → Save → **Download** the `.p8` file
 (you can only download it once — back it up). Put into Vercel:
 
@@ -233,7 +281,7 @@ you run from Xcode.
 ### 3.4 Create the app in App Store Connect
 
 <https://appstoreconnect.apple.com> → **Apps** → **+ New App** → iOS, name
-**Ghostline**, language, Bundle ID `com.jaiprakash.ghostline`, SKU
+**Loveline**, language, Bundle ID `com.jaiprakash.ghostline`, SKU
 `ghostline`.
 
 ### 3.5 Upload a build
@@ -253,9 +301,9 @@ where you and Meenu can install it with the TestFlight app before release.
 * **App Privacy**: same data as the Play "Data safety" list in 2.6 — not used
   for tracking. The app also includes a privacy manifest
   (`ios/App/App/PrivacyInfo.xcprivacy`).
-* **Privacy Policy URL**: `https://private-msg-app-jai-prakash.vercel.app/privacy`
+* **Privacy Policy URL**: `https://loveline.space/privacy`
 * **App Review Information → Sign-in required**: give a working test
-  account (email + password) and explain: "Ghostline is a private,
+  account (email + password) and explain: "Loveline is a private,
   invitation-only messenger. Use this demo account."
 * Export compliance is pre-answered (standard HTTPS only).
 * **Submit for Review**.
@@ -274,7 +322,7 @@ where you and Meenu can install it with the TestFlight app before release.
   be accepted, but Apple can ask for **Sign in with Apple**. If the review
   asks, it can be added (Supabase supports it).
 * **"Just a website" (App Store 4.2).** Apple rejects apps that only wrap a
-  website. Ghostline has native notifications, Face ID unlock, camera,
+  website. Loveline has native notifications, Face ID unlock, camera,
   microphone and photo saving, which helps — mention them in the review notes.
 * **Test accounts.** Both reviewers need to sign in. Keep the demo account
   approved and active, with a sample chat in it.
@@ -287,7 +335,7 @@ where you and Meenu can install it with the TestFlight app before release.
   them automatically — the website, the installed web app, and the Android and
   iPhone apps. Open tabs and apps check for a new version when they come back
   to the screen and every 5 minutes: they reload by themselves if nothing
-  would be lost, or show *"A new version of Ghostline is ready · Update"* while
+  would be lost, or show *"A new version of Loveline is ready · Update"* while
   someone is typing or in a dialog. No store update needed.
 * **App changes** (icon, permissions, plugins, `capacitor.config.ts`, files
   in `android/` or `ios/`): run `npx cap sync`, raise the version numbers,
@@ -297,8 +345,8 @@ where you and Meenu can install it with the TestFlight app before release.
   | Name | Effect |
   | --- | --- |
   | `LATEST_ANDROID_BUILD` / `LATEST_IOS_BUILD` | Apps with a lower build number get **one** reminder: "A new version of the app is available · Update" (opens the store). |
-  | `MIN_ANDROID_BUILD` / `MIN_IOS_BUILD` | Apps with a lower build number show a full-screen **"Update Ghostline"** with a button to the store, until updated. Use this only when the old app really can't work any more. |
-  | `IOS_APP_STORE_ID` | The number in your App Store link (`apps.apple.com/app/id123456789` → `123456789`), so the button opens Ghostline's page directly. |
+  | `MIN_ANDROID_BUILD` / `MIN_IOS_BUILD` | Apps with a lower build number show a full-screen **"Update Loveline"** with a button to the store, until updated. Use this only when the old app really can't work any more. |
+  | `IOS_APP_STORE_ID` | The number in your App Store link (`apps.apple.com/app/id123456789` → `123456789`), so the button opens Loveline's page directly. |
 
   The build number is `versionCode` in `android/app/build.gradle` and
   **Build** in Xcode (target App → General). Only raise the minimum after
@@ -338,7 +386,7 @@ CAP_SERVER_URL=https://your-preview.vercel.app npx cap sync
 * **Delivered ticks:** browsers mark a message ✓✓ "Delivered" when the
   notification arrives. In the phone app this happens when the app is next
   opened (the website code can't run while the app is closed).
-* **Notifications inside the open app:** while Ghostline is open, new messages
+* **Notifications inside the open app:** while Loveline is open, new messages
   appear live in the chat instead of as a banner.
 * **Saving photos:** the download button opens the share sheet — choose
   **Save Image** (iPhone) or **Save** / your gallery (Android).
