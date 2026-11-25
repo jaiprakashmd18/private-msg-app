@@ -7,7 +7,7 @@ import { APP_NAME } from "@/lib/env";
 export const metadata: Metadata = { title: "Sign in" };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
-  const { error, detail } = await searchParams;
+  const { error } = await searchParams;
   return (
     <main
       id="main"
@@ -29,7 +29,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       <section className="grid items-center px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-8 sm:px-10 lg:pt-[max(2rem,env(safe-area-inset-top))]">
         <div className="mx-auto w-full max-w-md">
           <h1 className="mb-5 text-3xl font-semibold tracking-tight">Sign in</h1>
-          <LoginForm errorKey={typeof error === "string" ? error : undefined} errorDetail={typeof detail === "string" ? detail : undefined} />
+          <LoginForm errorKey={typeof error === "string" ? error : undefined} />
           <Link href="/privacy" className="mt-6 inline-block text-sm text-muted-foreground underline underline-offset-4 lg:hidden">
             Privacy notice
           </Link>

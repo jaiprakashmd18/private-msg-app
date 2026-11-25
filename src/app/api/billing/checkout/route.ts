@@ -1,5 +1,5 @@
 import { AppError, handleRouteError, logServerError } from "@/lib/errors";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { requireBillingMember } from "@/lib/billing-access.server";
 
 export const runtime = "nodejs";
 
@@ -16,11 +16,7 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, reason: "not_configured" }, { status: 200 });
     }
 
-    const supabase = await getSupabaseServerClient();
-    const { data } = await supabase.auth.getClaims();
-    const userId = data?.claims?.sub;
-    const email = typeof data?.claims?.email === "string" ? data.claims.email : undefined;
-    if (!userId) throw new AppError("Not signed in", 401, "unauthenticated");
+    const { user_id: userId, email } = await requireBillingMember(request, true);
 
     const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin;
     const form = new URLSearchParams({

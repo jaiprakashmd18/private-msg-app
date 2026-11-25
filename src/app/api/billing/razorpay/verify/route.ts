@@ -1,7 +1,7 @@
-import { verifyRazorpayPaymentSignature } from "@/lib/billing.server";
+import { isPaidRazorpayOrder, verifyRazorpayPaymentSignature } from "@/lib/billing.server";
 import { AppError, handleRouteError, logServerError } from "@/lib/errors";
 import { getSupabaseServiceClient } from "@/lib/supabase/admin";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { requireBillingMember } from "@/lib/billing-access.server";
 
 export const runtime = "nodejs";
 
@@ -18,10 +18,7 @@ export async function POST(request: Request) {
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keyId || !keySecret) return Response.json({ ok: false, reason: "not_configured" }, { status: 200 });
 
-    const supabase = await getSupabaseServerClient();
-    const { data } = await supabase.auth.getClaims();
-    const userId = data?.claims?.sub;
-    if (!userId) throw new AppError("Not signed in", 401, "unauthenticated");
+    const { user_id: userId } = await requireBillingMember(request);
 
     const body = (await request.json().catch(() => ({}))) as {
       razorpay_order_id?: unknown;
@@ -44,13 +41,17 @@ export async function POST(request: Request) {
     const res = await fetch(`https://api.razorpay.com/v1/orders/${encodeURIComponent(orderId)}`, {
       headers: { authorization: `Basic ${auth}` },
     });
-    const order = (await res.json()) as { notes?: Record<string, unknown>; error?: { description?: string } };
+    const order = (await res.json()) as { status?: string; notes?: Record<string, unknown>; error?: { description?: string } };
     if (!res.ok) {
       logServerError("billing/razorpay/verify", order.error ?? { status: res.status });
       throw new AppError("Could not verify payment", 502, "razorpay_error");
     }
     if (order.notes?.user_id !== userId) {
       throw new AppError("This payment isn't for your account", 403, "forbidden");
+    }
+
+    if (!isPaidRazorpayOrder(order)) {
+      return Response.json({ ok: true, is_plus: false, pending: true }, { headers: { "cache-control": "no-store" } });
     }
 
     const { error } = await getSupabaseServiceClient().rpc("server_apply_subscription", {

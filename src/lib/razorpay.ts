@@ -8,9 +8,6 @@
  */
 import { APP_NAME } from "@/lib/env";
 
-/** The browser knows Razorpay is on when its (public) key id is set. */
-export const RAZORPAY_ENABLED = Boolean(process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID);
-
 interface RazorpaySuccess {
   razorpay_order_id: string;
   razorpay_payment_id: string;

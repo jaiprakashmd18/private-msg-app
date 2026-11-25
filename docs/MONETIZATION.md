@@ -66,7 +66,6 @@ here as a **one-time lifetime** unlock.
    | `RAZORPAY_AMOUNT` | price in **paise**, e.g. `39900` for ₹399 |
    | `RAZORPAY_CURRENCY` | `INR` (default) |
    | `RAZORPAY_WEBHOOK_SECRET` | the webhook secret (mark Sensitive, if you added one) |
-   | `NEXT_PUBLIC_PLUS_PRICE` | the label shown on the button, e.g. `₹399 · lifetime` |
 
 Now the website shows **Pay with UPI / Google Pay**. When the payment succeeds,
 Loveline verifies Razorpay's signature on return and unlocks Plus immediately;
@@ -102,7 +101,6 @@ Stripe is best for non-Indian cards. To show its **Pay by card** button, also se
    | `STRIPE_SECRET_KEY` | `sk_…` (mark Sensitive) |
    | `STRIPE_PRICE_ID` | `price_…` |
    | `STRIPE_WEBHOOK_SECRET` | `whsec_…` (mark Sensitive) |
-   | `NEXT_PUBLIC_PLUS_PRICE` | The label shown on the paywall, e.g. `$4.99 / month` |
 
 Now the website's **Subscribe** button opens Stripe Checkout. When the payment
 succeeds, the person is sent back to **Settings**, where Plus unlocks within a
@@ -152,9 +150,13 @@ Do this after your apps exist in the stores (see `docs/MOBILE_PUBLISHING.md`).
 
 ## Granting Plus for free (anytime)
 
-Admin → **Members & access** → next to a registered member → **Grant Plus** (or
-**Remove Plus**). Use this for the two of you, for testers, or for comps. It's
-recorded in the audit log and never expires unless you remove it.
+Apply `supabase/migrations/20261126001800_separate_plus_grants.sql` before
+deploying the grant controls. For a project initialized through `setup_all.sql`,
+apply this migration after that script.
+
+In **Admin → Members & access**, select **Grant free Plus** for a registered
+active member. **Remove free Plus** ends only the manual grant. Provider
+subscriptions continue on their own billing schedule. Grants are audited.
 
 ## What's in the code
 
