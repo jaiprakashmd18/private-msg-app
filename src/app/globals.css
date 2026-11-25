@@ -238,6 +238,8 @@
  * the visible area reported by ViewportSync.
  */
 .app-shell {
+  /* Leave room for the header, message list, and input when tools are open. */
+  --chat-panel-limit: max(2rem, calc((100cqh - 11rem) / 2));
   container-type: size;
   position: fixed;
   inset: 0;

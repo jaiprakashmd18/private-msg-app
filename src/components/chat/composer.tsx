@@ -207,7 +207,7 @@ export function Composer({
   return (
     <div className="pb-safe px-2 pt-2 sm:px-4">
       <div className="mx-auto w-full max-w-4xl">
-        <div className="max-h-[30cqh] overflow-y-auto overscroll-contain px-2">
+        <div className="max-h-[min(30cqh,var(--chat-panel-limit))] overflow-y-auto overscroll-contain px-2">
           {editing && (
             <div className="glass mb-2 flex items-center gap-2 rounded-2xl px-3 py-2 text-xs">
               <span className="flex-1">Editing message — Enter to save, Esc to cancel</span>
