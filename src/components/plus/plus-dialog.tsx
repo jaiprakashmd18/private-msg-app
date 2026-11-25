@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { isNativeApp } from "@/lib/native";
-import { PLUS_FEATURES, PLUS_NAME, PLUS_PRICE, STRIPE_ENABLED, startSubscribe } from "@/lib/plus";
-import { payWithRazorpay, RAZORPAY_ENABLED } from "@/lib/razorpay";
+import { PLUS_FEATURES, PLUS_NAME, startSubscribe } from "@/lib/plus";
+import { payWithRazorpay } from "@/lib/razorpay";
 
 /**
  * The paywall. Shows what Loveline Plus unlocks and a Subscribe button.
@@ -26,7 +26,7 @@ export function PlusDialog({
   /** The feature they tapped, named in the subtitle. */
   feature?: string;
 }) {
-  const { access } = useApp();
+  const { access, plusPayment } = useApp();
   const router = useRouter();
   const [busy, setBusy] = useState<"rz" | "stripe" | null>(null);
   const native = isNativeApp();
@@ -61,7 +61,7 @@ export function PlusDialog({
           </span>
           <DialogTitle className="text-2xl">{PLUS_NAME}</DialogTitle>
           <DialogDescription>
-            {feature ? `${feature} is part of ${PLUS_NAME}.` : "Unlock the couple pack."} One payment covers both of you.
+            {feature ? `${feature} is part of ${PLUS_NAME}.` : "Unlock the couple pack."} One partner’s Plus access unlocks the couple pack for both.
           </DialogDescription>
         </DialogHeader>
 
@@ -85,30 +85,28 @@ export function PlusDialog({
           </p>
         ) : (
           <div className="grid gap-2">
-            {canPayHere && RAZORPAY_ENABLED && (
+            {canPayHere && plusPayment.razorpay && (
               <Button size="lg" onClick={() => void payRazorpay()} disabled={busy !== null}>
-                {busy === "rz" ? <Spinner /> : <Smartphone />} Pay with UPI / Google Pay · {PLUS_PRICE}
+                {busy === "rz" ? <Spinner /> : <Smartphone />} Pay once with UPI / Google Pay
               </Button>
             )}
-            {canPayHere && STRIPE_ENABLED && (
+            {canPayHere && plusPayment.stripe && (
               <Button
                 size="lg"
-                variant={RAZORPAY_ENABLED ? "outline" : "default"}
+                variant={plusPayment.razorpay ? "outline" : "default"}
                 onClick={() => void subscribe()}
                 disabled={busy !== null}
               >
-                {busy === "stripe" ? <Spinner /> : <CreditCard />} Pay by card · {PLUS_PRICE}
+                {busy === "stripe" ? <Spinner /> : <CreditCard />} Subscribe by card
               </Button>
             )}
-            {(!canPayHere || (!RAZORPAY_ENABLED && !STRIPE_ENABLED)) && (
-              <p className="rounded-2xl bg-muted/60 p-3 text-center text-sm text-muted-foreground">
-                {native
-                  ? "Open Loveline in your web browser to unlock Plus, or ask the administrator to turn it on for you."
-                  : "Payments aren’t set up yet. Ask the administrator to unlock Plus for you."}
-              </p>
-            )}
-            <p className="text-center text-xs text-muted-foreground">
-              One payment unlocks the couple pack for both of you — forever.
+            <p className="rounded-2xl bg-muted/60 p-3 text-center text-sm text-muted-foreground">
+              {native
+                ? "Open Loveline in your web browser to see payment options."
+                : plusPayment.razorpay || plusPayment.stripe
+                  ? "Checkout shows the price and billing terms before you pay."
+                  : "Online checkout is currently unavailable."}
+              {" "}An administrator can also grant Plus for free.
             </p>
           </div>
         )}

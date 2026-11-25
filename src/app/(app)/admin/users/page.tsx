@@ -7,7 +7,10 @@ export const metadata: Metadata = { title: "Members & access" };
 
 export default async function AdminUsersPage() {
   const supabase = await getSupabaseServerClient();
-  const { data, error } = await supabase.rpc("admin_list_allowlist");
+  const [{ data, error }, grants] = await Promise.all([
+    supabase.rpc("admin_list_allowlist"),
+    supabase.rpc("admin_list_plus_grants"),
+  ]);
   if (error) return <p className="text-sm text-destructive">Could not load the allowlist.</p>;
-  return <AllowlistManager entries={(data ?? []) as AllowlistEntry[]} />;
+  return <AllowlistManager entries={(data ?? []) as AllowlistEntry[]} plusGrants={grants.error ? null : (grants.data ?? []) as string[]} />;
 }

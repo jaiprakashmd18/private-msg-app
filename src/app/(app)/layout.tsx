@@ -15,8 +15,14 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   // Set on devices where someone turned on app lock: start locked, so the
   // page never shows messages before the lock screen appears.
   const lockCookie = (await cookies()).get(LOCK_COOKIE)?.value === "1";
+  const plusPayment = {
+    stripe: Boolean(process.env.NEXT_PUBLIC_STRIPE_ENABLED === "1" &&
+      process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID),
+    razorpay: Boolean((process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID) &&
+      process.env.RAZORPAY_KEY_SECRET),
+  };
   return (
-    <AppProvider access={access} settings={settings}>
+    <AppProvider access={access} settings={settings} plusPayment={plusPayment}>
       <AppLockGate initiallyLocked={lockCookie}>{children}</AppLockGate>
     </AppProvider>
   );

@@ -18,7 +18,7 @@ describe("Loveline Plus entitlement", () => {
 
     await asUser(admin.id, "select public.admin_set_plus($1, false)", [a.id]);
     expect(await myAccess(a.id)).toBe(false);
-    expect(await mySub(a.id)).toMatchObject({ is_plus: false, status: "canceled" });
+    expect(await mySub(a.id)).toMatchObject({ is_plus: false, status: "inactive" });
   });
 
   it("a timed grant expires", async () => {
@@ -27,7 +27,7 @@ describe("Loveline Plus entitlement", () => {
     await asUser(admin.id, "select public.admin_set_plus($1, true, 30)", [a.id]);
     expect(await myAccess(a.id)).toBe(true);
     // Move the end date into the past.
-    await asOwner("update public.subscriptions set current_period_end = now() - interval '1 day' where user_id = $1", [a.id]);
+    await asOwner("update private.plus_grants set expires_at = now() - interval '1 day' where user_id = $1", [a.id]);
     expect(await myAccess(a.id)).toBe(false);
   });
 
@@ -70,6 +70,27 @@ describe("Loveline Plus entitlement", () => {
     await expect(
       asUser(null, "select public.server_apply_subscription($1, 'paypal', 'active')", [a.id], "service_role"),
     ).rejects.toThrow(/Invalid subscription source/i);
+  });
+
+  it("a free grant and a paid subscription can end independently", async () => {
+    const admin = await createUser({ role: "admin" });
+    const member = await createUser();
+    const grant = (on: boolean) => asUser(admin.id, "select public.admin_set_plus($1, $2)", [member.id, on]);
+    const paid = (status: string) => asUser(null,
+      "select public.server_apply_subscription($1, 'stripe', $2)", [member.id, status], "service_role");
+
+    await grant(true);
+    await paid("active");
+    expect(await mySub(member.id)).toMatchObject({ is_plus: true, source: "stripe" });
+    const grants = await asUser(admin.id, "select public.admin_list_plus_grants()");
+    expect(grants).toContainEqual({ admin_list_plus_grants: member.id });
+    await expect(asUser(member.id, "select public.admin_list_plus_grants()")).rejects.toThrow(/Administrator privileges/i);
+
+    await paid("canceled");
+    expect(await mySub(member.id)).toMatchObject({ is_plus: true, source: "admin" });
+    await paid("active");
+    await grant(false);
+    expect(await mySub(member.id)).toMatchObject({ is_plus: true, source: "stripe" });
   });
 
   it("a Razorpay (one-time) payment unlocks Plus for life — no end date", async () => {
