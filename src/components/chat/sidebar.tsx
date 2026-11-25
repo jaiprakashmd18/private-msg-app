@@ -1,6 +1,7 @@
 "use client";
 
-import { MessagesSquare, Search, Settings, Shield, SquarePen, WifiOff, X } from "lucide-react";
+import { Search, Settings, Shield, SquarePen, WifiOff, X } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -28,9 +29,7 @@ export function Sidebar() {
       <header className="shrink-0 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] split:pt-4">
         <div className="flex h-11 items-center gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
-              <MessagesSquare className="size-[18px]" aria-hidden />
-            </span>
+            <Image src="/icon.svg" width={36} height={36} alt="" className="shrink-0 rounded-xl ring-1 ring-border" unoptimized />
             <span className="truncate font-semibold">{APP_NAME}</span>
           </div>
           <div className="flex items-center gap-1">

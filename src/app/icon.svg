@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#16161d"/><path d="M32 14c-9.4 0-17 7-17 15.6 0 4.9 2.5 9.3 6.4 12.1L20 50l8.6-4.3c1.1.2 2.2.3 3.4.3 9.4 0 17-7 17-15.6S41.4 14 32 14z" fill="#8b93ff"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="tile" x2="0.8" y2="1">
+      <stop stop-color="#3c1429"/>
+      <stop offset="1" stop-color="#140913"/>
+    </linearGradient>
+    <linearGradient id="rose" x2="0.8" y2="1">
+      <stop stop-color="#ffc3ca"/>
+      <stop offset="1" stop-color="#eb7297"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#tile)"/>
+  <path fill="url(#rose)" fill-rule="evenodd" d="M32 12c-11 0-20 8-20 18 0 5.4 2.6 10 7 13.2l-1.5 8.1 9.8-4.4c1.5.4 3.1.6 4.7.6 11 0 20-7.8 20-17.5S43 12 32 12Zm0 26-8.2-7.4a5.4 5.4 0 0 1 7.6-7.7l.6.7.6-.7a5.4 5.4 0 0 1 7.6 7.7L32 38Z"/>
+</svg>

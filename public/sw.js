@@ -1,7 +1,7 @@
 /* Ghostline service worker: makes the app installable, shows an offline page,
  * and displays push notifications. It deliberately caches NO messages or
  * user data — only the static offline page. */
-const OFFLINE_CACHE = "offline-v1";
+const OFFLINE_CACHE = "offline-v2";
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (event) => {

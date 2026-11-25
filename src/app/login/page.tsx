@@ -1,4 +1,4 @@
-import { MessagesSquare } from "lucide-react";
+import Image from "next/image";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LoginForm } from "@/components/auth/login-form";
@@ -15,9 +15,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
     >
       <div className="login-brand flex flex-col justify-between gap-8 px-6 pb-8 pt-[max(2rem,env(safe-area-inset-top))] text-[#fff7f2] sm:px-12 lg:p-14">
         <div className="flex items-center gap-3 text-lg font-semibold">
-          <span className="grid size-10 place-items-center rounded-xl bg-[#f8c6ae] text-[#442239]">
-            <MessagesSquare className="size-5" aria-hidden />
-          </span>
+          <Image src="/icon.svg" width={48} height={48} alt="" className="rounded-xl ring-1 ring-[#f6a8bb]/30" unoptimized />
           {APP_NAME}
         </div>
         <p className="max-w-[14ch] text-4xl font-semibold leading-[1.06] tracking-[-0.055em] sm:text-5xl lg:text-7xl">

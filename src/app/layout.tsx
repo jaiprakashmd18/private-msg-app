@@ -14,12 +14,12 @@ export const metadata: Metadata = {
   referrer: "no-referrer",
   applicationName: APP_NAME,
   appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "black" },
-  icons: { icon: "/icon.svg", apple: "/icons/apple-touch-icon.png" },
+  icons: { apple: "/icons/apple-touch-icon.png?v=rose" },
   formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#000000",
+  themeColor: "#120b11",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",

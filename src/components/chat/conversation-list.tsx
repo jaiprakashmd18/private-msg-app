@@ -238,22 +238,29 @@ function ConversationRow({
       setDrag(Math.max(-DELETE_WIDTH - 12, Math.min(0, base + dx)));
     }
   }
-  function onTouchEnd() {
-    if (start.current?.swiping) onOpenChange(offset < -DELETE_WIDTH / 2);
+  function resetSwipe() {
     setDrag(null);
     start.current = null;
   }
 
+  function onTouchEnd() {
+    if (start.current?.swiping) onOpenChange(offset < -DELETE_WIDTH / 2);
+    resetSwipe();
+  }
+
   return (
-    <li className="relative overflow-hidden rounded-2xl">
+    <li className="group/row relative overflow-hidden rounded-2xl">
       {/* Delete action revealed behind the row. */}
-      <div className="absolute inset-y-0 right-0 flex items-stretch pr-2" aria-hidden={!open}>
+      <div
+        className={cn("absolute inset-y-0 right-0 flex items-stretch pr-2", offset === 0 && "invisible")}
+        aria-hidden={!open}
+      >
         <button
           type="button"
           onClick={onAskDelete}
           tabIndex={open ? 0 : -1}
           aria-label={`Delete chat with ${name}`}
-          className="my-1 flex w-[76px] flex-col items-center justify-center gap-0.5 rounded-2xl bg-destructive text-xs font-medium text-white"
+          className="my-1 flex w-[76px] flex-col items-center justify-center gap-0.5 rounded-xl bg-destructive text-xs font-medium text-destructive-foreground"
         >
           <Trash2 className="size-5" />
           Delete
@@ -273,9 +280,10 @@ function ConversationRow({
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
+        onTouchCancel={resetSwipe}
         style={{ transform: `translateX(${offset}px)`, transition: drag === null ? "transform 0.2s ease" : "none" }}
         className={cn(
-          "group relative z-10 flex items-center gap-2 rounded-2xl border border-border/70 bg-card py-3 pl-2 pr-3 transition-colors active:bg-accent pointer-fine:hover:bg-accent/60",
+          "relative z-10 flex touch-pan-y items-center gap-2 rounded-2xl border border-border bg-card py-3 pl-2 pr-3 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent pointer-fine:pr-12 pointer-fine:hover:bg-accent",
           active && "border-primary/40 bg-accent pointer-fine:hover:bg-accent",
         )}
       >
@@ -299,16 +307,11 @@ function ConversationRow({
             </span>
           )}
         </span>
-        <div
-          className={cn(
-            "min-w-0 flex-1 border-b border-border/50 py-1.5 pl-1 group-last-of-type:border-transparent",
-            active && "border-transparent",
-          )}
-        >
+        <div className="min-w-0 flex-1 py-1.5 pl-1">
           <div className="flex items-baseline gap-2">
-            <span className="flex-1 truncate text-[17px] font-semibold tracking-[-0.01em]">{name}</span>
+            <span className="min-w-0 flex-1 truncate text-base font-semibold tracking-[-0.01em]">{name}</span>
             {c.last_message_created_at && (
-              <time dateTime={c.last_message_created_at} className="shrink-0 text-[15px] text-muted-foreground">
+              <time dateTime={c.last_message_created_at} className="shrink-0 text-xs tabular-nums text-muted-foreground">
                 {formatListTime(c.last_message_created_at)}
               </time>
             )}
@@ -318,21 +321,18 @@ function ConversationRow({
           </p>
           {unread && <span className="sr-only">Unread messages: {c.unread_count > 99 ? "99+" : c.unread_count}</span>}
         </div>
+      </Link>
 
-        {/* Pointer devices: a trash button on hover (no swipe with a mouse). */}
+      {offset === 0 && (
         <button
           type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onAskDelete();
-          }}
+          onClick={onAskDelete}
           aria-label={`Delete chat with ${name}`}
-          className="hidden shrink-0 rounded-full p-2 text-muted-foreground hover:bg-destructive hover:text-white focus-visible:opacity-100 pointer-fine:block pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100"
+          className="absolute right-2 top-1/2 z-20 hidden size-8 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground opacity-0 hover:bg-destructive hover:text-destructive-foreground focus-visible:opacity-100 pointer-fine:grid pointer-fine:group-hover/row:opacity-100"
         >
           <Trash2 className="size-4" />
         </button>
-      </Link>
+      )}
     </li>
   );
 }

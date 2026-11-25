@@ -46,36 +46,36 @@
 }
 
 .dark {
-  --background: #1c141d;
-  --foreground: #ffffff;
-  --grouped: #140e16;
-  --card: #2a1d2b;
-  --card-foreground: #ffffff;
-  --popover: #2a1d2b;
-  --popover-foreground: #ffffff;
-  --primary: #efb6d5;
-  --primary-foreground: #29172a;
-  --secondary: #38263a;
-  --secondary-foreground: #ffffff;
-  --muted: #2a1d2b;
-  --muted-foreground: #c2abbf;
-  --accent: rgb(255 255 255 / 0.09);
-  --accent-foreground: #ffffff;
-  --destructive: #ff453a;
-  --destructive-foreground: #ffffff;
-  --success: #30d158;
-  --border: #493449;
-  --input: #372638;
-  --ring: #efb6d5;
-  --bubble-mine: #763e65;
-  --bubble-mine-foreground: #ffffff;
-  --bubble-theirs: #38263a;
-  --bubble-theirs-foreground: #ffffff;
-  --sidebar: #231824;
-  --glass: rgb(30 30 32 / 0.55);
-  --glass-strong: rgb(36 36 40 / 0.78);
-  --glass-border: rgb(255 255 255 / 0.12);
-  --glass-shadow: 0 12px 40px rgb(0 0 0 / 0.5);
+  --background: #120b11;
+  --foreground: #fbeaf1;
+  --grouped: #0d080c;
+  --card: #20101a;
+  --card-foreground: #fbeaf1;
+  --popover: #281420;
+  --popover-foreground: #fbeaf1;
+  --primary: #f6a8bb;
+  --primary-foreground: #2b101c;
+  --secondary: #361927;
+  --secondary-foreground: #fbeaf1;
+  --muted: #26131e;
+  --muted-foreground: #c9a6b8;
+  --accent: #3b1c2c;
+  --accent-foreground: #fff0f4;
+  --destructive: #a52847;
+  --destructive-foreground: #fff1f4;
+  --success: #68cf9f;
+  --border: #472637;
+  --input: #331927;
+  --ring: #f6a8bb;
+  --bubble-mine: #7d2849;
+  --bubble-mine-foreground: #fff2f5;
+  --bubble-theirs: #321823;
+  --bubble-theirs-foreground: #fbeaf1;
+  --sidebar: #170c14;
+  --glass: rgb(36 17 29 / 0.78);
+  --glass-strong: rgb(42 20 33 / 0.92);
+  --glass-border: rgb(246 168 187 / 0.15);
+  --glass-shadow: 0 12px 40px rgb(0 0 0 / 0.55);
 }
 
 @theme inline {
@@ -276,13 +276,15 @@ html[data-keyboard="open"] .app-shell {
 
 .login-brand {
   background:
-    radial-gradient(ellipse at 8% 110%, #8f4d73 0%, transparent 60%),
-    radial-gradient(ellipse at 110% 0%, #734361 0%, transparent 50%),
-    #382337;
+    radial-gradient(ellipse at 18% 108%, #752441 0%, transparent 56%),
+    radial-gradient(ellipse at 100% 0%, #4c1b35 0%, transparent 52%),
+    #190b16;
 }
 
 .conversation-canvas {
   background-color: var(--grouped);
-  background-image: radial-gradient(color-mix(in oklab, var(--foreground) 13%, transparent) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-image:
+    radial-gradient(ellipse at 80% 100%, color-mix(in oklab, var(--bubble-mine) 20%, transparent), transparent 68%),
+    radial-gradient(color-mix(in oklab, var(--foreground) 11%, transparent) 1px, transparent 1px);
+  background-size: auto, 20px 20px;
 }
