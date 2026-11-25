@@ -1,3 +1,4 @@
+import { MessagesSquare } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LoginForm } from "@/components/auth/login-form";
@@ -10,27 +11,32 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <main
       id="main"
-      className="relative grid min-h-dvh place-items-center overflow-hidden px-4 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(2.5rem,env(safe-area-inset-top))]"
+      className="grid min-h-dvh bg-grouped lg:grid-cols-[minmax(0,1fr)_minmax(26rem,0.85fr)]"
     >
-      <div className="relative w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 grid size-16 place-items-center rounded-[18px] bg-primary text-primary-foreground">
-            <svg viewBox="0 0 24 24" className="size-9" fill="currentColor" aria-hidden>
-              <path d="M12 3C6.5 3 2 6.9 2 11.7c0 2.7 1.4 5.1 3.7 6.7L5 22l4.6-2.4c.8.2 1.6.2 2.4.2 5.5 0 10-3.9 10-8.7S17.5 3 12 3z" />
-            </svg>
-          </div>
-          <h1 className="text-[34px] font-bold tracking-[-0.02em]">{APP_NAME}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Private messaging for invited members.</p>
+      <div className="login-brand flex flex-col justify-between gap-8 px-6 pb-8 pt-[max(2rem,env(safe-area-inset-top))] text-[#fff7f2] sm:px-12 lg:p-14">
+        <div className="flex items-center gap-3 text-lg font-semibold">
+          <span className="grid size-10 place-items-center rounded-xl bg-[#f8c6ae] text-[#442239]">
+            <MessagesSquare className="size-5" aria-hidden />
+          </span>
+          {APP_NAME}
         </div>
-        <LoginForm errorKey={typeof error === "string" ? error : undefined} errorDetail={typeof detail === "string" ? detail : undefined} />
-        <p className="mt-8 text-center text-xs text-muted-foreground">
-          Access is by invitation only. Read the{" "}
-          <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground">
-            privacy notice
-          </Link>
-          .
+        <p className="max-w-[14ch] text-4xl font-semibold leading-[1.06] tracking-[-0.055em] sm:text-5xl lg:text-7xl">
+          Private messaging for invited members.
         </p>
+        <Link href="/privacy" className="hidden self-start text-sm text-[#f6d4e1] underline underline-offset-4 lg:block">
+          Privacy notice
+        </Link>
       </div>
+
+      <section className="grid items-center px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-8 sm:px-10 lg:pt-[max(2rem,env(safe-area-inset-top))]">
+        <div className="mx-auto w-full max-w-md">
+          <h1 className="mb-5 text-3xl font-semibold tracking-tight">Sign in</h1>
+          <LoginForm errorKey={typeof error === "string" ? error : undefined} errorDetail={typeof detail === "string" ? detail : undefined} />
+          <Link href="/privacy" className="mt-6 inline-block text-sm text-muted-foreground underline underline-offset-4 lg:hidden">
+            Privacy notice
+          </Link>
+        </div>
+      </section>
     </main>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Settings, Shield, SquarePen, WifiOff, X } from "lucide-react";
+import { MessagesSquare, Search, Settings, Shield, SquarePen, WifiOff, X } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -25,11 +25,14 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Top bar with plain icon buttons, then a large title. */}
-      <header className="px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+      <header className="shrink-0 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] split:pt-4">
         <div className="flex h-11 items-center gap-2">
-          <UserMenu />
-          <div className="flex-1" />
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+              <MessagesSquare className="size-[18px]" aria-hidden />
+            </span>
+            <span className="truncate font-semibold">{APP_NAME}</span>
+          </div>
           <div className="flex items-center gap-1">
             {access.role === "admin" && (
               <Button
@@ -57,19 +60,16 @@ export function Sidebar() {
                 <Settings />
               </Link>
             </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="text-primary hover:bg-transparent"
-              aria-label="New conversation"
-              title="New conversation"
-              onClick={() => setNewOpen(true)}
-            >
-              <SquarePen />
-            </Button>
+            <UserMenu />
           </div>
         </div>
-        <h1 className="mt-1 text-[34px] font-bold leading-tight tracking-[-0.02em]">{APP_NAME}</h1>
+        <div className="mb-3 mt-5 flex items-center justify-between gap-2">
+          <h1 className="text-3xl font-semibold tracking-tight">Inbox</h1>
+          <Button onClick={() => setNewOpen(true)} className="shrink-0 gap-2 rounded-xl" aria-label="New conversation">
+            <SquarePen className="size-4" aria-hidden />
+            New chat
+          </Button>
+        </div>
         <div className="relative mt-2">
           <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -79,7 +79,7 @@ export function Sidebar() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Escape" && setQuery("")}
-            className="h-9 rounded-xl pl-9 pr-9 text-[17px] pointer-fine:text-[15px]"
+            className="h-11 rounded-xl bg-background pl-9 pr-9 text-[17px] pointer-fine:text-[15px]"
             maxLength={100}
           />
           {query && (

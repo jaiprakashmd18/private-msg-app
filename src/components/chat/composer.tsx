@@ -387,7 +387,7 @@ export function Composer({
               <Plus className="size-5" strokeWidth={2.5} />
             </button>
           )}
-          <div className={cn("glass relative min-w-0 flex-1 rounded-[20px]", tooLong && "ring-2 ring-destructive")}>
+          <div className={cn("relative min-w-0 flex-1 rounded-2xl border bg-muted focus-within:border-primary/60", tooLong && "ring-2 ring-destructive")}>
             <label htmlFor="composer" className="sr-only">
               {editing ? "Edit message" : "Message"}
             </label>
@@ -419,7 +419,7 @@ export function Composer({
               }}
               aria-describedby="composer-hint"
               className={cn(
-                "block max-h-[min(200px,22cqh)] min-h-[38px] w-full resize-none bg-transparent py-[8px] pl-4 text-[17px] leading-[22px] placeholder:text-muted-foreground focus-visible:outline-none pointer-fine:text-[15px]",
+                "block max-h-[min(200px,22cqh)] min-h-[44px] w-full resize-none bg-transparent py-[8px] pl-4 text-[17px] leading-[22px] placeholder:text-muted-foreground focus-visible:outline-none pointer-fine:text-[15px]",
                 "pr-11",
               )}
             />
@@ -434,7 +434,7 @@ export function Composer({
                 {body.length}/{MAX_MESSAGE_LENGTH}
               </span>
             )}
-            <div className="absolute bottom-[3px] right-[3px]">
+            <div className="absolute bottom-1.5 right-1.5">
               {showMic ? (
                 <button
                   type="button"
@@ -442,7 +442,7 @@ export function Composer({
                   title="Voice message"
                   disabled={disabled}
                   onClick={() => void startRecording()}
-                  className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                  className="grid size-8 place-items-center rounded-xl text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
                 >
                   <Mic className="size-5" />
                 </button>
@@ -451,7 +451,7 @@ export function Composer({
                   type="submit"
                   disabled={!canSubmit}
                   aria-label={editing ? "Save edit" : "Send message"}
-                  className="grid size-8 place-items-center rounded-full bg-primary text-primary-foreground transition-transform active:scale-90 disabled:opacity-40"
+                  className="grid size-8 place-items-center rounded-xl bg-primary text-primary-foreground transition-transform active:scale-90 disabled:opacity-40"
                 >
                   {editing ? <Check className="size-[18px]" strokeWidth={3} /> : <ArrowUp className="size-[18px]" strokeWidth={3} />}
                 </button>

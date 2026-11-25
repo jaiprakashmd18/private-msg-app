@@ -479,7 +479,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
 
   return (
     <>
-      <div className={cn("relative flex min-h-0 flex-1 flex-col", appearance.bubble_color && `bubble-${appearance.bubble_color}`)}>
+      <div className={cn("conversation-canvas relative flex min-h-0 flex-1 flex-col", appearance.bubble_color && `bubble-${appearance.bubble_color}`)}>
         {wallpaperUrl && (
           <div
             aria-hidden
@@ -491,17 +491,17 @@ export function ConversationView({ conversationId }: { conversationId: string })
         )}
         <HeartBurst burst={burst} emojis={burstEmojis} />
         <header
-          className="relative z-20 shrink-0 border-b bg-background/90 pt-[max(0.25rem,env(safe-area-inset-top))]"
+          className="relative z-20 shrink-0 border-b bg-background pt-[max(0.625rem,env(safe-area-inset-top))] split:pt-3"
         >
-          <div className="mx-auto grid max-w-4xl grid-cols-[minmax(4.75rem,1fr)_minmax(0,3fr)_minmax(4.75rem,1fr)] items-center gap-2 px-3 pb-2">
+          <div className="flex items-center gap-2 px-3 pb-2 sm:gap-3 sm:px-5">
             <Link
               href="/chat"
               aria-label="Back to conversations"
-              className="glass mt-0.5 flex h-10 shrink-0 items-center gap-1 rounded-full pl-2 pr-2.5 text-primary shadow-md ring-1 ring-foreground/10 justify-self-start split:invisible"
+              className="flex h-10 shrink-0 items-center gap-0.5 rounded-xl bg-accent px-1.5 text-primary split:hidden"
             >
               <ChevronLeft className="size-6" strokeWidth={2.5} aria-hidden />
               {otherUnread > 0 && (
-                <span className="grid min-w-[1.4rem] place-items-center rounded-full bg-white px-1 text-[13px] font-semibold leading-5 text-black">
+                <span className="grid min-w-[1.4rem] place-items-center rounded-full bg-primary px-1 text-xs font-semibold leading-5 text-primary-foreground">
                   {otherUnread > 99 ? "99+" : otherUnread}
                 </span>
               )}
@@ -510,10 +510,10 @@ export function ConversationView({ conversationId }: { conversationId: string })
               <button
                 type="button"
                 onClick={() => setInfoOpen(true)}
-                className="relative flex min-w-0 flex-1 flex-col items-center"
+                className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
                 aria-label={`${title}: ${isGroup ? "group info" : "contact info"}`}
               >
-                <span className="relative">
+                <span className="relative shrink-0">
                   {isGroup ? (
                     <GroupAvatar path={summary.avatar_path} name={title} className="size-11 shadow-sm" />
                   ) : (
@@ -531,35 +531,36 @@ export function ConversationView({ conversationId }: { conversationId: string })
                     <span className="absolute bottom-1 right-1 size-3 rounded-full border-2 border-background bg-success" aria-hidden />
                   )}
                 </span>
-                {/* Name in a glass pill overlapping the avatar's lower edge. */}
-                <span className="glass relative -mt-3 flex max-w-full items-center gap-0.5 rounded-full py-0.5 pl-3 pr-2 shadow-md ring-1 ring-foreground/10">
-                  <h2 className="truncate text-[15px] font-semibold tracking-[-0.01em]">{title}</h2>
-                  <ChevronRight className="size-3 shrink-0 text-muted-foreground/70" aria-hidden />
-                </span>
-                <p
-                  className={cn(
-                    "mt-1 flex max-w-full items-center justify-center gap-1 truncate text-[11px] leading-tight empty:hidden",
-                    typingIds.length ? "text-primary" : "text-muted-foreground",
-                  )}
-                  aria-live="polite"
-                >
-                  {subtitle && <span className="truncate">{subtitle}</span>}
-                  {!isGroup && !typingIds.length && streak && streak.days > 0 && (
-                    <span className={cn("shrink-0", streak.today_done ? "" : "opacity-60")}>
-                      {subtitle && <span className="mr-1" aria-hidden>·</span>}🔥 {streak.days}
-                    </span>
-                  )}
-                </p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1">
+                    <h2 className="truncate text-base font-semibold tracking-tight">{title}</h2>
+                    <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  </div>
+                  <p
+                    className={cn(
+                      "flex items-center gap-1 text-xs leading-tight empty:hidden",
+                      typingIds.length ? "text-primary" : "text-muted-foreground",
+                    )}
+                    aria-live="polite"
+                  >
+                    {subtitle && <span className="truncate">{subtitle}</span>}
+                    {!isGroup && !typingIds.length && streak && streak.days > 0 && (
+                      <span className={cn("shrink-0", streak.today_done ? "" : "opacity-60")}>
+                        {subtitle && <span className="mr-1" aria-hidden>·</span>}🔥 {streak.days}
+                      </span>
+                    )}
+                  </p>
+                </div>
               </button>
             ) : (
-              <div className="flex flex-1 flex-col items-center gap-2 pt-1">
+              <div className="flex flex-1 items-center gap-2">
                 <Skeleton className="size-11 rounded-full" />
-                <Skeleton className="h-6 w-24 rounded-full" />
+                <Skeleton className="h-4 w-24 rounded-full" />
               </div>
             )}
-            <div className="justify-self-end">
+            <div className="shrink-0">
               {summary && (
-                <div className="glass flex h-10 items-center gap-0.5 rounded-full px-1 shadow-md ring-1 ring-foreground/10">
+                <div className="flex h-10 items-center gap-0.5 rounded-xl border bg-card px-1">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -832,7 +833,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
             )}
           </div>
         </div>
-        <div className="relative z-10 shrink-0 border-t bg-background/90">
+        <div className="relative z-10 shrink-0 border-t bg-background">
           <Composer
             disabled={loading || otherInactive}
             disabledReason={otherInactive ? `${title} no longer has access, so you can't send new messages.` : undefined}

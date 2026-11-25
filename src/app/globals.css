@@ -7,38 +7,37 @@
 @custom-variant split (@media (min-width: 768px) and (min-height: 500px));
 
 /*
- * Design tokens — iMessage colours with "liquid glass" surfaces.
- * Dark (pure black, like iOS) is the default; light matches iOS light mode.
- * Text colours keep WCAG AA contrast on their backgrounds.
+ * Design tokens for the plum and rose palette. Conversation color overrides
+ * remain independent of the default bubble colors.
  */
 :root {
   --radius: 1rem;
-  --background: #ffffff;
-  --foreground: #000000;
-  --grouped: #f2f2f7;
-  --card: #ffffff;
-  --card-foreground: #000000;
-  --popover: #ffffff;
-  --popover-foreground: #000000;
-  --primary: #0066e0;
-  --primary-foreground: #ffffff;
-  --secondary: #e9e9eb;
-  --secondary-foreground: #000000;
-  --muted: #f2f2f7;
-  --muted-foreground: #6c6c70;
-  --accent: rgb(120 120 128 / 0.12);
-  --accent-foreground: #000000;
+  --background: #fffaf7;
+  --foreground: #241923;
+  --grouped: #f4ecef;
+  --card: #fffaf7;
+  --card-foreground: #241923;
+  --popover: #fffaf7;
+  --popover-foreground: #241923;
+  --primary: #713b5b;
+  --primary-foreground: #fffaf7;
+  --secondary: #f0e5eb;
+  --secondary-foreground: #241923;
+  --muted: #f4ecef;
+  --muted-foreground: #675563;
+  --accent: #ecdde7;
+  --accent-foreground: #241923;
   --destructive: #d70015;
-  --destructive-foreground: #ffffff;
+  --destructive-foreground: #fffaf7;
   --success: #248a3d;
-  --border: rgb(60 60 67 / 0.16);
-  --input: rgb(118 118 128 / 0.12);
-  --ring: #007aff;
-  --bubble-mine: #0a6cdf;
-  --bubble-mine-foreground: #ffffff;
-  --bubble-theirs: #e9e9eb;
-  --bubble-theirs-foreground: #000000;
-  --sidebar: #ffffff;
+  --border: #e3d4dd;
+  --input: #f2e7ee;
+  --ring: #894d73;
+  --bubble-mine: #713b5b;
+  --bubble-mine-foreground: #fffaf7;
+  --bubble-theirs: #f0e5eb;
+  --bubble-theirs-foreground: #241923;
+  --sidebar: #fcf5f5;
   /* Liquid glass */
   --glass: rgb(255 255 255 / 0.62);
   --glass-strong: rgb(250 250 252 / 0.82);
@@ -47,32 +46,32 @@
 }
 
 .dark {
-  --background: #000000;
+  --background: #1c141d;
   --foreground: #ffffff;
-  --grouped: #000000;
-  --card: #1c1c1e;
+  --grouped: #140e16;
+  --card: #2a1d2b;
   --card-foreground: #ffffff;
-  --popover: #1c1c1e;
+  --popover: #2a1d2b;
   --popover-foreground: #ffffff;
-  --primary: #0a84ff;
-  --primary-foreground: #ffffff;
-  --secondary: #2c2c2e;
+  --primary: #efb6d5;
+  --primary-foreground: #29172a;
+  --secondary: #38263a;
   --secondary-foreground: #ffffff;
-  --muted: #1c1c1e;
-  --muted-foreground: #98989f;
+  --muted: #2a1d2b;
+  --muted-foreground: #c2abbf;
   --accent: rgb(255 255 255 / 0.09);
   --accent-foreground: #ffffff;
   --destructive: #ff453a;
   --destructive-foreground: #ffffff;
   --success: #30d158;
-  --border: rgb(84 84 88 / 0.5);
-  --input: rgb(118 118 128 / 0.24);
-  --ring: #0a84ff;
-  --bubble-mine: #0a6cdf;
+  --border: #493449;
+  --input: #372638;
+  --ring: #efb6d5;
+  --bubble-mine: #763e65;
   --bubble-mine-foreground: #ffffff;
-  --bubble-theirs: #26252a;
+  --bubble-theirs: #38263a;
   --bubble-theirs-foreground: #ffffff;
-  --sidebar: #000000;
+  --sidebar: #231824;
   --glass: rgb(30 30 32 / 0.55);
   --glass-strong: rgb(36 36 40 / 0.78);
   --glass-border: rgb(255 255 255 / 0.12);
@@ -271,4 +270,17 @@ html[data-keyboard="open"] .app-shell {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+.login-brand {
+  background:
+    radial-gradient(ellipse at 8% 110%, #8f4d73 0%, transparent 60%),
+    radial-gradient(ellipse at 110% 0%, #734361 0%, transparent 50%),
+    #382337;
+}
+
+.conversation-canvas {
+  background-color: var(--grouped);
+  background-image: radial-gradient(color-mix(in oklab, var(--foreground) 13%, transparent) 1px, transparent 1px);
+  background-size: 20px 20px;
 }

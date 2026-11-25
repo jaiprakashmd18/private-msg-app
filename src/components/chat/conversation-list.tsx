@@ -156,7 +156,7 @@ export function ConversationList({
 
   return (
     <>
-      <ul className="pb-4">
+      <ul className="space-y-2 px-3 pb-4">
         {visible.map((c) => (
           <ConversationRow
             key={c.id}
@@ -245,7 +245,7 @@ function ConversationRow({
   }
 
   return (
-    <li className="relative overflow-hidden">
+    <li className="relative overflow-hidden rounded-2xl">
       {/* Delete action revealed behind the row. */}
       <div className="absolute inset-y-0 right-0 flex items-stretch pr-2" aria-hidden={!open}>
         <button
@@ -275,23 +275,22 @@ function ConversationRow({
         onTouchEnd={onTouchEnd}
         style={{ transform: `translateX(${offset}px)`, transition: drag === null ? "transform 0.2s ease" : "none" }}
         className={cn(
-          "group relative z-10 mx-2 flex items-center gap-2 rounded-2xl bg-sidebar py-2 pl-1 pr-3 transition-colors active:bg-accent pointer-fine:hover:bg-accent/60",
-          active && "bg-accent pointer-fine:hover:bg-accent",
+          "group relative z-10 flex items-center gap-2 rounded-2xl border border-border/70 bg-card py-3 pl-2 pr-3 transition-colors active:bg-accent pointer-fine:hover:bg-accent/60",
+          active && "border-primary/40 bg-accent pointer-fine:hover:bg-accent",
         )}
       >
-        {/* Unread: a blue dot, like iMessage. */}
         <span className="grid w-3 shrink-0 place-items-center" aria-hidden>
           {unread && <span className="size-2.5 rounded-full bg-primary" />}
         </span>
         <span className="relative shrink-0">
           {c.kind === "group" ? (
-            <GroupAvatar path={c.avatar_path} name={name} className="size-[52px]" />
+            <GroupAvatar path={c.avatar_path} name={name} className="size-11" />
           ) : (
             <Avatar
               name={name}
               seed={c.other_user_id}
               path={c.other_avatar_path}
-              className={cn("size-[52px]", !c.other_is_active && "opacity-50")}
+              className={cn("size-11", !c.other_is_active && "opacity-50")}
             />
           )}
           {online && (
