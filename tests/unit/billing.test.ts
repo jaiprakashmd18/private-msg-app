@@ -2,6 +2,8 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   bearerMatches,
+  isPaidRazorpayOrder,
+  parseStripeCheckoutConfirmation,
   parseRazorpayWebhook,
   parseRevenueCatEvent,
   parseStripeEvent,
@@ -28,9 +30,26 @@ describe("Stripe webhook", () => {
     expect(verifyStripeSignature(body, null, secret)).toBe(false);
   });
 
+  it("waits for settlement even if Checkout reports a complete session", () => {
+    const session = { client_reference_id: USER, status: "complete", payment_status: "unpaid" };
+    expect(parseStripeEvent({ type: "checkout.session.completed", data: { object: { ...session, subscription: "sub_1" } } })).toBeNull();
+    const subscription = {
+      metadata: { user_id: USER }, id: "sub_1", status: "active",
+      items: { data: [{ current_period_end: 1893456000 }] },
+    };
+    expect(parseStripeCheckoutConfirmation({ ...session, subscription }, USER)).toBeNull();
+    const paid = { ...session, payment_status: "paid", subscription };
+    expect(parseStripeCheckoutConfirmation(paid, USER, 0)).toMatchObject({
+      source: "stripe", status: "active", currentPeriodEnd: "2030-01-01T00:00:00.000Z",
+    });
+    expect(parseStripeCheckoutConfirmation(paid, USER, 1893456000000)).toBeNull();
+    expect(parseStripeCheckoutConfirmation(paid, "someone-else", 0)).toBeNull();
+    expect(parseStripeCheckoutConfirmation({ ...paid, subscription: { ...subscription, status: "canceled" } }, USER, 0)).toBeNull();
+  });
+
   it("maps checkout and subscription events to the user; ignores noise", () => {
     expect(
-      parseStripeEvent({ type: "checkout.session.completed", data: { object: { client_reference_id: USER, customer: "cus_1", subscription: "sub_1" } } }),
+      parseStripeEvent({ type: "checkout.session.completed", data: { object: { client_reference_id: USER, payment_status: "paid", customer: "cus_1", subscription: "sub_1" } } }),
     ).toMatchObject({ userId: USER, source: "stripe", status: "active", externalSub: "sub_1" });
 
     const upd = parseStripeEvent({
@@ -71,6 +90,12 @@ describe("RevenueCat webhook", () => {
 
 describe("Razorpay", () => {
   const secret = "rzp_secret_test";
+
+  it("waits for a paid Loveline order before granting lifetime access", () => {
+    expect(isPaidRazorpayOrder({ status: "attempted", notes: { plan: "plus_lifetime" } })).toBe(false);
+    expect(isPaidRazorpayOrder({ status: "paid", notes: { plan: "different_product" } })).toBe(false);
+    expect(isPaidRazorpayOrder({ status: "paid", notes: { plan: "plus_lifetime" } })).toBe(true);
+  });
 
   it("verifies a checkout-return signature (order_id|payment_id) and rejects fakes", () => {
     const orderId = "order_ABC123";

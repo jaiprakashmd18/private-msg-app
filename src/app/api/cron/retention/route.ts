@@ -1,5 +1,4 @@
 import { timingSafeEqual } from "node:crypto";
-import { getServerEnv } from "@/lib/env.server";
 import { handleRouteError, jsonError } from "@/lib/errors";
 import { removeStorageObjects } from "@/lib/storage.server";
 import { getSupabaseServiceClient } from "@/lib/supabase/admin";
@@ -7,10 +6,10 @@ import { getSupabaseServiceClient } from "@/lib/supabase/admin";
 export const runtime = "nodejs";
 
 function authorized(request: Request): boolean {
-  const { CRON_SECRET } = getServerEnv();
-  if (!CRON_SECRET) return false;
+  const secret = process.env.CRON_SECRET;
+  if (!secret || secret.length < 16) return false;
   const header = request.headers.get("authorization") ?? "";
-  const expected = Buffer.from(`Bearer ${CRON_SECRET}`);
+  const expected = Buffer.from(`Bearer ${secret}`);
   const actual = Buffer.from(header);
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }

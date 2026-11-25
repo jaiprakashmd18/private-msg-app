@@ -59,7 +59,8 @@ interface StripeEvent {
 /** Maps a Stripe event to an update, or null if it isn't one we act on. */
 export function parseStripeEvent(event: StripeEvent): SubscriptionUpdate | null {
   const obj = event.data?.object ?? {};
-  if (event.type === "checkout.session.completed") {
+  if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
+    if (obj.payment_status !== "paid" || typeof obj.subscription !== "string") return null;
     const userId = obj.client_reference_id ?? (obj.metadata as Record<string, unknown> | undefined)?.user_id;
     if (!isUuid(userId)) return null;
     return {
@@ -72,10 +73,12 @@ export function parseStripeEvent(event: StripeEvent): SubscriptionUpdate | null 
       cancelAtPeriodEnd: false,
     };
   }
-  if (event.type?.startsWith("customer.subscription.")) {
+  if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
     const userId = (obj.metadata as Record<string, unknown> | undefined)?.user_id;
     if (!isUuid(userId)) return null;
-    const periodEnd = typeof obj.current_period_end === "number" ? new Date(obj.current_period_end * 1000).toISOString() : null;
+    const item = (obj.items as { data?: Array<{ current_period_end?: number }> } | undefined)?.data?.[0];
+    const end = obj.current_period_end ?? item?.current_period_end;
+    const periodEnd = typeof end === "number" ? new Date(end * 1000).toISOString() : null;
     return {
       userId,
       source: "stripe",
@@ -87,6 +90,21 @@ export function parseStripeEvent(event: StripeEvent): SubscriptionUpdate | null 
     };
   }
   return null;
+}
+
+/** The Checkout Session is paid and its expanded subscription still grants access. */
+export function parseStripeCheckoutConfirmation(session: Record<string, unknown>, userId: string, now = Date.now()) {
+  if (session.client_reference_id !== userId || session.payment_status !== "paid") return null;
+  if (typeof session.subscription !== "object" || !session.subscription) return null;
+  const update = parseStripeEvent({
+    type: "customer.subscription.updated",
+    data: { object: session.subscription as Record<string, unknown> },
+  });
+  if (!update || update.userId !== userId || !update.externalSub || !update.currentPeriodEnd ||
+      Date.parse(update.currentPeriodEnd) <= now || (update.status !== "active" && update.status !== "trialing")) {
+    return null;
+  }
+  return update;
 }
 
 // --- RevenueCat (Apple / Google) ------------------------------------------------
@@ -170,6 +188,10 @@ export function verifyRazorpayPaymentSignature(orderId: string, paymentId: strin
 export function verifyRazorpayWebhookSignature(payload: string, signature: string | null, secret: string): boolean {
   if (!secret) return false;
   return hmacEquals(createHmac("sha256", secret).update(payload).digest("hex"), signature);
+}
+
+export function isPaidRazorpayOrder(order: { status?: string; notes?: Record<string, unknown> }) {
+  return order.status === "paid" && order.notes?.plan === "plus_lifetime";
 }
 
 interface RazorpayWebhookBody {

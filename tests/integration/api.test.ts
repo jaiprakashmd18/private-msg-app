@@ -49,6 +49,13 @@ describe.skipIf(!enabled)("Next.js API routes", () => {
     expect(cron.status).toBe(401);
   });
 
+  it("requires a signed-in member for every checkout endpoint", async () => {
+    for (const path of ["/api/billing/checkout", "/api/billing/confirm", "/api/billing/razorpay/order", "/api/billing/razorpay/verify"]) {
+      const response = await post(path, {});
+      expect(response.status).toBe(401);
+    }
+  });
+
   it("redirects signed-out visitors away from protected pages", async () => {
     for (const path of ["/chat", "/admin", "/settings"]) {
       const res = await fetch(`${appUrl}${path}`, { redirect: "manual" });

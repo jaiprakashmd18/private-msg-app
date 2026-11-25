@@ -29,7 +29,7 @@ function GoogleIcon() {
   );
 }
 
-export function LoginForm({ errorKey, errorDetail }: { errorKey?: string; errorDetail?: string }) {
+export function LoginForm({ errorKey }: { errorKey?: string }) {
   const [busy, setBusy] = useState<"google" | "password" | null>(null);
   const [error, setError] = useState<string | null>(errorKey ? (ERRORS[errorKey] ?? ERRORS.failed!) : null);
   const [email, setEmail] = useState("");
@@ -38,30 +38,31 @@ export function LoginForm({ errorKey, errorDetail }: { errorKey?: string; errorD
   async function signIn() {
     setBusy("google");
     setError(null);
-    if (isNativeApp()) {
-      // Inside the Android / iOS app: Google's page opens in the system's secure browser window.
-      try {
+    try {
+      if (isNativeApp()) {
         const { Browser } = await import("@capacitor/browser");
         const done = await Browser.addListener("browserFinished", () => {
           setBusy(null);
           void done.remove();
         });
-        await nativeGoogleSignIn(getSupabaseBrowserClient());
-      } catch {
-        setBusy(null);
-        setError(ERRORS.failed!);
+        try {
+          await nativeGoogleSignIn(getSupabaseBrowserClient());
+        } catch (error) {
+          await done.remove();
+          throw error;
+        }
+        return;
       }
-      return;
-    }
-    const { error: oauthError } = await getSupabaseBrowserClient().auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: { prompt: "select_account" },
-      },
-    });
-    // On success the browser is already on its way to Google.
-    if (oauthError) {
+
+      const { error: oauthError } = await getSupabaseBrowserClient().auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: { prompt: "select_account" },
+        },
+      });
+      if (oauthError) throw oauthError;
+    } catch {
       setBusy(null);
       setError(ERRORS.failed!);
     }
@@ -80,20 +81,25 @@ export function LoginForm({ errorKey, errorDetail }: { errorKey?: string; errorD
     }
     setBusy("password");
     setError(null);
-    const supabase = getSupabaseBrowserClient();
-    // Straight from the browser to Supabase Auth, so its per-IP rate limits
-    // apply to each person rather than to our server.
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email: parsed.data, password });
-    if (signInError) {
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email: parsed.data, password });
+      if (signInError) {
+        setError(passwordSignInError(signInError));
+        setBusy(null);
+        return;
+      }
+      try {
+        await supabase.rpc("log_auth_event", { p_action: "auth.sign_in" });
+      } finally {
+        // Reload so the server sees the new session cookies.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full reload picks up the new session
+        window.location.assign("/chat");
+      }
+    } catch {
+      setError(ERRORS.failed!);
       setBusy(null);
-      setError(passwordSignInError(signInError));
-      return;
     }
-    await supabase.rpc("log_auth_event", { p_action: "auth.sign_in" });
-    // A full navigation so the server sees the new session cookies. The app
-    // sends people with a temporary password to /set-password first.
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full reload picks up the new session
-    window.location.assign("/chat");
   }
 
   return (
@@ -149,7 +155,6 @@ export function LoginForm({ errorKey, errorDetail }: { errorKey?: string; errorD
       {error ? (
         <div role="alert" className="grid gap-1">
           <p className="text-sm text-destructive">{error}</p>
-          {errorDetail && <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">Details: {errorDetail}</p>}
         </div>
       ) : (
         <p className="text-center text-xs text-muted-foreground">
