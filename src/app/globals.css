@@ -239,6 +239,7 @@
  * the visible area reported by ViewportSync.
  */
 .app-shell {
+  container-type: size;
   position: fixed;
   inset: 0;
 }

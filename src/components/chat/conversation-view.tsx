@@ -187,24 +187,6 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const [moods, setMoods] = useState<MemberMood[]>([]);
   const [searching, setSearching] = useState(false);
   const [listTab, setListTab] = useState<ListTab>("todo");
-  // The header and message box float over the messages; the list is padded
-  // by their (changing) heights.
-  const headerRef = useRef<HTMLElement>(null);
-  const composerRef = useRef<HTMLDivElement>(null);
-  const [headerHeight, setHeaderHeight] = useState(64);
-  const [composerHeight, setComposerHeight] = useState(64);
-  useEffect(() => {
-    const header = headerRef.current;
-    const composer = composerRef.current;
-    if (!header || !composer || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => {
-      setHeaderHeight(header.offsetHeight);
-      setComposerHeight(composer.offsetHeight);
-    });
-    observer.observe(header);
-    observer.observe(composer);
-    return () => observer.disconnect();
-  }, []);
   // Unread messages in other chats, shown on the back button like iMessage.
   const otherUnread = useMemo(
     () => conversations.reduce((sum, c) => (c.id === conversationId ? sum : sum + c.unread_count), 0),
@@ -397,6 +379,19 @@ export function ConversationView({ conversationId }: { conversationId: string })
     [messages, nameOf],
   );
 
+  // Keep the latest message visible when the composer or visual viewport resizes.
+  const showConversation = Boolean(summary || inboxLoading || (loading && !error));
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      if (atBottomRef.current) el.scrollTop = el.scrollHeight;
+      prevScrollHeightRef.current = el.scrollHeight;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [showConversation]);
+
   // Keep scroll anchored: stick to bottom for new messages, preserve position
   // when older messages are prepended.
   useLayoutEffect(() => {
@@ -466,7 +461,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
     : null;
 
   // Not in my inbox once it has loaded ⇒ not (or no longer) a member.
-  if (!summary && !inboxLoading && (!loading || error)) {
+  if (!showConversation) {
     return (
       <div className="grid flex-1 place-items-center p-6 text-center">
         <div>
@@ -495,152 +490,14 @@ export function ConversationView({ conversationId }: { conversationId: string })
           />
         )}
         <HeartBurst burst={burst} emojis={burstEmojis} />
-        <div
-          ref={scrollRef}
-          onScroll={onScroll}
-          className="absolute inset-0 overflow-y-auto overflow-x-hidden overscroll-contain"
-          style={{ paddingTop: headerHeight + 12, paddingBottom: composerHeight + 12 }}
-          role="log"
-          aria-live="polite"
-          aria-relevant="additions"
-          aria-label={`Messages in ${title}`}
-        >
-          {/* Readable line lengths on wide screens. */}
-          <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col">
-            {loading ? (
-              <div className="space-y-3 px-6">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className={i % 2 ? "flex justify-end" : "flex"}>
-                    <Skeleton className="h-10 w-2/5 rounded-2xl" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <>
-                {hasMore ? (
-                  <div className="flex justify-center py-2">
-                    <Button variant="ghost" size="sm" onClick={() => void loadOlder()} disabled={loadingOlder}>
-                      {loadingOlder ? <Spinner label="Loading earlier messages" /> : "Load earlier messages"}
-                    </Button>
-                  </div>
-                ) : (
-                  messages.length > 0 && (
-                    <p className="py-3 text-center text-xs text-muted-foreground">Beginning of your conversation</p>
-                  )
-                )}
-                {messages.length === 0 && error && (
-              <div className="grid flex-1 place-items-center px-6 text-center">
-                <div>
-                  <p className="font-medium">Couldn&apos;t load messages</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Check your connection and try again.</p>
-                  <Button variant="outline" className="mt-4" onClick={reload}>
-                    Try again
-                  </Button>
-                </div>
-              </div>
-            )}
-            {messages.length === 0 && !error && (
-                  <div className="grid flex-1 place-items-center px-6 text-center">
-                    <div>
-                      <p className="font-medium">No messages yet</p>
-                      <p className="mt-1 text-sm text-muted-foreground">Say hello{isGroup ? " to the group" : ` to ${title}`}.</p>
-                    </div>
-                  </div>
-                )}
-                {messages.map((m, i) => {
-                  const prev = messages[i - 1];
-                  const next = messages[i + 1];
-                  const newDay = needsTimeHeader(prev, m);
-                  const divider = newDay && (
-                    <p className="mb-1 mt-5 text-center text-[11px] font-medium text-muted-foreground">
-                      {formatTimeHeader(m.created_at)}
-                    </p>
-                  );
-                  if (m.system_event) {
-                    return (
-                      <Fragment key={m.id}>
-                        {divider}
-                        <SystemMessage event={m.system_event} actorId={m.sender_id} nameOf={nameOf} />
-                      </Fragment>
-                    );
-                  }
-                  const mine = m.sender_id === access.user_id;
-                  const grouped =
-                    !newDay &&
-                    !prev?.system_event &&
-                    prev?.sender_id === m.sender_id &&
-                    new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < GROUP_WINDOW_MS;
-                  // The tail goes on the last bubble of a run from the same person.
-                  const tail =
-                    !next ||
-                    Boolean(next.system_event) ||
-                    next.sender_id !== m.sender_id ||
-                    needsTimeHeader(m, next) ||
-                    new Date(next.created_at).getTime() - new Date(m.created_at).getTime() >= GROUP_WINDOW_MS;
-                  const canEdit = editWindowMs > 0 && now - new Date(m.created_at).getTime() < editWindowMs;
-                  const receipt = mine
-                    ? receiptFor(m, summary?.other_last_read_at ?? null, summary?.other_last_delivered_at ?? null)
-                    : undefined;
-                  return (
-                    <Fragment key={m.id}>
-                      {divider}
-                      <MessageBubble
-                        message={m}
-                        mine={mine}
-                        myId={access.user_id}
-                        grouped={grouped}
-                        tail={tail}
-                        senderName={isGroup ? nameOf(m.sender_id) : undefined}
-                        nameOf={nameOf}
-                        receipt={receipt}
-                        canEdit={canEdit}
-                        onEdit={() => {
-                          setReplyingTo(null);
-                          setEditing({ id: m.id, body: m.body });
-                        }}
-                        onDelete={() => setConfirmDelete(m.id)}
-                        onRetry={() => retry(m.client_id)}
-                        onDiscard={() => discard(m.client_id)}
-                        onReply={() => {
-                          setEditing(null);
-                          setReplyingTo(m);
-                        }}
-                        onReact={(emoji) => void react(m.id, emoji)}
-                        onOpenImage={(attachmentId) => {
-                          const idx = photos.findIndex((p) => p.attachment.id === attachmentId);
-                          if (idx >= 0) setLightboxIndex(idx);
-                        }}
-                        onJumpTo={setJumpTarget}
-                      />
-                      {m.id === lastMineId && receipt && receipt !== "sending" && receipt !== "failed" && (
-                        <p
-                          className="mt-1 flex items-center justify-end gap-1 px-4 text-[11px] font-medium text-muted-foreground sm:px-6"
-                          aria-live="polite"
-                        >
-                          <ReceiptIcon receipt={receipt} className="size-3.5" />
-                          {receipt === "read" ? (isGroup ? "Seen by everyone" : "Seen") : receipt === "delivered" ? "Delivered" : "Sent"}
-                        </p>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </>
-            )}
-            {typingIds.length > 0 && (
-              <TypingBubble name={isGroup ? typingIds.map((id) => nameOf(id)).join(", ") : undefined} />
-            )}
-          </div>
-        </div>
-              {/* Floating glass header: back, photo + name in the middle, actions. */}
         <header
-          ref={headerRef}
-          className="absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-background via-background/80 to-transparent pt-[max(0.25rem,env(safe-area-inset-top))]"
+          className="relative z-20 shrink-0 border-b bg-background/90 pt-[max(0.25rem,env(safe-area-inset-top))]"
         >
-          <div className="mx-auto flex max-w-4xl items-start justify-between gap-2 px-3 pb-2">
+          <div className="mx-auto grid max-w-4xl grid-cols-[minmax(4.75rem,1fr)_minmax(0,3fr)_minmax(4.75rem,1fr)] items-center gap-2 px-3 pb-2">
             <Link
               href="/chat"
               aria-label="Back to conversations"
-              className="glass mt-0.5 flex h-10 shrink-0 items-center gap-1 rounded-full pl-2 pr-2.5 text-primary shadow-md ring-1 ring-foreground/10 split:invisible"
+              className="glass mt-0.5 flex h-10 shrink-0 items-center gap-1 rounded-full pl-2 pr-2.5 text-primary shadow-md ring-1 ring-foreground/10 justify-self-start split:invisible"
             >
               <ChevronLeft className="size-6" strokeWidth={2.5} aria-hidden />
               {otherUnread > 0 && (
@@ -658,9 +515,9 @@ export function ConversationView({ conversationId }: { conversationId: string })
               >
                 <span className="relative">
                   {isGroup ? (
-                    <GroupAvatar path={summary.avatar_path} name={title} className="size-14 shadow-sm" />
+                    <GroupAvatar path={summary.avatar_path} name={title} className="size-11 shadow-sm" />
                   ) : (
-                    <Avatar name={title} seed={summary.other_user_id} path={summary.other_avatar_path} className="size-14 shadow-sm" />
+                    <Avatar name={title} seed={summary.other_user_id} path={summary.other_avatar_path} className="size-11 shadow-sm" />
                   )}
                   {!isGroup && moods.find((m) => m.user_id === summary.other_user_id) && (
                     <span
@@ -696,11 +553,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
               </button>
             ) : (
               <div className="flex flex-1 flex-col items-center gap-2 pt-1">
-                <Skeleton className="size-14 rounded-full" />
+                <Skeleton className="size-11 rounded-full" />
                 <Skeleton className="h-6 w-24 rounded-full" />
               </div>
             )}
-            <div className="mt-0.5 shrink-0">
+            <div className="justify-self-end">
               {summary && (
                 <div className="glass flex h-10 items-center gap-0.5 rounded-full px-1 shadow-md ring-1 ring-foreground/10">
                 <DropdownMenu>
@@ -840,7 +697,142 @@ export function ConversationView({ conversationId }: { conversationId: string })
             )}
           </div>
         </header>
-        <div ref={composerRef} className="absolute inset-x-0 bottom-0 z-20">
+        <div
+          ref={scrollRef}
+          onScroll={onScroll}
+          className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain py-3"
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions"
+          aria-label={`Messages in ${title}`}
+        >
+          {/* Readable line lengths on wide screens. */}
+          <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col">
+            {loading ? (
+              <div className="space-y-3 px-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className={i % 2 ? "flex justify-end" : "flex"}>
+                    <Skeleton className="h-10 w-2/5 rounded-2xl" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                {hasMore ? (
+                  <div className="flex justify-center py-2">
+                    <Button variant="ghost" size="sm" onClick={() => void loadOlder()} disabled={loadingOlder}>
+                      {loadingOlder ? <Spinner label="Loading earlier messages" /> : "Load earlier messages"}
+                    </Button>
+                  </div>
+                ) : (
+                  messages.length > 0 && (
+                    <p className="py-3 text-center text-xs text-muted-foreground">Beginning of your conversation</p>
+                  )
+                )}
+                {messages.length === 0 && error && (
+              <div className="grid flex-1 place-items-center px-6 text-center">
+                <div>
+                  <p className="font-medium">Couldn&apos;t load messages</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Check your connection and try again.</p>
+                  <Button variant="outline" className="mt-4" onClick={reload}>
+                    Try again
+                  </Button>
+                </div>
+              </div>
+            )}
+            {messages.length === 0 && !error && (
+                  <div className="grid flex-1 place-items-center px-6 text-center">
+                    <div>
+                      <p className="font-medium">No messages yet</p>
+                      <p className="mt-1 text-sm text-muted-foreground">Say hello{isGroup ? " to the group" : ` to ${title}`}.</p>
+                    </div>
+                  </div>
+                )}
+                {messages.map((m, i) => {
+                  const prev = messages[i - 1];
+                  const next = messages[i + 1];
+                  const newDay = needsTimeHeader(prev, m);
+                  const divider = newDay && (
+                    <p className="mb-1 mt-5 text-center text-[11px] font-medium text-muted-foreground">
+                      {formatTimeHeader(m.created_at)}
+                    </p>
+                  );
+                  if (m.system_event) {
+                    return (
+                      <Fragment key={m.id}>
+                        {divider}
+                        <SystemMessage event={m.system_event} actorId={m.sender_id} nameOf={nameOf} />
+                      </Fragment>
+                    );
+                  }
+                  const mine = m.sender_id === access.user_id;
+                  const grouped =
+                    !newDay &&
+                    !prev?.system_event &&
+                    prev?.sender_id === m.sender_id &&
+                    new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < GROUP_WINDOW_MS;
+                  // The tail goes on the last bubble of a run from the same person.
+                  const tail =
+                    !next ||
+                    Boolean(next.system_event) ||
+                    next.sender_id !== m.sender_id ||
+                    needsTimeHeader(m, next) ||
+                    new Date(next.created_at).getTime() - new Date(m.created_at).getTime() >= GROUP_WINDOW_MS;
+                  const canEdit = editWindowMs > 0 && now - new Date(m.created_at).getTime() < editWindowMs;
+                  const receipt = mine
+                    ? receiptFor(m, summary?.other_last_read_at ?? null, summary?.other_last_delivered_at ?? null)
+                    : undefined;
+                  return (
+                    <Fragment key={m.id}>
+                      {divider}
+                      <MessageBubble
+                        message={m}
+                        mine={mine}
+                        myId={access.user_id}
+                        grouped={grouped}
+                        tail={tail}
+                        senderName={isGroup ? nameOf(m.sender_id) : undefined}
+                        nameOf={nameOf}
+                        receipt={receipt}
+                        canEdit={canEdit}
+                        onEdit={() => {
+                          setReplyingTo(null);
+                          setEditing({ id: m.id, body: m.body });
+                        }}
+                        onDelete={() => setConfirmDelete(m.id)}
+                        onRetry={() => retry(m.client_id)}
+                        onDiscard={() => discard(m.client_id)}
+                        onReply={() => {
+                          setEditing(null);
+                          setReplyingTo(m);
+                        }}
+                        onReact={(emoji) => void react(m.id, emoji)}
+                        onOpenImage={(attachmentId) => {
+                          const idx = photos.findIndex((p) => p.attachment.id === attachmentId);
+                          if (idx >= 0) setLightboxIndex(idx);
+                        }}
+                        onJumpTo={setJumpTarget}
+                      />
+                      {m.id === lastMineId && receipt && receipt !== "sending" && receipt !== "failed" && (
+                        <p
+                          className="mt-1 flex items-center justify-end gap-1 px-4 text-[11px] font-medium text-muted-foreground sm:px-6"
+                          aria-live="polite"
+                        >
+                          <ReceiptIcon receipt={receipt} className="size-3.5" />
+                          {receipt === "read" ? (isGroup ? "Seen by everyone" : "Seen") : receipt === "delivered" ? "Delivered" : "Sent"}
+                        </p>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </>
+            )}
+            {typingIds.length > 0 && (
+              <TypingBubble name={isGroup ? typingIds.map((id) => nameOf(id)).join(", ") : undefined} />
+            )}
+          </div>
+        </div>
+        <div className="relative z-10 shrink-0 border-t bg-background/90">
           <Composer
             disabled={loading || otherInactive}
             disabledReason={otherInactive ? `${title} no longer has access, so you can't send new messages.` : undefined}

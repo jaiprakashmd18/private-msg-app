@@ -95,7 +95,7 @@ export function ChatSearch({
         </button>
       </div>
       {q && (
-        <div className="glass-panel absolute inset-x-2 top-full max-h-[min(60dvh,26rem)] overflow-y-auto overscroll-contain rounded-[22px]">
+        <div className="glass-panel mx-auto mt-2 max-h-[min(32cqh,26rem)] max-w-4xl overflow-y-auto overscroll-contain rounded-[22px]">
           <div className="mx-auto max-w-4xl">
             {failed ? (
               <p className="p-4 text-center text-sm text-muted-foreground">Search failed. Try again.</p>

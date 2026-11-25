@@ -207,139 +207,141 @@ export function Composer({
   return (
     <div className="pb-safe px-2 pt-2 sm:px-4">
       <div className="mx-auto w-full max-w-4xl">
-        {editing && (
-          <div className="glass mb-2 flex items-center gap-2 rounded-2xl px-3 py-2 text-xs">
-            <span className="flex-1">Editing message — Enter to save, Esc to cancel</span>
-            <button type="button" onClick={onCancelEdit} aria-label="Cancel editing" className="rounded p-0.5 hover:bg-background/40">
-              <X className="size-3.5" />
-            </button>
-          </div>
-        )}
-        {replyingTo && !editing && (
-          <div className="glass mb-2 flex items-center gap-2 rounded-2xl border-l-4 !border-l-primary px-3 py-2 text-xs">
-            <Reply className="size-3.5 shrink-0 text-primary" aria-hidden />
-            <span className="min-w-0 flex-1">
-              <span className="block font-semibold">Replying to {replyingTo.author}</span>
-              <span className="block truncate text-muted-foreground">{replyingTo.text}</span>
-            </span>
-            <button type="button" onClick={onCancelReply} aria-label="Cancel reply" className="rounded p-0.5 hover:bg-background/40">
-              <X className="size-3.5" />
-            </button>
-          </div>
-        )}
-        {appsOpen && !editing && (
-          <div className="glass-panel mb-2 grid grid-cols-3 gap-2 rounded-[24px] p-3" role="menu" aria-label="Add to message">
-            {attachmentsEnabled && (
-              <AppTile
-                label="Camera"
-                onClick={() => {
-                  setAppsOpen(false);
-                  cameraRef.current?.click();
-                }}
-              >
-                <Camera />
-              </AppTile>
-            )}
-            {attachmentsEnabled && (
-              <AppTile
-                label="Photos & files"
-                onClick={() => {
-                  setAppsOpen(false);
-                  fileRef.current?.click();
-                }}
-              >
-                <Images />
-              </AppTile>
-            )}
-            {onSendSticker && (
-              <AppTile
-                label="Stickers and GIFs"
-                onClick={() => {
-                  setAppsOpen(false);
-                  setStickersOpen(true);
-                }}
-              >
-                <Smile />
-              </AppTile>
-            )}
-            {onShareLocation && (
-              <AppTile
-                label="Location"
-                onClick={() => {
-                  setAppsOpen(false);
-                  onShareLocation();
-                }}
-              >
-                <MapPin />
-              </AppTile>
-            )}
-          </div>
-        )}
-        {stickersOpen && onSendSticker && !editing && (
-          <StickerPanel
-            onPick={(payload) => {
-              onSendSticker(payload);
-              setStickersOpen(false);
-            }}
-          />
-        )}
-        {(files.length > 0 || preparing > 0) && (
-          <ul className="mb-2 flex flex-wrap gap-2" aria-label="Files to send">
-            {files.map((f, i) => (
-              <li key={`${f.file.name}-${i}`} className="relative">
-                {f.previewUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- local preview (blob URL)
-                  <img src={f.previewUrl} alt={f.file.name} className="size-16 rounded-lg object-cover" />
-                ) : (
-                  <span className="flex h-16 max-w-44 items-center gap-2 rounded-lg bg-muted px-2.5 text-xs">
-                    <span className="truncate">{f.file.name}</span>
-                    <span className="shrink-0 text-muted-foreground">{formatBytes(f.file.size)}</span>
-                  </span>
-                )}
-                {isVideo(f.file.type) && f.previewUrl && (
-                  <span className="pointer-events-none absolute inset-0 grid place-items-center text-white drop-shadow" aria-hidden>
-                    ▶
-                  </span>
-                )}
-                {allowViewOnce && files.length === 1 && f.previewUrl && isImage(f.file.type) && (
+        <div className="max-h-[30cqh] overflow-y-auto overscroll-contain px-2">
+          {editing && (
+            <div className="glass mb-2 flex items-center gap-2 rounded-2xl px-3 py-2 text-xs">
+              <span className="flex-1">Editing message — Enter to save, Esc to cancel</span>
+              <button type="button" onClick={onCancelEdit} aria-label="Cancel editing" className="rounded p-0.5 hover:bg-background/40">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          )}
+          {replyingTo && !editing && (
+            <div className="glass mb-2 flex items-center gap-2 rounded-2xl border-l-4 !border-l-primary px-3 py-2 text-xs">
+              <Reply className="size-3.5 shrink-0 text-primary" aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">Replying to {replyingTo.author}</span>
+                <span className="block truncate text-muted-foreground">{replyingTo.text}</span>
+              </span>
+              <button type="button" onClick={onCancelReply} aria-label="Cancel reply" className="rounded p-0.5 hover:bg-background/40">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          )}
+          {appsOpen && !editing && (
+            <div className="glass-panel mb-2 grid grid-cols-3 gap-2 rounded-[24px] p-3" role="menu" aria-label="Add to message">
+              {attachmentsEnabled && (
+                <AppTile
+                  label="Camera"
+                  onClick={() => {
+                    setAppsOpen(false);
+                    cameraRef.current?.click();
+                  }}
+                >
+                  <Camera />
+                </AppTile>
+              )}
+              {attachmentsEnabled && (
+                <AppTile
+                  label="Photos & files"
+                  onClick={() => {
+                    setAppsOpen(false);
+                    fileRef.current?.click();
+                  }}
+                >
+                  <Images />
+                </AppTile>
+              )}
+              {onSendSticker && (
+                <AppTile
+                  label="Stickers and GIFs"
+                  onClick={() => {
+                    setAppsOpen(false);
+                    setStickersOpen(true);
+                  }}
+                >
+                  <Smile />
+                </AppTile>
+              )}
+              {onShareLocation && (
+                <AppTile
+                  label="Location"
+                  onClick={() => {
+                    setAppsOpen(false);
+                    onShareLocation();
+                  }}
+                >
+                  <MapPin />
+                </AppTile>
+              )}
+            </div>
+          )}
+          {stickersOpen && onSendSticker && !editing && (
+            <StickerPanel
+              onPick={(payload) => {
+                onSendSticker(payload);
+                setStickersOpen(false);
+              }}
+            />
+          )}
+          {(files.length > 0 || preparing > 0) && (
+            <ul className="mb-2 flex flex-wrap gap-2" aria-label="Files to send">
+              {files.map((f, i) => (
+                <li key={`${f.file.name}-${i}`} className="relative">
+                  {f.previewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- local preview (blob URL)
+                    <img src={f.previewUrl} alt={f.file.name} className="size-16 rounded-lg object-cover" />
+                  ) : (
+                    <span className="flex h-16 max-w-44 items-center gap-2 rounded-lg bg-muted px-2.5 text-xs">
+                      <span className="truncate">{f.file.name}</span>
+                      <span className="shrink-0 text-muted-foreground">{formatBytes(f.file.size)}</span>
+                    </span>
+                  )}
+                  {isVideo(f.file.type) && f.previewUrl && (
+                    <span className="pointer-events-none absolute inset-0 grid place-items-center text-white drop-shadow" aria-hidden>
+                      ▶
+                    </span>
+                  )}
+                  {allowViewOnce && files.length === 1 && f.previewUrl && isImage(f.file.type) && (
+                    <button
+                      type="button"
+                      onClick={() => setFiles((prev) => prev.map((p, j) => (j === i ? { ...p, viewOnce: !p.viewOnce } : p)))}
+                      aria-pressed={Boolean(f.viewOnce)}
+                      aria-label="View once"
+                      title={f.viewOnce ? "View once: on" : "Send as view once"}
+                      className={cn(
+                        "absolute bottom-1 left-1 grid size-6 place-items-center rounded-full border-2 text-[11px] font-bold shadow",
+                        f.viewOnce
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-white bg-black/50 text-white",
+                      )}
+                    >
+                      1
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setFiles((prev) => prev.map((p, j) => (j === i ? { ...p, viewOnce: !p.viewOnce } : p)))}
-                    aria-pressed={Boolean(f.viewOnce)}
-                    aria-label="View once"
-                    title={f.viewOnce ? "View once: on" : "Send as view once"}
-                    className={cn(
-                      "absolute bottom-1 left-1 grid size-6 place-items-center rounded-full border-2 text-[11px] font-bold shadow",
-                      f.viewOnce
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-white bg-black/50 text-white",
-                    )}
+                    aria-label={`Remove ${f.file.name}`}
+                    onClick={() => removeFile(i)}
+                    className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-foreground text-background"
                   >
-                    1
+                    <X className="size-3" />
                   </button>
-                )}
-                <button
-                  type="button"
-                  aria-label={`Remove ${f.file.name}`}
-                  onClick={() => removeFile(i)}
-                  className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-foreground text-background"
-                >
-                  <X className="size-3" />
-                </button>
-              </li>
-            ))}
-            {preparing > 0 && (
-              <li className="grid size-16 place-items-center rounded-lg bg-muted">
-                <Spinner label="Preparing photo" />
-              </li>
-            )}
-          </ul>
-        )}
-        {files.length === 1 && files[0]!.viewOnce && (
-          <p className="mb-2 text-xs text-muted-foreground">
-            View once: they can open this photo one time, then it&apos;s deleted. Any text is sent as a separate message.
-          </p>
-        )}
+                </li>
+              ))}
+              {preparing > 0 && (
+                <li className="grid size-16 place-items-center rounded-lg bg-muted">
+                  <Spinner label="Preparing photo" />
+                </li>
+              )}
+            </ul>
+          )}
+          {files.length === 1 && files[0]!.viewOnce && (
+            <p className="mb-2 text-xs text-muted-foreground">
+              View once: they can open this photo one time, then it&apos;s deleted. Any text is sent as a separate message.
+            </p>
+          )}
+        </div>
         <form
           className="flex items-end gap-2"
           onSubmit={(e) => {
@@ -417,7 +419,7 @@ export function Composer({
               }}
               aria-describedby="composer-hint"
               className={cn(
-                "block max-h-[200px] min-h-[38px] w-full resize-none bg-transparent py-[8px] pl-4 text-[17px] leading-[22px] placeholder:text-muted-foreground focus-visible:outline-none pointer-fine:text-[15px]",
+                "block max-h-[min(200px,22cqh)] min-h-[38px] w-full resize-none bg-transparent py-[8px] pl-4 text-[17px] leading-[22px] placeholder:text-muted-foreground focus-visible:outline-none pointer-fine:text-[15px]",
                 "pr-11",
               )}
             />
