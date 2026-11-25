@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   referrer: "no-referrer",
   applicationName: APP_NAME,
   appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "black" },
-  icons: { apple: "/icons/apple-touch-icon.png?v=rose" },
+  icons: { icon: { url: "/icon.svg?v=rose", type: "image/svg+xml" }, apple: "/icons/apple-touch-icon.png?v=rose" },
   formatDetection: { telephone: false },
 };
 
