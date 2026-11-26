@@ -558,6 +558,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
                 <Skeleton className="h-4 w-24 rounded-full" />
               </div>
             )}
+            {!isGroup && summary && (
+              <Button asChild size="icon-sm" variant="ghost" className="shrink-0 text-primary">
+                <Link href={`/chat/${conversationId}/space`} aria-label="Our Space" title="Our Space"><Heart /></Link>
+              </Button>
+            )}
             <div className="shrink-0">
               {summary && (
                 <div className="flex h-10 items-center gap-0.5 rounded-xl border bg-card px-1">
@@ -803,6 +808,14 @@ export function ConversationView({ conversationId }: { conversationId: string })
                         onDelete={() => setConfirmDelete(m.id)}
                         onRetry={() => retry(m.client_id)}
                         onDiscard={() => discard(m.client_id)}
+                        onSaveMemory={!isGroup && !m.deleted_at && !m.local_status && !m.attachments?.some((file) => file.view_once) ? () =>
+                          requirePlus("Saved memories", () => {
+                            void supabase.rpc("set_couple_memory", { p_chat: conversationId, p_message: m.id, p_action: "save" })
+                              .then(({ error }) => {
+                                if (error) reportError(error, "Could not save this memory.");
+                                else toast.success("Saved to Our Space");
+                              });
+                          }) : undefined}
                         onReply={() => {
                           setEditing(null);
                           setReplyingTo(m);

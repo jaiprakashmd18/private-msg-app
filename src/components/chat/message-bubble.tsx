@@ -2,6 +2,7 @@
 
 import {
   AlertCircle,
+  Bookmark,
   Check,
   CheckCheck,
   Clock,
@@ -174,6 +175,7 @@ export function MessageBubble({
   onRetry,
   onDiscard,
   onReply,
+  onSaveMemory,
   onReact,
   onOpenImage,
   onJumpTo,
@@ -195,6 +197,7 @@ export function MessageBubble({
   onRetry: () => void;
   onDiscard: () => void;
   onReply: () => void;
+  onSaveMemory?: () => void;
   onReact: (emoji: string) => void;
   onOpenImage: (attachmentId: string) => void;
   onJumpTo: (messageId: string) => void;
@@ -449,6 +452,7 @@ export function MessageBubble({
                 <DropdownMenuItem onSelect={onReply}>
                   <Reply /> Reply
                 </DropdownMenuItem>
+                {onSaveMemory && <DropdownMenuItem onSelect={onSaveMemory}><Bookmark /> Save to Memories</DropdownMenuItem>}
                 {message.body && !special && (
                   <DropdownMenuItem
                     onSelect={() => {

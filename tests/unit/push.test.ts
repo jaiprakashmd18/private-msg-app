@@ -12,6 +12,16 @@ describe("push notification payload", () => {
     expect(buildPayload({ ...base, show_preview: false }).body).toBe("New message");
   });
 
+  it("redacts names and event details in private mode before delivery", () => {
+    const target = { ...base, conversation_kind: "group" as const, conversation_title: "Private group", event: { type: "nudge" } };
+    expect(buildPayload({ ...target, privacy_mode: "private" })).toEqual({
+      title: "New message", body: "", url: "/chat/c1", tag: "message-c1",
+    });
+    expect(buildPayload({ ...target, privacy_mode: "sender" })).toEqual({
+      title: "Alex", body: "New message", url: "/chat/c1", tag: "message-c1",
+    });
+  });
+
   it("describes attachment-only messages and truncates long text", () => {
     expect(buildPayload({ ...base, body: "", has_attachments: true }).body).toBe("📎 Attachment");
     expect(buildPayload({ ...base, body: "x".repeat(500) }).body).toHaveLength(140);

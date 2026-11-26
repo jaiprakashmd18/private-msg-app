@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { GiftCode } from "@/components/plus/gift-code";
 import { PlusDialog } from "@/components/plus/plus-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -218,6 +219,7 @@ export function PlusCard() {
             </p>
           </>
         )}
+        <GiftCode />
       </CardContent>
       <PlusDialog open={open} onOpenChange={setOpen} />
     </Card>
