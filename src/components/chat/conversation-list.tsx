@@ -29,7 +29,7 @@ import type { ConversationSummary } from "@/types/app";
 
 /** The name shown for a conversation in lists and search. */
 export function conversationName(c: ConversationSummary): string {
-  return c.kind === "group" ? (c.title ?? "Group") : displayNameOf(c.other_display_name, c.other_email);
+  return c.kind === "group" ? (c.title ?? "Group") : (c.nicknames?.[c.other_user_id ?? ""] ?? displayNameOf(c.other_display_name, c.other_email));
 }
 
 function preview(c: ConversationSummary, myId: string) {
@@ -134,7 +134,7 @@ export function ConversationList({
   const needle = filter.trim().toLowerCase();
   const visible = needle
     ? conversations.filter((c) =>
-        `${c.title ?? ""} ${c.other_display_name ?? ""} ${c.other_email ?? ""}`.toLowerCase().includes(needle),
+        `${conversationName(c)} ${c.other_display_name ?? ""} ${c.other_email ?? ""}`.toLowerCase().includes(needle),
       )
     : conversations;
 

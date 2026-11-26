@@ -63,6 +63,7 @@ export type SystemEvent =
   | { type: "date_reminder"; date_id: string; kind: SpecialDateKind; title: string; years: number };
 
 export interface ConversationSummary {
+  nicknames?: Record<string, string>;
   id: string;
   kind: ConversationKind;
   /** Group name (groups only). */

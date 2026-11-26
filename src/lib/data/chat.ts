@@ -22,7 +22,20 @@ const MESSAGE_SELECT =
 export async function listConversations(supabase: SupabaseClient): Promise<ConversationSummary[]> {
   const { data, error } = await supabase.rpc("list_conversations");
   if (error) throw error;
-  return (data ?? []) as ConversationSummary[];
+  const rows = (data ?? []) as ConversationSummary[];
+  const directIds = rows.filter((row) => row.kind === "direct").map((row) => row.id);
+  if (!directIds.length) return rows;
+  const { data: names, error: nicknameError } = await supabase.from("chat_nicknames")
+    .select("conversation_id,user_id,nickname");
+  if (nicknameError) return rows;
+  const byChat = new Map<string, Record<string, string>>();
+  for (const name of names ?? []) {
+    if (!name.nickname) continue;
+    const nicknames = byChat.get(name.conversation_id) ?? {};
+    nicknames[name.user_id] = name.nickname;
+    byChat.set(name.conversation_id, nicknames);
+  }
+  return rows.map((row) => ({ ...row, nicknames: byChat.get(row.id) }));
 }
 
 export async function listDirectory(supabase: SupabaseClient): Promise<DirectoryEntry[]> {

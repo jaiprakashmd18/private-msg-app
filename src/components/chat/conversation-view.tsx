@@ -30,6 +30,7 @@ import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
 import { Composer, type EditingState, type ReplyingState } from "@/components/chat/composer";
 import { ChatSearch } from "@/components/chat/chat-search";
+import { conversationName } from "@/components/chat/conversation-list";
 import { ConversationInfoDialog } from "@/components/chat/conversation-info-dialog";
 import { AppearanceDialog } from "@/components/chat/couple/appearance-dialog";
 import { DailyQuestionDialog, dailyQuestionStatus } from "@/components/chat/couple/daily-question";
@@ -337,7 +338,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
     if (lastMessage?.sender_id) clearUser(lastMessage.sender_id);
   }, [lastMessage?.id, lastMessage?.sender_id, clearUser]);
 
-  const title = isGroup ? (summary?.title ?? "Group") : displayNameOf(summary?.other_display_name, summary?.other_email);
+  const title = summary ? conversationName(summary) : displayNameOf(null, null);
   const editWindowMs = (settings?.edit_window_minutes ?? 15) * 60_000;
   const otherInactive = summary?.kind === "direct" ? !summary.other_is_active : false;
 
