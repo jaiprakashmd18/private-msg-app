@@ -83,9 +83,10 @@ export async function createUser(opts: { role?: "member" | "admin"; label?: stri
   return { id, email, entryId: entry.id };
 }
 
-/** Makes two people contacts (as an invite would). */
+/** Seeds mutual contact matches and the legacy relationship for test fixtures. */
 export async function connect(a: string, b: string) {
   await asOwner("select private.link_contacts($1, $2)", [a, b]);
+  await asOwner("insert into private.synced_chat_contacts values ($1, $2), ($2, $1) on conflict do nothing", [a, b]);
 }
 
 export async function directConversation(a: string, b: string): Promise<string> {

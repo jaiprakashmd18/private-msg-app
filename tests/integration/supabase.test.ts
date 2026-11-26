@@ -183,9 +183,11 @@ describe.skipIf(!enabled)("Supabase end-to-end", () => {
   });
 
   it("delivers messages in real time to the other member", { timeout: 40_000 }, async () => {
-    // Alice invites Bob (they become contacts) before they can chat.
+    // Alice invites Bob and matches his verified email before starting the chat.
     const invited = await alice.sb.rpc("invite_contact", { p_email: bob.email });
     expect(invited.error).toBeNull();
+    const { error: syncError } = await alice.sb.rpc("sync_chat_contacts", { p_emails: [bob.email], p_phones: [] });
+    expect(syncError).toBeNull();
     const { data: convId, error } = await alice.sb.rpc("get_or_create_direct_conversation", {
       p_other_user_id: bob.userId,
     });

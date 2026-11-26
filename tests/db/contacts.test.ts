@@ -30,7 +30,10 @@ describe("members invite their own contacts", () => {
     const meenu = await signIn(email);
     const [access] = await asUser<{ is_active: boolean }>(meenu, "select is_active from public.my_access()");
     expect(access?.is_active).toBe(true);
-    // Both see each other, and can chat.
+    expect(await directory(a.id)).toEqual([]);
+    expect(await directory(meenu)).toEqual([]);
+    await asUser(a.id, "select public.sync_chat_contacts($1, '{}')", [[email]]);
+    await asUser(meenu, "select public.sync_chat_contacts($1, '{}')", [[a.email]]);
     expect(await directory(a.id)).toContain(meenu);
     expect(await directory(meenu)).toEqual([a.id]);
     await asUser(meenu, "select public.get_or_create_direct_conversation($1)", [a.id]);
@@ -42,13 +45,13 @@ describe("members invite their own contacts", () => {
     const b = await createUser();
     const c = await createUser();
     expect(await invite(a.id, b.email)).toMatchObject({ status: "connected", user_id: b.id });
-    expect(await directory(b.id)).toContain(a.id);
+    expect(await directory(b.id)).toEqual([]);
 
     const email = freshEmail();
     await invite(a.id, email);
     await invite(c.id, email);
     const newcomer = await signIn(email);
-    expect((await directory(newcomer)).sort()).toEqual([a.id, c.id].sort());
+    expect(await directory(newcomer)).toEqual([]);
   });
 
   it("refuses bad emails, yourself, people the administrator disabled, and too many invites", async () => {
@@ -108,10 +111,10 @@ describe("people only see their own contacts", () => {
     expect(await asUser(a.id, "select id from public.profiles where id = $1", [stranger.id])).toHaveLength(0);
     await expect(
       asUser(stranger.id, "select public.get_or_create_direct_conversation($1)", [a.id]),
-    ).rejects.toThrow(/only message your contacts/);
+    ).rejects.toThrow(/Sync this person/);
     await expect(
       asUser(stranger.id, "select public.create_group('x', $1::uuid[])", [[a.id]]),
-    ).rejects.toThrow(/only add your contacts/);
+    ).rejects.toThrow(/only add synced contacts/);
     // Nobody can read someone else's contact list.
     expect(await asUser(stranger.id, "select 1 from public.contacts where user_id = $1", [a.id])).toHaveLength(0);
   });
@@ -127,12 +130,19 @@ describe("people only see their own contacts", () => {
     expect(await directory(b.id)).toEqual([a.id]);
   });
 
-  it("the administrator can still reach everyone", async () => {
+  it("the administrator also needs to sync a contact to start a chat", async () => {
     const admin = await createUser({ role: "admin" });
     const member = await createUser();
     expect(await asUser(admin.id, "select id from public.profiles where id = $1", [member.id])).toHaveLength(1);
-    await asUser(admin.id, "select public.get_or_create_direct_conversation($1)", [member.id]);
-    expect(await directory(member.id)).toContain(admin.id);
+    await expect(asUser(admin.id, "select public.get_or_create_direct_conversation($1)", [member.id])).rejects.toThrow(/Sync this person/);
+    await asOwner("update auth.users set phone = '995555123456', phone_confirmed_at = now() where id = $1", [member.id]);
+    await asUser(admin.id, "select public.sync_chat_contacts('{}', $1)", [["+995555123456"]]);
+    expect(await directory(admin.id)).toEqual([member.id]);
+    const [before] = await asUser(admin.id, "select public.get_or_create_direct_conversation($1)", [member.id]);
+    await asOwner("update private.contact_sync_state set synced_at = now() - interval '1 minute' where user_id = $1", [admin.id]);
+    await asUser(admin.id, "select public.sync_chat_contacts('{}', '{}')");
+    expect(await directory(admin.id)).toEqual([]);
+    expect(await asUser(admin.id, "select public.get_or_create_direct_conversation($1)", [member.id])).toEqual([before]);
   });
 });
 
