@@ -288,3 +288,44 @@ html[data-keyboard="open"] .app-shell {
     radial-gradient(color-mix(in oklab, var(--foreground) 11%, transparent) 1px, transparent 1px);
   background-size: auto, 20px 20px;
 }
+
+.chat-theme-midnight-rose,
+.chat-theme-moonlight,
+.chat-theme-ember {
+  --foreground: #fff2f6;
+  --background: #170d15;
+  --muted: #281825;
+  --muted-foreground: #d6adbf;
+  --primary: #f5a8bf;
+  --bubble-mine: #7e234c;
+  --bubble-theirs: #311926;
+  --bubble-mine-foreground: #fff7fa;
+  --bubble-theirs-foreground: #fff2f6;
+  --theme-glow: #41132d;
+  color: var(--foreground);
+  background-color: var(--background);
+  background-image:
+    radial-gradient(ellipse at 22% 0%, var(--theme-glow), transparent 62%),
+    radial-gradient(ellipse at 100% 100%, var(--theme-glow), transparent 48%);
+  background-size: auto;
+}
+
+.chat-theme-moonlight {
+  --background: #0d1326;
+  --muted: #202943;
+  --muted-foreground: #b6c5e8;
+  --primary: #b9c7ff;
+  --bubble-mine: #3d5095;
+  --bubble-theirs: #232d4a;
+  --theme-glow: #25335f;
+}
+
+.chat-theme-ember {
+  --background: #21100d;
+  --muted: #39221d;
+  --muted-foreground: #edbea9;
+  --primary: #ffc2a3;
+  --bubble-mine: #8a3e30;
+  --bubble-theirs: #40241e;
+  --theme-glow: #51261c;
+}

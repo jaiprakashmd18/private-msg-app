@@ -16,7 +16,7 @@ import { Spinner } from "@/components/ui/spinner";
 import {
   cancelInvitation,
   createGroup,
-  getOrCreateConversation,
+  requestDirectChat,
   type InviteResult,
   inviteContact,
   listDirectory,
@@ -61,7 +61,7 @@ export function NewConversationDialog({
               ? "Name the group and choose who's in it."
               : mode === "invite"
                 ? "Add their email. They can sign in straight away and you'll see each other in your contacts."
-                : "Choose one of your contacts, or invite someone new."}
+                : "Open an existing chat, send a message request, or invite someone new."}
           </DialogDescription>
         </DialogHeader>
         {/* Mounted only while open, so each opening starts with fresh state. */}
@@ -152,7 +152,14 @@ function PeoplePicker({
   async function start(person: DirectoryEntry) {
     setPending(person.id);
     try {
-      await open(await getOrCreateConversation(supabase, person.id));
+      const request = await requestDirectChat(supabase, person.id);
+      if (request.chat_id) await open(request.chat_id);
+      else if (request.request_status === "incoming") toast.info("They already sent you a request. Open Message requests to respond.");
+      else if (request.request_status === "declined") toast.info("This message request was declined.");
+      else {
+        toast.success("Message request sent. The chat opens after they accept.");
+        onDone();
+      }
     } catch (err) {
       reportError(err, "Could not start the conversation.");
     } finally {

@@ -1,11 +1,14 @@
 "use client";
 
-import { ArrowLeft, Heart } from "lucide-react";
+import { ArrowLeft, CalendarHeart, Heart } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
 import { conversationName } from "@/components/chat/conversation-list";
+import { SongCard } from "@/components/chat/song-card";
+import { VoicePlayer } from "@/components/chat/voice-player";
+import { parseSongLink } from "@/lib/chat-experience";
 import { SharedListDialog, type ListTab } from "@/components/chat/couple/shared-list-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +21,16 @@ import type { Attachment, DatePlan, SpecialDate } from "@/types/app";
 
 type Letter = { id: string; title: string; body: string | null; mine: boolean; opened_at: string | null };
 type Memory = { id: string; body: string; caption: string; pinned: boolean; saved_at: string };
+
+function MemoryMedia({ file }: { file?: Attachment }) {
+  const audio = file?.mime_type.startsWith("audio/");
+  const { url } = useSignedUrl(ATTACHMENTS_BUCKET, audio ? file?.storage_path : file?.thumb_path ?? file?.storage_path);
+  if (!file) return null;
+  if (audio) return <VoicePlayer src={url} durationMs={file.duration_ms} mine={false} />;
+  if (!url) return null;
+  // eslint-disable-next-line @next/next/no-img-element -- private signed media
+  return <img src={url} alt={file.file_name} loading="lazy" className="aspect-[4/3] w-full rounded-xl object-cover" />;
+}
 
 export function OurSpace({ conversationId }: { conversationId: string }) {
   const { supabase, reportError, access: member } = useApp();
@@ -34,6 +47,7 @@ export function OurSpace({ conversationId }: { conversationId: string }) {
   const [plus, setPlus] = useState<boolean | null>(null);
   const [letters, setLetters] = useState<Letter[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
+  const [memoryMedia, setMemoryMedia] = useState<Record<string, Attachment>>({});
   const [letterDraft, setLetterDraft] = useState({ id: "", title: "", body: "" });
   const [listOpen, setListOpen] = useState(false);
   const [listTab, setListTab] = useState<ListTab>("bucket");
@@ -68,7 +82,22 @@ export function OurSpace({ conversationId }: { conversationId: string }) {
     setPlans(nextPlans);
     if (letterRows.error || memoryRows.error) throw letterRows.error ?? memoryRows.error;
     setLetters((letterRows.data ?? []) as Letter[]);
-    setMemories((memoryRows.data ?? []) as Memory[]);
+    const saved = (memoryRows.data ?? []) as Memory[];
+    const files: Attachment[] = [];
+    for (let i = 0; i < saved.length; i += 80) {
+      const { data } = await supabase.from("attachments").select("*").eq("conversation_id", conversationId)
+        .eq("view_once", false).in("message_id", saved.slice(i, i + 80).map((item) => item.id))
+        .order("created_at");
+      files.push(...((data ?? []) as Attachment[]));
+    }
+    const byMessage: Record<string, Attachment> = {};
+    for (const file of files) {
+      if ((file.mime_type.startsWith("image/") || file.mime_type.startsWith("audio/")) && !byMessage[file.message_id]) {
+        byMessage[file.message_id] = file;
+      }
+    }
+    setMemoryMedia(byMessage);
+    setMemories(saved);
   }, [conversationId, supabase]);
 
   useEffect(() => {
@@ -110,22 +139,55 @@ export function OurSpace({ conversationId }: { conversationId: string }) {
   const anniversary = together && nextOccurrence({ on_date: together.on_date, yearly: true }, now);
   const nextPlan = plans.find((plan) => Date.parse(plan.starts_at) >= now.getTime());
 
+  const timeline = [...memories].sort((a, b) => b.saved_at.localeCompare(a.saved_at));
+  const pinned = memories.filter((memory) => memory.pinned);
+  const songs = timeline.flatMap((memory) => {
+    const song = parseSongLink(memory.body);
+    return song ? [{ id: memory.id, song }] : [];
+  });
+
   return (
     <div className="min-h-0 flex-1 overflow-y-auto bg-grouped px-4 pb-safe pt-[max(1rem,env(safe-area-inset-top))] sm:px-8">
       <div className="mx-auto grid max-w-3xl gap-5">
         <Button asChild variant="ghost" className="w-fit"><Link href={chatHref}><ArrowLeft /> Back to chat</Link></Button>
         {!allowed ? <p>{loading ? "Loading conversation…" : "Our Space is available in one-to-one chats."}</p> : (
           <>
-            <header className="relative isolate overflow-hidden rounded-3xl bg-[#351222] p-6 text-white sm:p-10">
+            <header className="relative isolate -mx-4 flex min-h-64 flex-col justify-end overflow-hidden bg-[#351222] p-6 text-white sm:mx-0 sm:min-h-80 sm:rounded-3xl sm:p-10">
               {/* eslint-disable-next-line @next/next/no-img-element -- private signed media */}
-              {coverUrl && <img src={coverUrl} alt="" className="absolute inset-0 -z-10 size-full object-cover opacity-30" />}
+              {coverUrl && <img src={coverUrl} alt="" className="absolute inset-0 -z-20 size-full object-cover" />}
+              <div className="absolute inset-0 -z-10 bg-linear-to-t from-[#170811] via-[#170811]/75 to-[#170811]/15" aria-hidden />
               <Heart className="mb-4 size-7 fill-rose-300 text-rose-300" aria-hidden />
               <h1 className="text-4xl font-semibold tracking-tight">Our Space</h1>
               <p className="mt-2">{conversationName(conversation)}</p>
               {together && <p className="mt-2 text-rose-200">{daysTogether(together.on_date, now)} days together</p>}
               {anniversary && <p className="text-rose-200">Anniversary in {anniversary.daysUntil} days</p>}
-              {nextPlan && <p className="mt-4">Next date · {nextPlan.title} · {formatDateTime(nextPlan.starts_at)}</p>}
+
             </header>
+            {nextPlan && (
+              <section className="flex items-start gap-3 rounded-2xl border bg-card p-4">
+                <CalendarHeart className="mt-1 size-5 shrink-0 text-primary" aria-hidden />
+                <div className="min-w-0">
+                  <h2 className="text-sm text-muted-foreground">Next date</h2>
+                  <p className="break-words text-xl font-semibold">{nextPlan.title}</p>
+                  <p className="text-sm">{formatDateTime(nextPlan.starts_at)}</p>
+                </div>
+              </section>
+            )}
+            {pinned.length > 0 && (
+              <section className="grid gap-3">
+                <h2 className="text-xl font-semibold">Pinned memories</h2>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {pinned.map((memory) => (
+                    <article key={memory.id} className="grid min-w-0 gap-2 rounded-2xl border bg-card p-3">
+                      <MemoryMedia file={memoryMedia[memory.id]} />
+                      <Link className="line-clamp-2 break-words font-medium text-primary" href={`${chatHref}?m=${memory.id}`}>
+                        {memory.caption || memory.body || "Open pinned memory"}
+                      </Link>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
             {photos.length > 1 && <label className="grid gap-1 text-sm">
               Cover photo
               <select className="rounded-xl border bg-card p-2" value={photo?.id ?? ""} disabled={busy} onChange={(event) =>
@@ -164,8 +226,14 @@ export function OurSpace({ conversationId }: { conversationId: string }) {
                   </article>
                 ))}
               </section>
+              {songs.length > 0 && (
+                <section className="grid gap-3 rounded-3xl border bg-card p-5">
+                  <h2 className="text-xl font-semibold">Our songs</h2>
+                  {songs.map(({ id, song }) => <SongCard key={id} song={song} />)}
+                </section>
+              )}
               <section className="grid gap-3 rounded-3xl border bg-card p-5">
-                <h2 className="text-xl font-semibold">Saved memories</h2>
+                <h2 className="text-xl font-semibold">Memory timeline</h2>
                 {memories.length === 0 && <p className="text-sm text-muted-foreground">Open a message’s menu and choose Save to Memories.</p>}
                 {memories.length > 0 && <label className="grid gap-1 text-sm">Browse by month
                   <select className="rounded-xl border bg-background p-2" value={month} onChange={(event) => setMonth(event.target.value)}>
@@ -174,8 +242,9 @@ export function OurSpace({ conversationId }: { conversationId: string }) {
                       <option key={value} value={value}>{value}</option>)}
                   </select>
                 </label>}
-                {memories.filter((memory) => !month || memory.saved_at.startsWith(month)).map((memory) => <article key={memory.id} className="grid gap-2 rounded-2xl border p-3">
+                {timeline.filter((memory) => !month || memory.saved_at.startsWith(month)).map((memory) => <article key={memory.id} className="grid gap-2 rounded-2xl border p-3">
                   <p className="text-xs text-muted-foreground">{new Date(memory.saved_at).toLocaleDateString(undefined, { month: "long", year: "numeric" })}{memory.pinned ? " · Pinned" : ""}</p>
+                  <MemoryMedia file={memoryMedia[memory.id]} />
                   <Link className="line-clamp-3 break-words text-primary underline" href={`${chatHref}?m=${memory.id}`}>{memory.body || "Open media in chat"}</Link>
                   <form key={memory.caption + memory.pinned} className="grid gap-2" onSubmit={(e) => {
                     e.preventDefault();

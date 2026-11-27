@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Settings, Shield, SquarePen, WifiOff, X } from "lucide-react";
+import { Inbox, Search, Settings, Shield, SquarePen, WifiOff, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
 import { ConversationList } from "@/components/chat/conversation-list";
+import { MessageRequests } from "@/components/chat/message-requests";
 import { NewConversationDialog } from "@/components/chat/new-conversation-dialog";
 import { SearchResults } from "@/components/chat/search-results";
 import { UserMenu } from "@/components/chat/user-menu";
@@ -22,6 +23,7 @@ export function Sidebar() {
   const params = useParams<{ conversationId?: string }>();
   const [query, setQuery] = useState("");
   const [newOpen, setNewOpen] = useState(false);
+  const [requestsOpen, setRequestsOpen] = useState(false);
   const pendingRequests = usePendingRequests();
 
   return (
@@ -69,6 +71,9 @@ export function Sidebar() {
             New chat
           </Button>
         </div>
+        <Button variant="ghost" size="sm" onClick={() => setRequestsOpen(true)} className="mb-1 px-2">
+          <Inbox /> Message requests
+        </Button>
         <div className="relative mt-2">
           <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -108,6 +113,7 @@ export function Sidebar() {
         )}
       </nav>
 
+      <MessageRequests open={requestsOpen} onOpenChange={setRequestsOpen} />
       <NewConversationDialog open={newOpen} onOpenChange={setNewOpen} />
     </>
   );

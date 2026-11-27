@@ -29,6 +29,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
 import { Composer, type EditingState, type ReplyingState } from "@/components/chat/composer";
+import { useSharedChatStyle } from "@/hooks/use-shared-chat-style";
 import { ChatSearch } from "@/components/chat/chat-search";
 import { conversationName } from "@/components/chat/conversation-list";
 import { ConversationInfoDialog } from "@/components/chat/conversation-info-dialog";
@@ -199,6 +200,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const { rows: dailyAnswers, reload: reloadDaily } = useLiveRows<DailyAnswer>("daily_answers", conversationId, () =>
     listDailyAnswers(supabase, conversationId, today),
   );
+  const shared = useSharedChatStyle(conversationId);
   const [appearance, setAppearance] = useState<ChatAppearance>({ wallpaper_path: null, bubble_color: null });
   const [burst, setBurst] = useState(0);
   const { url: wallpaperUrl } = useSignedUrl(AVATARS_BUCKET, appearance.wallpaper_path);
@@ -480,8 +482,8 @@ export function ConversationView({ conversationId }: { conversationId: string })
 
   return (
     <>
-      <div className={cn("conversation-canvas relative flex min-h-0 flex-1 flex-col", appearance.bubble_color && `bubble-${appearance.bubble_color}`)}>
-        {wallpaperUrl && (
+      <div className={cn("conversation-canvas relative flex min-h-0 flex-1 flex-col", shared.theme ? `chat-theme-${shared.theme}` : appearance.bubble_color ? `bubble-${appearance.bubble_color}` : !appearance.wallpaper_path && "chat-theme-midnight-rose")}>
+        {!shared.theme && wallpaperUrl && (
           <div
             aria-hidden
             className="absolute inset-0 bg-cover bg-center"
@@ -676,6 +678,13 @@ export function ConversationView({ conversationId }: { conversationId: string })
               )}
             </div>
           </div>
+        {shared.pin && (
+          <button type="button" onClick={() => setJumpTarget(shared.pin!.id)}
+            className="mx-3 mb-2 flex w-[calc(100%-1.5rem)] min-w-0 items-center gap-2 rounded-xl border bg-muted px-3 py-2 text-left text-sm">
+            <span className="shrink-0 font-semibold text-primary">Pinned</span>
+            <span className="truncate">{shared.pin.body || "Open pinned media"}</span>
+          </button>
+        )}
         {searching && (
           <ChatSearch
             conversationId={conversationId}
@@ -817,6 +826,15 @@ export function ConversationView({ conversationId }: { conversationId: string })
                                 else toast.success("Saved to Our Space");
                               });
                           }) : undefined}
+                        pinned={shared.pin?.id === m.id}
+                        onPin={!m.deleted_at && !m.local_status && !m.attachments?.some((file) => file.view_once) ? () => {
+                          void supabase.rpc("pin_chat_message", {
+                            p_chat: conversationId, p_message: m.id, p_pin: shared.pin?.id !== m.id,
+                          }).then(({ error }) => {
+                            if (error) reportError(error, "Could not update the pinned message.");
+                            else void shared.refresh();
+                          });
+                        } : undefined}
                         onReply={() => {
                           setEditing(null);
                           setReplyingTo(m);
@@ -933,6 +951,9 @@ export function ConversationView({ conversationId }: { conversationId: string })
       <AppearanceDialog
         conversationId={conversationId}
         appearance={appearance}
+        sharedTheme={shared.theme}
+        allowSharedTheme={!isGroup}
+        onSharedChanged={shared.refresh}
         open={panel === "look"}
         onOpenChange={(o) => setPanel(o ? "look" : null)}
         onChanged={setAppearance}

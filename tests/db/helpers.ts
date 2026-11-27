@@ -89,14 +89,23 @@ export async function connect(a: string, b: string) {
   await asOwner("insert into private.synced_chat_contacts values ($1, $2), ($2, $1) on conflict do nothing", [a, b]);
 }
 
+export async function acceptDirectRequest(sender: string, recipient: string): Promise<string> {
+  const [{ chat_id }] = await asUser<{ chat_id: string | null }>(
+    sender, "select chat_id from public.request_direct_chat($1)", [recipient],
+  );
+  if (chat_id) return chat_id;
+  const [{ id: requestId }] = await asUser<{ id: string }>(
+    recipient, "select id from public.direct_message_requests where sender_id = $1", [sender],
+  );
+  const [{ id }] = await asUser<{ id: string }>(
+    recipient, "select public.respond_to_direct_request($1, true) as id", [requestId],
+  );
+  return id;
+}
+
 export async function directConversation(a: string, b: string): Promise<string> {
   await connect(a, b);
-  const [row] = await asUser<{ id: string }>(
-    a,
-    "select public.get_or_create_direct_conversation($1) as id",
-    [b],
-  );
-  return row.id;
+  return acceptDirectRequest(a, b);
 }
 
 export async function send(userId: string, conversationId: string, body: string, clientId = randomUUID()) {

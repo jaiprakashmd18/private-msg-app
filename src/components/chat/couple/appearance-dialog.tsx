@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useSignedUrl } from "@/hooks/use-signed-url";
+import { CHAT_THEMES, type SharedChatTheme } from "@/lib/chat-experience";
 import { AVATARS_BUCKET } from "@/lib/constants";
 import { removeAvatarFile, uploadAvatarFile } from "@/lib/data/chat";
 import { setChatAppearance } from "@/lib/data/couple";
@@ -32,15 +33,21 @@ export function AppearanceDialog({
   open,
   onOpenChange,
   onChanged,
+  sharedTheme,
+  allowSharedTheme,
+  onSharedChanged,
 }: {
   conversationId: string;
   appearance: ChatAppearance;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onChanged: (next: ChatAppearance) => void;
+  sharedTheme: SharedChatTheme | null;
+  allowSharedTheme: boolean;
+  onSharedChanged: () => Promise<void>;
 }) {
   const { supabase, access, reportError } = useApp();
-  const [busy, setBusy] = useState<"wallpaper" | "color" | null>(null);
+  const [busy, setBusy] = useState<"wallpaper" | "color" | "shared" | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { url: preview } = useSignedUrl(AVATARS_BUCKET, appearance.wallpaper_path);
   // Saves always start from the latest look, so a quick colour change and
@@ -83,6 +90,19 @@ export function AppearanceDialog({
     }
   }
 
+  async function changeSharedTheme(theme: string | null) {
+    setBusy("shared");
+    try {
+      const { error } = await supabase.rpc("set_shared_chat_theme", { p_chat: conversationId, p_theme: theme });
+      if (error) throw error;
+      await onSharedChanged();
+    } catch (error) {
+      reportError(error, "Could not change the shared chat theme.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -93,6 +113,17 @@ export function AppearanceDialog({
           <DialogDescription>Your wallpaper and bubble colour for this chat, on all your devices.</DialogDescription>
         </DialogHeader>
 
+        {allowSharedTheme && <section className="grid gap-2">
+          <h3 className="text-sm font-medium">Shared theme</h3>
+          <p className="text-xs text-muted-foreground">Both people see the same colors and wallpaper. Turn off the shared theme to use your personal appearance.</p>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(CHAT_THEMES).map(([id, name]) => (
+              <Button key={id} size="sm" variant={sharedTheme === id ? "default" : "outline"}
+                aria-pressed={sharedTheme === id} disabled={busy !== null} onClick={() => void changeSharedTheme(id)}>{name}</Button>
+            ))}
+            {sharedTheme && <Button size="sm" variant="ghost" disabled={busy !== null} onClick={() => void changeSharedTheme(null)}>Use personal appearance</Button>}
+          </div>
+        </section>}
         <section className="grid gap-2">
           <h3 className="text-sm font-medium">Wallpaper</h3>
           <div className="flex items-center gap-3">

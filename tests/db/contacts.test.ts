@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { asOwner, asUser, connect, createUser, directConversation, freshEmail, insertAuthUser, send } from "./helpers";
+import { acceptDirectRequest, asOwner, asUser, connect, createUser, directConversation, freshEmail, insertAuthUser, send } from "./helpers";
 
 type Invite = { status: string; user_id: string | null; display_name: string | null };
 const invite = (by: string, email: string, name: string | null = null) =>
@@ -36,7 +36,7 @@ describe("members invite their own contacts", () => {
     await asUser(meenu, "select public.sync_chat_contacts($1, '{}')", [[a.email]]);
     expect(await directory(a.id)).toContain(meenu);
     expect(await directory(meenu)).toEqual([a.id]);
-    await asUser(meenu, "select public.get_or_create_direct_conversation($1)", [a.id]);
+    await acceptDirectRequest(meenu, a.id);
     expect(await asUser(a.id, "select 1 from public.list_my_invitations()")).toHaveLength(0);
   });
 
@@ -110,7 +110,7 @@ describe("people only see their own contacts", () => {
     expect(await asUser(a.id, "select id from public.profiles where id = $1", [b.id])).toHaveLength(1);
     expect(await asUser(a.id, "select id from public.profiles where id = $1", [stranger.id])).toHaveLength(0);
     await expect(
-      asUser(stranger.id, "select public.get_or_create_direct_conversation($1)", [a.id]),
+      asUser(stranger.id, "select public.request_direct_chat($1)", [a.id]),
     ).rejects.toThrow(/Sync this person/);
     await expect(
       asUser(stranger.id, "select public.create_group('x', $1::uuid[])", [[a.id]]),
@@ -134,15 +134,15 @@ describe("people only see their own contacts", () => {
     const admin = await createUser({ role: "admin" });
     const member = await createUser();
     expect(await asUser(admin.id, "select id from public.profiles where id = $1", [member.id])).toHaveLength(1);
-    await expect(asUser(admin.id, "select public.get_or_create_direct_conversation($1)", [member.id])).rejects.toThrow(/Sync this person/);
+    await expect(asUser(admin.id, "select public.request_direct_chat($1)", [member.id])).rejects.toThrow(/Sync this person/);
     await asOwner("update auth.users set phone = '995555123456', phone_confirmed_at = now() where id = $1", [member.id]);
     await asUser(admin.id, "select public.sync_chat_contacts('{}', $1)", [["+995555123456"]]);
     expect(await directory(admin.id)).toEqual([member.id]);
-    const [before] = await asUser(admin.id, "select public.get_or_create_direct_conversation($1)", [member.id]);
+    const before = await acceptDirectRequest(admin.id, member.id);
     await asOwner("update private.contact_sync_state set synced_at = now() - interval '1 minute' where user_id = $1", [admin.id]);
     await asUser(admin.id, "select public.sync_chat_contacts('{}', '{}')");
     expect(await directory(admin.id)).toEqual([]);
-    expect(await asUser(admin.id, "select public.get_or_create_direct_conversation($1)", [member.id])).toEqual([before]);
+    expect(await asUser(admin.id, "select public.get_or_create_direct_conversation($1)", [member.id])).toEqual([{ get_or_create_direct_conversation: before }]);
   });
 });
 

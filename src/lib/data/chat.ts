@@ -77,12 +77,11 @@ export async function deleteChatForMe(supabase: SupabaseClient, conversationId: 
   if (error) throw error;
 }
 
-export async function getOrCreateConversation(supabase: SupabaseClient, otherUserId: string): Promise<string> {
-  const { data, error } = await supabase.rpc("get_or_create_direct_conversation", {
-    p_other_user_id: otherUserId,
-  });
+export async function requestDirectChat(supabase: SupabaseClient, otherUserId: string) {
+  const { data, error } = await supabase.rpc("request_direct_chat", { p_other: otherUserId })
+    .single<{ chat_id: string | null; request_status: "pending" | "accepted" | "incoming" | "declined" }>();
   if (error) throw error;
-  return data as string;
+  return data;
 }
 
 /** Newest-first page of messages older than `before` (keyset pagination). */
