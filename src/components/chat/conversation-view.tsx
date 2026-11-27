@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
+import { CallButtons } from "./call-provider";
 import { Composer, type EditingState, type ReplyingState } from "@/components/chat/composer";
 import { useSharedChatStyle } from "@/hooks/use-shared-chat-style";
 import { ChatSearch } from "@/components/chat/chat-search";
@@ -561,6 +562,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
                 <Skeleton className="h-4 w-24 rounded-full" />
               </div>
             )}
+            {!isGroup && !otherInactive && summary?.other_user_id && <CallButtons chat={conversationId} peer={summary.other_user_id} />}
             {!isGroup && summary && (
               <Button asChild size="icon-sm" variant="ghost" className="shrink-0 text-primary">
                 <Link href={`/chat/${conversationId}/space`} aria-label="Our Space" title="Our Space"><Heart /></Link>

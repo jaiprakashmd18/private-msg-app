@@ -83,3 +83,11 @@ end $$;
 grant usage on schema public to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+
+-- Minimal database-side Broadcast API for the disposable signaling tests.
+create schema realtime;
+create table realtime.messages (extension text, topic text, payload jsonb);
+alter table realtime.messages enable row level security;
+create function realtime.topic() returns text language sql stable as $$ select current_setting('realtime.topic', true) $$;
+create function realtime.send(payload jsonb, event text, topic text, private boolean) returns void
+language sql as $$ insert into realtime.messages values ('broadcast', $3, $1) $$;

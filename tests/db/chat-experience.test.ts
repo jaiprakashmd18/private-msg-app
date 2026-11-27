@@ -55,3 +55,14 @@ it("shares themes and pins with members only and preserves the theme when a mess
   expect(await asUser(b.id, "select theme,pinned_message_id from public.shared_chat_style where conversation_id = $1", [chat]))
     .toEqual([{ theme: "midnight-rose", pinned_message_id: null }]);
 });
+
+it("only signals an active direct-chat peer", async () => {
+  const a = await createUser();
+  const b = await createUser();
+  const outsider = await createUser();
+  const chat = await directConversation(a.id, b.id);
+  const signal = "select public.signal_direct_call($1, gen_random_uuid(), $2)";
+  await asUser(a.id, signal, [chat, "voice"]);
+  await expect(asUser(outsider.id, signal, [chat, "voice"])).rejects.toThrow(/direct chat/);
+  await expect(asUser(a.id, signal, [chat, "other"])).rejects.toThrow(/Invalid call/);
+});
