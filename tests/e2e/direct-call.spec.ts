@@ -38,7 +38,7 @@ for (const scenario of ["voice", "video", "decline"] as const) {
         ` });
       }
       const [a, b] = pages;
-      await a.evaluate((mode: "voice" | "video") => window.call.start("chat", "1", mode), mode);
+      await a.evaluate<void, "voice" | "video">(mode => window.call.start("chat", "1", mode), mode);
       await expect.poll(() => b.evaluate(() => window.call.current?.phase)).toBe("incoming");
       expect(await b.evaluate(() => !!window.call.current?.local)).toBe(false);
       if (scenario === "decline") {
