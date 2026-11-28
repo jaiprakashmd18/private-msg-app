@@ -159,24 +159,32 @@ export async function prepareAvatar(file: File, size = 320): Promise<Blob> {
   }
 }
 
-/** A chat wallpaper: at most 1600 px on the long side, JPEG (well under 2 MB). */
+/** Decode with the browser's photo decoder, then fit the private bucket's 2 MiB limit. */
 export async function prepareWallpaper(file: File, maxSide = 1600): Promise<Blob> {
-  if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
-    throw new Error("Please choose a JPG, PNG or WebP photo.");
-  }
-  const bitmap = await createImageBitmap(file);
+  const url = URL.createObjectURL(file);
   try {
-    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const image = new Image();
+    image.src = url;
+    try {
+      await image.decode();
+    } catch {
+      throw new Error("Please choose a JPG, PNG or WebP copy. This browser could not read that photo.");
+    }
     const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas unavailable");
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return await new Promise((resolve, reject) =>
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Encoding failed"))), "image/jpeg", 0.8),
-    );
+    for (const edge of [maxSide, Math.min(maxSide, 1024)]) {
+      const { width, height } = fit(image.naturalWidth, image.naturalHeight, edge);
+      canvas.width = width;
+      canvas.height = height;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(image, 0, 0, width, height);
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", 0.8));
+      if (blob && blob.size <= 2097152) return blob;
+    }
+    throw new Error("Please choose a smaller photo for your wallpaper.");
   } finally {
-    bitmap.close();
+    URL.revokeObjectURL(url);
   }
 }

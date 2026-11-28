@@ -57,17 +57,21 @@ export function AppearanceDialog({
     latest.current = appearance;
   }, [appearance]);
 
-  async function apply(change: Partial<ChatAppearance>, kind: "wallpaper" | "color") {
-    setBusy(kind);
+  async function save(change: Partial<ChatAppearance>) {
     const before = latest.current;
     const next = { ...before, ...change };
+    await setChatAppearance(supabase, conversationId, next.wallpaper_path, next.bubble_color);
+    latest.current = next;
+    onChanged(next);
+    if (before.wallpaper_path && before.wallpaper_path !== next.wallpaper_path) {
+      await removeAvatarFile(supabase, before.wallpaper_path).catch(() => undefined);
+    }
+  }
+
+  async function apply(change: Partial<ChatAppearance>, kind: "wallpaper" | "color") {
+    setBusy(kind);
     try {
-      await setChatAppearance(supabase, conversationId, next.wallpaper_path, next.bubble_color);
-      latest.current = next;
-      if (before.wallpaper_path && before.wallpaper_path !== next.wallpaper_path) {
-        await removeAvatarFile(supabase, before.wallpaper_path).catch(() => undefined);
-      }
-      onChanged(next);
+      await save(change);
     } catch (err) {
       reportError(err, "Could not change the look of this chat.");
     } finally {
@@ -82,11 +86,12 @@ export function AppearanceDialog({
     try {
       const blob = await prepareWallpaper(file);
       const path = await uploadAvatarFile(supabase, `users/${access.user_id}`, blob);
-      await apply({ wallpaper_path: path }, "wallpaper");
-      toast.success("Wallpaper set");
+      await save({ wallpaper_path: path });
+      toast.success(sharedTheme ? "Wallpaper saved for your personal appearance" : "Wallpaper set");
     } catch (err) {
-      setBusy(null);
       reportError(err, err instanceof Error && err.message.startsWith("Please") ? err.message : "Could not set the wallpaper.");
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -137,7 +142,7 @@ export function AppearanceDialog({
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/*"
                 className="sr-only"
                 aria-label="Choose a wallpaper photo"
                 onChange={(e) => void pickWallpaper(e.target.files?.[0])}
