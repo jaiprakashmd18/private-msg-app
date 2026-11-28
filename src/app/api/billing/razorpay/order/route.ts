@@ -1,5 +1,5 @@
 import { AppError, handleRouteError, logServerError } from "@/lib/errors";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { requireBillingMember } from "@/lib/billing-access.server";
 
 export const runtime = "nodejs";
 
@@ -12,7 +12,7 @@ export const runtime = "nodejs";
  *   RAZORPAY_AMOUNT    price in the smallest unit (paise); default 39900 = ₹399
  *   RAZORPAY_CURRENCY  default INR
  */
-export async function POST() {
+export async function POST(request: Request) {
   try {
     // Key id is public; accept it under either name so the browser and server share one value.
     const keyId = process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
@@ -21,11 +21,7 @@ export async function POST() {
       return Response.json({ ok: false, reason: "not_configured" }, { status: 200 });
     }
 
-    const supabase = await getSupabaseServerClient();
-    const { data } = await supabase.auth.getClaims();
-    const userId = data?.claims?.sub;
-    const email = typeof data?.claims?.email === "string" ? data.claims.email : undefined;
-    if (!userId) throw new AppError("Not signed in", 401, "unauthenticated");
+    const { user_id: userId, email } = await requireBillingMember(request, true);
 
     const amount = Math.max(100, Number(process.env.RAZORPAY_AMOUNT) || 39900);
     const currency = (process.env.RAZORPAY_CURRENCY || "INR").toUpperCase();

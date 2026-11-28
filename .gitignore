@@ -21,3 +21,7 @@ supabase/.branches/
 *.p12
 *.mobileprovision
 android/keystore.properties
+
+# Playwright artifacts
+playwright-report/
+test-results/

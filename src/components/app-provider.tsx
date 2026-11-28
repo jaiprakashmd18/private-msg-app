@@ -11,6 +11,7 @@ interface AppContextValue {
   access: Access;
   settings: AppSettings | null;
   supabase: SupabaseClient;
+  plusPayment: { stripe: boolean; razorpay: boolean };
   /** Shows a toast, or routes to the unauthorized screen if access was revoked. */
   reportError: (error: unknown, fallback?: string) => void;
 }
@@ -20,10 +21,12 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({
   access,
   settings,
+  plusPayment,
   children,
 }: {
   access: Access;
   settings: AppSettings | null;
+  plusPayment: AppContextValue["plusPayment"];
   children: React.ReactNode;
 }) {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
@@ -47,8 +50,8 @@ export function AppProvider({
   }, []);
 
   const value = useMemo(
-    () => ({ access, settings, supabase, reportError }),
-    [access, settings, supabase, reportError],
+    () => ({ access, settings, plusPayment, supabase, reportError }),
+    [access, settings, plusPayment, supabase, reportError],
   );
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

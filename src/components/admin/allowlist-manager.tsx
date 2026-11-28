@@ -18,7 +18,7 @@ import { formatDateTime } from "@/lib/format";
 import { addEmailSchema } from "@/lib/validation";
 import type { AllowlistEntry } from "@/types/app";
 
-export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
+export function AllowlistManager({ entries, plusGrants }: { entries: AllowlistEntry[]; plusGrants: string[] | null }) {
   const { supabase, access, reportError } = useApp();
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -133,7 +133,8 @@ export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
         <CardHeader className="flex-row items-center justify-between gap-4">
           <div>
             <CardTitle>Allowlist</CardTitle>
-            <CardDescription>{entries.length} accounts</CardDescription>
+            <CardDescription>{entries.length} accounts · Grant free Plus gives an active member access without checkout.</CardDescription>
+            {plusGrants === null && <p className="text-sm text-destructive">Manual Plus controls are unavailable. Check the database upgrade.</p>}
           </div>
           <Input
             aria-label="Filter accounts"
@@ -152,6 +153,7 @@ export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
                 const isAdminEntry = n.role === "admin";
                 const isSelf = n.user_id === access.user_id;
                 const busy = busyId === n.id;
+                const hasGrant = Boolean(n.user_id && plusGrants?.includes(n.user_id));
                 return (
                   <li key={n.id} className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center">
                     <div className="min-w-0 flex-1">
@@ -163,6 +165,8 @@ export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
                           <Badge variant="destructive">Disabled</Badge>
                         )}
                         {isAdminEntry && <Badge>Admin</Badge>}
+                        {n.is_plus && <Badge variant="secondary">Plus active</Badge>}
+                        {hasGrant && <Badge variant="outline">Free grant</Badge>}
                         {isSelf && <Badge variant="outline">You</Badge>}
                         {!n.user_id && <Badge variant="outline">Not registered yet</Badge>}
                         {n.password_pending ? (
@@ -181,6 +185,25 @@ export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
                         {n.user_id && <> · Last active {formatDateTime(n.last_seen_at)}</>}
                       </p>
                     </div>
+                    {plusGrants !== null && n.user_id && (n.status === "active" || hasGrant) && (
+                      <ConfirmButton
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        title={hasGrant ? `Remove the free Plus grant for ${n.email}?` : `Grant free Plus to ${n.email}?`}
+                        description={hasGrant ? "Any paid subscription will keep its current access." : "This grants Plus without taking a payment."}
+                        confirmLabel={hasGrant ? "Remove free Plus" : "Grant free Plus"}
+                        onConfirm={() =>
+                          run(
+                            n.id,
+                            async () => await supabase.rpc("admin_set_plus", { p_user_id: n.user_id, p_on: !hasGrant }),
+                            hasGrant ? "Free Plus grant removed" : "Free Plus granted",
+                          )
+                        }
+                      >
+                        <Sparkles /> {hasGrant ? "Remove free Plus" : "Grant free Plus"}
+                      </ConfirmButton>
+                    )}
                     {isAdminEntry ? (
                       <p className="max-w-60 text-xs text-muted-foreground">
                         Administrator entries can only be changed by the database owner (SQL).
@@ -275,22 +298,6 @@ export function AllowlistManager({ entries }: { entries: AllowlistEntry[] }) {
                           >
                             <LogOut /> Sign out
                           </ConfirmButton>
-                        )}
-                        {n.user_id && n.status === "active" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() =>
-                              run(
-                                n.id,
-                                async () => await supabase.rpc("admin_set_plus", { p_user_id: n.user_id, p_on: !n.is_plus }),
-                                n.is_plus ? "Plus removed" : "Plus granted",
-                              )
-                            }
-                          >
-                            <Sparkles className={n.is_plus ? "text-primary" : undefined} /> {n.is_plus ? "Remove Plus" : "Grant Plus"}
-                          </Button>
                         )}
                         <ConfirmButton
                           size="sm"

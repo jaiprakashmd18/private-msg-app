@@ -34,6 +34,7 @@ interface PushTarget {
   p256dh: string;
   auth: string;
   show_preview: boolean;
+  privacy_mode?: "full" | "sender" | "private";
   conversation_id: string;
   conversation_kind?: "direct" | "group";
   conversation_title?: string | null;
@@ -67,6 +68,9 @@ export interface PushPayload {
 export function buildPayload(t: Omit<PushTarget, "endpoint" | "p256dh" | "auth">): PushPayload {
   const url = `/chat/${t.conversation_id}`;
   const sender = t.sender_name || "Someone";
+  if (t.privacy_mode === "private") return { title: "New message", body: "", url, tag: `message-${t.conversation_id}` };
+  if (t.privacy_mode === "sender") return { title: sender, body: "New message", url, tag: `message-${t.conversation_id}` };
+  if (t.privacy_mode === "full") t = { ...t, show_preview: true };
   if (t.event?.type === "nudge") {
     const tap = tapFor(t.event.kind);
     return { title: sender, body: tap.notification, url, tag: `nudge-${t.conversation_id}`, vibrate: [120, 60, 120, 60, 240] };
@@ -174,6 +178,19 @@ export async function notifyNewMessage(
   if (error) throw error;
   const targets = (data ?? []) as PushTarget[];
   if (targets.length === 0) return 0;
+
+  const { data: preferences, error: preferencesError } = await service.rpc("server_notification_modes", {
+    p_endpoints: targets.map((target) => target.endpoint),
+  });
+  // Rollouts can briefly have a newer app than database. Use minimal push
+  // content whenever preferences cannot be read.
+  const byEndpoint = new Map<string, PushTarget["privacy_mode"]>(
+    (preferences ?? []).map((row: Pick<PushTarget, "endpoint"> & { mode: PushTarget["privacy_mode"] }) => [row.endpoint, row.mode]),
+  );
+  for (const target of targets) {
+    target.privacy_mode = preferencesError ? "private" : byEndpoint.get(target.endpoint);
+  }
+
 
   const web = targets.filter((t) => !isNativeEndpoint(t.endpoint));
   const phones = targets.filter((t) => isNativeEndpoint(t.endpoint));

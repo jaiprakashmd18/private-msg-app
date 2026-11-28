@@ -35,6 +35,10 @@ export default function PrivacyPage() {
             </li>
             <li>Your conversations, messages, attachments, and when messages were delivered and read.</li>
             <li>
+              If you sync or import contacts, Loveline checks the selected email addresses and phone numbers against
+              verified member accounts. It keeps the account matches and the time of your last sync.
+            </li>
+            <li>
               If you use them: special dates, your shared list, love notes waiting to be sent (only you can see those
               until they&apos;re delivered) and your chat wallpaper and colour. View-once photos are deleted after
               they&apos;re opened. The app lock PIN never leaves your device. Your answer to the question of the day is

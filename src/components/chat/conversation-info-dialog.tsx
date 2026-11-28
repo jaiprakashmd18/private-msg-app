@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { conversationName } from "@/components/chat/conversation-list";
 import { useChat } from "@/components/chat/chat-provider";
 import { PhotoEditor } from "@/components/photo-editor";
 import { Avatar } from "@/components/ui/avatar";
@@ -82,12 +83,40 @@ export function ConversationInfoDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {isGroup ? <Users className="size-5" aria-hidden /> : null}
-            {isGroup ? summary.title : displayNameOf(summary.other_display_name, summary.other_email)}
+            {conversationName(summary)}
           </DialogTitle>
           <DialogDescription>
             {isGroup ? `Group · ${members.length} member${members.length === 1 ? "" : "s"}` : summary.other_email}
           </DialogDescription>
         </DialogHeader>
+
+        {!isGroup && summary.other_user_id && (
+          <div className="grid gap-3 rounded-xl border p-3">
+            <div>
+              <h3 className="font-semibold">Shared nicknames</h3>
+              <p className="text-sm text-muted-foreground">Both people in this chat can see and edit these names.</p>
+            </div>
+            {[
+              { id: access.user_id, label: "Your nickname" },
+              { id: summary.other_user_id, label: "Their nickname" },
+            ].map(({ id, label }) => (
+              <form key={id + (summary.nicknames?.[id] ?? "")} className="flex flex-wrap items-end gap-2" onSubmit={(event) => {
+                event.preventDefault();
+                const value = new FormData(event.currentTarget).get("nickname");
+                void run(id, async () => {
+                  const { error } = await supabase.rpc("set_chat_nickname", { p_chat: summary.id, p_user: id, p_nickname: value });
+                  if (error) throw error;
+                }, "Nickname updated");
+              }}>
+                <label className="grid min-w-0 flex-1 gap-1 text-sm">
+                  {label}
+                  <Input name="nickname" maxLength={40} defaultValue={summary.nicknames?.[id] ?? ""} placeholder="Leave blank to clear" />
+                </label>
+                <Button type="submit" size="sm" disabled={busy !== null}>Save</Button>
+              </form>
+            ))}
+          </div>
+        )}
 
         {amAdmin && (
           <PhotoEditor

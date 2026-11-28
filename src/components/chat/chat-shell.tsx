@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { ChatProvider } from "@/components/chat/chat-provider";
+import { CallProvider } from "./call-provider";
 import { Sidebar } from "@/components/chat/sidebar";
 import { cn } from "@/lib/utils";
 
@@ -19,20 +20,22 @@ export function ChatShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ChatProvider>
-      <div className="app-shell flex overflow-hidden bg-grouped pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] split:gap-3 split:p-3">
-        <aside
-          aria-label="Conversations"
-          className={cn(
-            "w-full shrink-0 flex-col bg-sidebar split:flex split:w-[308px] split:overflow-hidden split:rounded-[1.5rem] split:border lg:w-[352px]",
-            inConversation ? "hidden" : "flex",
-          )}
-        >
-          <Sidebar />
-        </aside>
-        <main id="main" className={cn("min-w-0 flex-1 flex-col overflow-hidden bg-background split:rounded-[1.5rem] split:border", inConversation ? "flex" : "hidden split:flex")}>
-          {children}
-        </main>
-      </div>
+      <CallProvider>
+        <div className="app-shell flex overflow-hidden bg-grouped pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] split:gap-3 split:p-3">
+          <aside
+            aria-label="Conversations"
+            className={cn(
+              "w-full shrink-0 flex-col bg-sidebar split:flex split:w-[308px] split:overflow-hidden split:rounded-[1.5rem] split:border lg:w-[352px]",
+              inConversation ? "hidden" : "flex",
+            )}
+          >
+            <Sidebar />
+          </aside>
+          <main id="main" className={cn("min-w-0 flex-1 flex-col overflow-hidden bg-background split:rounded-[1.5rem] split:border", inConversation ? "flex" : "hidden split:flex")}>
+            {children}
+          </main>
+        </div>
+      </CallProvider>
     </ChatProvider>
   );
 }

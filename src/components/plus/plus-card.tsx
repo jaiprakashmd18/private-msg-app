@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
+import { GiftCode } from "@/components/plus/gift-code";
 import { PlusDialog } from "@/components/plus/plus-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,8 +13,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { formatDateTime } from "@/lib/format";
 import { isNativeApp } from "@/lib/native";
-import { PLUS_NAME, STRIPE_ENABLED, startSubscribe } from "@/lib/plus";
-import { payWithRazorpay, RAZORPAY_ENABLED } from "@/lib/razorpay";
+import { PLUS_NAME, startSubscribe } from "@/lib/plus";
+import { payWithRazorpay } from "@/lib/razorpay";
 import type { SubscriptionState } from "@/types/app";
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -26,7 +27,7 @@ const SOURCE_LABEL: Record<string, string> = {
 
 /** Settings card: your Loveline Plus status, and a Subscribe / Manage button. */
 export function PlusCard() {
-  const { supabase, access } = useApp();
+  const { supabase, access, plusPayment } = useApp();
   const router = useRouter();
   const [sub, setSub] = useState<SubscriptionState | null>(null);
   const [open, setOpen] = useState(false);
@@ -171,43 +172,54 @@ export function PlusCard() {
               {sub.source ? ` (via ${SOURCE_LABEL[sub.source] ?? sub.source})` : ""}.
             </p>
             <p className="text-muted-foreground">
-              {sub.cancel_at_period_end && sub.current_period_end
+              {(sub.source === "admin" || sub.cancel_at_period_end) && sub.current_period_end
                 ? `Ends on ${formatDateTime(sub.current_period_end)}.`
                 : sub.current_period_end
                   ? `Renews on ${formatDateTime(sub.current_period_end)}.`
                   : "No end date."}
             </p>
-            <p className="text-xs text-muted-foreground">
-              To change or cancel, use the store you subscribed through (App Store / Google Play), the Stripe email receipt,
-              or ask the administrator.
-            </p>
+            {sub.source === "admin" && (
+              <p className="text-xs text-muted-foreground">An administrator can manage this free grant.</p>
+            )}
+            {(sub.source === "stripe" || sub.source === "apple" || sub.source === "google") && (
+              <p className="text-xs text-muted-foreground">
+                Manage your subscription through the original checkout provider.
+              </p>
+            )}
           </>
         ) : (
           <>
             <p className="text-muted-foreground">
-              You&apos;re on the free plan. Unlock the couple pack for both of you — one payment, forever.
+              You&apos;re on the free plan. One partner’s Plus access unlocks the couple pack for both.
             </p>
             <div className="flex flex-wrap gap-2">
-              {canPayHere && RAZORPAY_ENABLED && (
+              {canPayHere && plusPayment.razorpay && (
                 <Button onClick={() => void payRazorpay()} disabled={busy !== null}>
-                  {busy === "rz" ? <Spinner /> : <Smartphone />} Pay with UPI / Google Pay
+                  {busy === "rz" ? <Spinner /> : <Smartphone />} Pay once with UPI / Google Pay
                 </Button>
               )}
-              {canPayHere && STRIPE_ENABLED && (
+              {canPayHere && plusPayment.stripe && (
                 <Button
-                  variant={RAZORPAY_ENABLED ? "outline" : "default"}
+                  variant={plusPayment.razorpay ? "outline" : "default"}
                   onClick={() => void subscribe()}
                   disabled={busy !== null}
                 >
-                  {busy === "stripe" ? <Spinner /> : <CreditCard />} Pay by card
+                  {busy === "stripe" ? <Spinner /> : <CreditCard />} Subscribe by card
                 </Button>
               )}
               <Button variant="ghost" onClick={() => setOpen(true)}>
                 <Sparkles /> See what&apos;s included
               </Button>
             </div>
+            <p className="text-sm text-muted-foreground">
+              {!canPayHere ? "Open Loveline in your browser to see payment options. " :
+                !plusPayment.razorpay && !plusPayment.stripe ? "Online checkout is currently unavailable. " :
+                  "Checkout shows the price and billing terms. "}
+              An administrator can also grant Plus for free.
+            </p>
           </>
         )}
+        <GiftCode />
       </CardContent>
       <PlusDialog open={open} onOpenChange={setOpen} />
     </Card>

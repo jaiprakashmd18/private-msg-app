@@ -1,6 +1,7 @@
+import { parseStripeCheckoutConfirmation } from "@/lib/billing.server";
 import { AppError, handleRouteError, logServerError } from "@/lib/errors";
 import { getSupabaseServiceClient } from "@/lib/supabase/admin";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { requireBillingMember } from "@/lib/billing-access.server";
 
 export const runtime = "nodejs";
 
@@ -19,46 +20,35 @@ export async function POST(request: Request) {
     const secret = process.env.STRIPE_SECRET_KEY;
     if (!secret) return Response.json({ ok: false, reason: "not_configured" }, { status: 200 });
 
-    const supabase = await getSupabaseServerClient();
-    const { data: claims } = await supabase.auth.getClaims();
-    const userId = claims?.claims?.sub;
-    if (!userId) throw new AppError("Not signed in", 401, "unauthenticated");
+    const { user_id: userId } = await requireBillingMember(request);
 
     const body = (await request.json().catch(() => ({}))) as { sessionId?: unknown };
     const sessionId = typeof body.sessionId === "string" ? body.sessionId : "";
     // Stripe Checkout Session ids look like cs_test_... / cs_live_... .
     if (!/^cs_[A-Za-z0-9_]+$/.test(sessionId)) throw new AppError("Bad session", 400, "bad_request");
 
-    const res = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
+    const res = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}?expand[]=subscription`, {
       headers: { authorization: `Bearer ${secret}` },
     });
-    const session = (await res.json()) as {
-      payment_status?: string;
-      status?: string;
-      client_reference_id?: string;
-      customer?: string;
-      subscription?: string;
-      error?: { message?: string };
-    };
+    const session = (await res.json()) as Record<string, unknown>;
     if (!res.ok) {
       logServerError("billing/confirm", session.error ?? { status: res.status });
       throw new AppError("Could not verify payment", 502, "stripe_error");
     }
 
-    // Only the person who started this exact checkout, and only once it is paid.
-    const paid = session.payment_status === "paid" || session.status === "complete";
-    if (session.client_reference_id !== userId || !paid) {
-      return Response.json({ ok: true, is_plus: false, pending: true });
+    const update = parseStripeCheckoutConfirmation(session, userId);
+    if (!update) {
+      return Response.json({ ok: true, is_plus: false, pending: true }, { headers: { "cache-control": "no-store" } });
     }
 
     const { error } = await getSupabaseServiceClient().rpc("server_apply_subscription", {
-      p_user_id: userId,
-      p_source: "stripe",
-      p_status: "active",
-      p_current_period_end: null,
-      p_external_customer: typeof session.customer === "string" ? session.customer : null,
-      p_external_sub: typeof session.subscription === "string" ? session.subscription : null,
-      p_cancel_at_period_end: false,
+      p_user_id: update.userId,
+      p_source: update.source,
+      p_status: update.status,
+      p_current_period_end: update.currentPeriodEnd,
+      p_external_customer: update.externalCustomer,
+      p_external_sub: update.externalSub,
+      p_cancel_at_period_end: update.cancelAtPeriodEnd,
     });
     if (error) throw error;
 

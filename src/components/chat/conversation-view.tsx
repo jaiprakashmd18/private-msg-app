@@ -28,8 +28,11 @@ import { toast } from "sonner";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
+import { CallButtons } from "./call-provider";
 import { Composer, type EditingState, type ReplyingState } from "@/components/chat/composer";
+import { useSharedChatStyle } from "@/hooks/use-shared-chat-style";
 import { ChatSearch } from "@/components/chat/chat-search";
+import { conversationName } from "@/components/chat/conversation-list";
 import { ConversationInfoDialog } from "@/components/chat/conversation-info-dialog";
 import { AppearanceDialog } from "@/components/chat/couple/appearance-dialog";
 import { DailyQuestionDialog, dailyQuestionStatus } from "@/components/chat/couple/daily-question";
@@ -198,6 +201,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const { rows: dailyAnswers, reload: reloadDaily } = useLiveRows<DailyAnswer>("daily_answers", conversationId, () =>
     listDailyAnswers(supabase, conversationId, today),
   );
+  const shared = useSharedChatStyle(conversationId);
   const [appearance, setAppearance] = useState<ChatAppearance>({ wallpaper_path: null, bubble_color: null });
   const [burst, setBurst] = useState(0);
   const { url: wallpaperUrl } = useSignedUrl(AVATARS_BUCKET, appearance.wallpaper_path);
@@ -337,7 +341,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
     if (lastMessage?.sender_id) clearUser(lastMessage.sender_id);
   }, [lastMessage?.id, lastMessage?.sender_id, clearUser]);
 
-  const title = isGroup ? (summary?.title ?? "Group") : displayNameOf(summary?.other_display_name, summary?.other_email);
+  const title = summary ? conversationName(summary) : displayNameOf(null, null);
   const editWindowMs = (settings?.edit_window_minutes ?? 15) * 60_000;
   const otherInactive = summary?.kind === "direct" ? !summary.other_is_active : false;
 
@@ -479,8 +483,8 @@ export function ConversationView({ conversationId }: { conversationId: string })
 
   return (
     <>
-      <div className={cn("conversation-canvas relative flex min-h-0 flex-1 flex-col", appearance.bubble_color && `bubble-${appearance.bubble_color}`)}>
-        {wallpaperUrl && (
+      <div className={cn("conversation-canvas relative flex min-h-0 flex-1 flex-col", shared.theme ? `chat-theme-${shared.theme}` : appearance.bubble_color ? `bubble-${appearance.bubble_color}` : !appearance.wallpaper_path && "chat-theme-midnight-rose")}>
+        {!shared.theme && wallpaperUrl && (
           <div
             aria-hidden
             className="absolute inset-0 bg-cover bg-center"
@@ -557,6 +561,12 @@ export function ConversationView({ conversationId }: { conversationId: string })
                 <Skeleton className="size-11 rounded-full" />
                 <Skeleton className="h-4 w-24 rounded-full" />
               </div>
+            )}
+            {!isGroup && !otherInactive && summary?.other_user_id && <CallButtons chat={conversationId} peer={summary.other_user_id} />}
+            {!isGroup && summary && (
+              <Button asChild size="icon-sm" variant="ghost" className="shrink-0 text-primary">
+                <Link href={`/chat/${conversationId}/space`} aria-label="Our Space" title="Our Space"><Heart /></Link>
+              </Button>
             )}
             <div className="shrink-0">
               {summary && (
@@ -670,6 +680,13 @@ export function ConversationView({ conversationId }: { conversationId: string })
               )}
             </div>
           </div>
+        {shared.pin && (
+          <button type="button" onClick={() => setJumpTarget(shared.pin!.id)}
+            className="mx-3 mb-2 flex w-[calc(100%-1.5rem)] min-w-0 items-center gap-2 rounded-xl border bg-muted px-3 py-2 text-left text-sm">
+            <span className="shrink-0 font-semibold text-primary">Pinned</span>
+            <span className="truncate">{shared.pin.body || "Open pinned media"}</span>
+          </button>
+        )}
         {searching && (
           <ChatSearch
             conversationId={conversationId}
@@ -803,6 +820,23 @@ export function ConversationView({ conversationId }: { conversationId: string })
                         onDelete={() => setConfirmDelete(m.id)}
                         onRetry={() => retry(m.client_id)}
                         onDiscard={() => discard(m.client_id)}
+                        onSaveMemory={!isGroup && !m.deleted_at && !m.local_status && !m.attachments?.some((file) => file.view_once) ? () =>
+                          requirePlus("Saved memories", () => {
+                            void supabase.rpc("set_couple_memory", { p_chat: conversationId, p_message: m.id, p_action: "save" })
+                              .then(({ error }) => {
+                                if (error) reportError(error, "Could not save this memory.");
+                                else toast.success("Saved to Our Space");
+                              });
+                          }) : undefined}
+                        pinned={shared.pin?.id === m.id}
+                        onPin={!m.deleted_at && !m.local_status && !m.attachments?.some((file) => file.view_once) ? () => {
+                          void supabase.rpc("pin_chat_message", {
+                            p_chat: conversationId, p_message: m.id, p_pin: shared.pin?.id !== m.id,
+                          }).then(({ error }) => {
+                            if (error) reportError(error, "Could not update the pinned message.");
+                            else void shared.refresh();
+                          });
+                        } : undefined}
                         onReply={() => {
                           setEditing(null);
                           setReplyingTo(m);
@@ -919,6 +953,9 @@ export function ConversationView({ conversationId }: { conversationId: string })
       <AppearanceDialog
         conversationId={conversationId}
         appearance={appearance}
+        sharedTheme={shared.theme}
+        allowSharedTheme={!isGroup}
+        onSharedChanged={shared.refresh}
         open={panel === "look"}
         onOpenChange={(o) => setPanel(o ? "look" : null)}
         onChanged={setAppearance}

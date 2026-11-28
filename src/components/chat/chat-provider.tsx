@@ -123,6 +123,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "conversation_members" }, () => {
         scheduleRefresh();
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_nicknames" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "direct_message_requests" }, scheduleRefresh)
       // "Subscribed to PostgreSQL" arrives a moment after SUBSCRIBED; changes made
       // in between are only caught by refreshing once the feed is really live.
       .on("system", {}, (payload: { extension?: string; status?: string }) => {

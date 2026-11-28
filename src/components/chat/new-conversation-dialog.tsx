@@ -2,7 +2,7 @@
 
 import { ArrowLeft, Check, Copy, Mail, Share2, UserPlus, Users, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
 import { useChat } from "@/components/chat/chat-provider";
@@ -16,12 +16,13 @@ import { Spinner } from "@/components/ui/spinner";
 import {
   cancelInvitation,
   createGroup,
-  getOrCreateConversation,
+  requestDirectChat,
   type InviteResult,
   inviteContact,
   listDirectory,
   listMyInvitations,
 } from "@/lib/data/chat";
+import { normalizeContactDetails, readVCard, type ContactDetails } from "@/lib/contact-sync";
 import { displayNameOf } from "@/lib/format";
 import { isNativeApp } from "@/lib/native";
 import { cn } from "@/lib/utils";
@@ -60,7 +61,7 @@ export function NewConversationDialog({
               ? "Name the group and choose who's in it."
               : mode === "invite"
                 ? "Add their email. They can sign in straight away and you'll see each other in your contacts."
-                : "Choose one of your contacts, or invite someone new."}
+                : "Open an existing chat, send a message request, or invite someone new."}
           </DialogDescription>
         </DialogHeader>
         {/* Mounted only while open, so each opening starts with fresh state. */}
@@ -97,6 +98,37 @@ function PeoplePicker({
   const [pending, setPending] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [groupName, setGroupName] = useState("");
+  const importInput = useRef<HTMLInputElement>(null);
+  const [canPickContacts, setCanPickContacts] = useState(false);
+
+  useEffect(() => {
+    Promise.resolve().then(() => setCanPickContacts("contacts" in navigator));
+  }, []);
+
+  async function syncContacts(readContacts: () => Promise<ContactDetails[]>) {
+    setPending("sync");
+    try {
+      const { emails, phones } = normalizeContactDetails(await readContacts());
+      if (emails.length + phones.length === 0) {
+        toast.info("Choose contacts with emails or numbers that include the country code.");
+        return;
+      }
+      if (emails.length + phones.length > 2000) {
+        toast.error("Choose up to 2,000 email addresses and phone numbers.");
+        return;
+      }
+      const { data, error } = await supabase.rpc("sync_chat_contacts", { p_emails: emails, p_phones: phones });
+      if (error) throw error;
+      setSelected(new Set());
+      setPeople(await listDirectory(supabase));
+      toast.success(`${data} Loveline contacts matched`);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      reportError(error, "Could not sync contacts.");
+    } finally {
+      setPending(null);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -120,7 +152,14 @@ function PeoplePicker({
   async function start(person: DirectoryEntry) {
     setPending(person.id);
     try {
-      await open(await getOrCreateConversation(supabase, person.id));
+      const request = await requestDirectChat(supabase, person.id);
+      if (request.chat_id) await open(request.chat_id);
+      else if (request.request_status === "incoming") toast.info("They already sent you a request. Open Message requests to respond.");
+      else if (request.request_status === "declined") toast.info("This message request was declined.");
+      else {
+        toast.success("Message request sent. The chat opens after they accept.");
+        onDone();
+      }
     } catch (err) {
       reportError(err, "Could not start the conversation.");
     } finally {
@@ -164,6 +203,21 @@ function PeoplePicker({
         onChange={(e) => setFilter(e.target.value)}
         autoFocus={mode === "chat"}
       />
+      <div className="flex flex-wrap gap-2">
+        {canPickContacts && <Button type="button" variant="outline" disabled={pending !== null} onClick={() => {
+          const picker = (navigator as Navigator & { contacts: { select: (fields: string[], options: { multiple: boolean }) => Promise<ContactDetails[]> } }).contacts;
+          void syncContacts(() => picker.select(["email", "tel"], { multiple: true }));
+        }}>Sync phone contacts</Button>}
+        <Button type="button" variant="outline" disabled={pending !== null} onClick={() => importInput.current?.click()}>Import contacts (.vcf)</Button>
+        <input ref={importInput} type="file" accept=".vcf,text/vcard,text/x-vcard" className="hidden" onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (!file) return;
+          if (file.size > 2_000_000) { toast.error("Choose a vCard file smaller than 2 MB."); return; }
+          void syncContacts(async () => [readVCard(await file.text())]);
+        }} />
+      </div>
+      <p className="text-xs text-muted-foreground">Sync replaces your previous contact matches. Loveline keeps only matched accounts.</p>
       <div className="-mx-2 min-h-24 overflow-y-auto">
         {mode === "chat" && !needle && (
           <button
@@ -197,7 +251,7 @@ function PeoplePicker({
           </div>
         ) : visible.length === 0 ? (
           <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-            {people.length === 0 ? "No contacts yet. Tap “Invite someone” to add people by email." : "No matches."}
+            {people.length === 0 ? "No matching contacts yet. Sync or import your contacts, or invite someone by email." : "No matches."}
           </p>
         ) : (
           <ul className="space-y-0.5" aria-label={mode === "group" ? "Choose group members" : "Contacts"}>
@@ -340,8 +394,7 @@ function InviteForm({ onDone }: { onDone: () => void }) {
         <div role="status" className="grid gap-3 rounded-2xl bg-primary/10 p-4 text-sm">
           {result.status === "connected" ? (
             <p>
-              <strong>{result.display_name ?? result.email}</strong> is already on Loveline — you&apos;re now contacts. Find
-              them in your contacts list.
+              <strong>{result.display_name ?? result.email}</strong> is already on Loveline. Sync or import your contacts to find them in New chat.
             </p>
           ) : (
             <>

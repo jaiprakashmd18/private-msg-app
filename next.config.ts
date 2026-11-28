@@ -6,7 +6,7 @@ const supabaseWs = supabaseOrigin.replace(/^http/, "ws");
 
 // Razorpay Checkout (UPI / Google Pay / cards) loads a script and opens an
 // iframe, so its origins are allowed in the CSP only when Razorpay is turned on.
-const rzpOn = Boolean(process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID);
+const rzpOn = Boolean((process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID) && process.env.RAZORPAY_KEY_SECRET);
 const rzp = rzpOn ? "https://*.razorpay.com" : "";
 const rzpScript = rzpOn ? "https://checkout.razorpay.com" : "";
 

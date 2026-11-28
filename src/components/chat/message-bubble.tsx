@@ -2,6 +2,7 @@
 
 import {
   AlertCircle,
+  Bookmark,
   Check,
   CheckCheck,
   Clock,
@@ -9,6 +10,7 @@ import {
   Mic,
   MoreHorizontal,
   Pencil,
+  Pin,
   Reply,
   RotateCw,
   Trash2,
@@ -19,6 +21,8 @@ import { toast } from "sonner";
 import { MessageAttachments } from "@/components/chat/attachment-view";
 import { LinkifiedText, LinkPreviewCard } from "@/components/chat/link-preview";
 import { LocationCard } from "@/components/chat/location-card";
+import { SongCard } from "@/components/chat/song-card";
+import { parseSongLink } from "@/lib/chat-experience";
 import { Sticker } from "@/components/chat/sticker";
 import {
   DropdownMenu,
@@ -174,6 +178,9 @@ export function MessageBubble({
   onRetry,
   onDiscard,
   onReply,
+  onSaveMemory,
+  onPin,
+  pinned,
   onReact,
   onOpenImage,
   onJumpTo,
@@ -195,11 +202,15 @@ export function MessageBubble({
   onRetry: () => void;
   onDiscard: () => void;
   onReply: () => void;
+  onSaveMemory?: () => void;
+  onPin?: () => void;
+  pinned?: boolean;
   onReact: (emoji: string) => void;
   onOpenImage: (attachmentId: string) => void;
   onJumpTo: (messageId: string) => void;
 }) {
   const deleted = Boolean(message.deleted_at);
+  const song = parseSongLink(message.body);
   const special = !deleted && Boolean(message.sticker || message.gif);
   // One to three emoji on their own are shown big, without a bubble.
   const bigEmoji =
@@ -378,6 +389,8 @@ export function MessageBubble({
                   <GifImage gif={message.gif} />
                 ) : sharedLocation ? (
                   <LocationCard location={sharedLocation} mine={mine} />
+                ) : song ? (
+                  <SongCard song={song} />
                 ) : bigEmoji ? (
                   <p className="text-5xl leading-tight" aria-label={message.body}>
                     {message.body}
@@ -449,6 +462,8 @@ export function MessageBubble({
                 <DropdownMenuItem onSelect={onReply}>
                   <Reply /> Reply
                 </DropdownMenuItem>
+                {onPin && <DropdownMenuItem onSelect={onPin}><Pin /> {pinned ? "Unpin message" : "Pin message"}</DropdownMenuItem>}
+                {onSaveMemory && <DropdownMenuItem onSelect={onSaveMemory}><Bookmark /> {song ? "Save song to Our Space" : "Save to Memories"}</DropdownMenuItem>}
                 {message.body && !special && (
                   <DropdownMenuItem
                     onSelect={() => {
